@@ -57,25 +57,26 @@ function getGridData() {
   const events = eventRows.slice(1).map((row) => ({
     eventId: row[0],
     activity: row[1],
+    person: String(row[2]),
     date: Utilities.formatDate(
-      new Date(row[2]),
+      new Date(row[3]),
       "Australia/Brisbane",
       "dd MMM yyyy",
     ),
     startTime: Utilities.formatDate(
-      new Date(row[3]),
-      "Australia/Brisbane",
-      "HH:mm",
-    ),
-    endTime: Utilities.formatDate(
       new Date(row[4]),
       "Australia/Brisbane",
       "HH:mm",
     ),
-    location: row[5],
-    maxSlots: row[6],
+    endTime: Utilities.formatDate(
+      new Date(row[5]),
+      "Australia/Brisbane",
+      "HH:mm",
+    ),
+    location: row[6],
+    maxSlots: row[7],
     signups: signupsMap[row[0]] || [],
-    remaining: row[6] - (signupsMap[row[0]] ? signupsMap[row[0]].length : 0),
+    remaining: row[7] - (signupsMap[row[0]] ? signupsMap[row[0]].length : 0),
   }));
 
   // Get unique sorted time slots and activities
@@ -131,7 +132,7 @@ function submitSignup(eventId, name, cls) {
     const eventRows = eventsSheet.getDataRange().getValues();
     const eventRow = eventRows.find((r) => r[0] == eventId);
     if (!eventRow) return { success: false, message: "Event not found." };
-    const maxSlots = eventRow[5];
+    const maxSlots = eventRow[7];
 
     const signupRows = signupsSheet.getDataRange().getValues();
     const existing = signupRows.slice(1).filter((r) => r[1] == eventId);
