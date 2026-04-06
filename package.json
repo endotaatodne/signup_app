@@ -1,0 +1,8 @@
+{
+    "name": "signup-app",
+    "version": "0.0.1",
+    "description": "A free open source signup app built on Google Apps Script",
+    "author": "endotaatodne",
+    "license": "MIT",
+    "homepage": "https://github.com/endotaatodne/signup-app"
+}

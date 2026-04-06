@@ -1,0 +1,424 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Signup App</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+        background: #f5f5f5;
+        color: #333;
+      }
+      h1 {
+        font-size: 1.4em;
+        margin-bottom: 1.2rem;
+        color: #222;
+      }
+
+      /* Grid */
+      .grid-wrapper {
+        overflow-x: auto;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        min-width: 400px;
+        background: white;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+      }
+      th {
+        background: #f0f0f0;
+        padding: 10px 14px;
+        font-size: 13px;
+        font-weight: 600;
+        text-align: center;
+        border: 1px solid #e0e0e0;
+      }
+      th.time-header {
+        text-align: left;
+      }
+      td {
+        padding: 8px 10px;
+        border: 1px solid #e0e0e0;
+        vertical-align: top;
+      }
+      td.time-cell {
+        font-size: 12px;
+        font-weight: 600;
+        color: #666;
+        white-space: nowrap;
+        background: #fafafa;
+      }
+
+      /* Slot cells */
+      .slot {
+        border-radius: 6px;
+        padding: 7px 9px;
+        cursor: pointer;
+        transition: opacity 0.15s;
+      }
+      .slot:hover {
+        opacity: 0.85;
+      }
+      .slot-available {
+        background: #e8f5e9;
+      }
+      .slot-full {
+        background: #f0f0f0;
+        cursor: default;
+      }
+      .slot-empty {
+        background: none;
+        cursor: default;
+      }
+      .slot-spots {
+        font-size: 11px;
+        font-weight: 600;
+        color: #2e7d32;
+      }
+      .slot-full-text {
+        font-size: 11px;
+        color: #999;
+      }
+      .slot-names {
+        font-size: 10px;
+        color: #555;
+        margin-top: 3px;
+        line-height: 1.4;
+      }
+
+      /* Modal */
+      .modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.45);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+      }
+      .modal-overlay.active {
+        display: flex;
+      }
+      .modal {
+        background: white;
+        border-radius: 12px;
+        padding: 24px;
+        width: 90%;
+        max-width: 380px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+      }
+      .modal-title {
+        font-size: 15px;
+        font-weight: 600;
+        margin-bottom: 4px;
+      }
+      .modal-subtitle {
+        font-size: 12px;
+        color: #888;
+        margin-bottom: 16px;
+      }
+      .modal input {
+        width: 100%;
+        padding: 10px 12px;
+        font-size: 14px;
+        border: 1px solid #ddd;
+        border-radius: 7px;
+        margin-bottom: 10px;
+        outline: none;
+      }
+      .modal input:focus {
+        border-color: #4caf50;
+      }
+      .modal-btn {
+        width: 100%;
+        padding: 11px;
+        font-size: 14px;
+        font-weight: 600;
+        background: #4caf50;
+        color: white;
+        border: none;
+        border-radius: 7px;
+        cursor: pointer;
+        margin-top: 4px;
+      }
+      .modal-btn:disabled {
+        background: #aaa;
+        cursor: not-allowed;
+      }
+      .modal-cancel {
+        width: 100%;
+        padding: 9px;
+        font-size: 13px;
+        color: #888;
+        background: none;
+        border: none;
+        cursor: pointer;
+        margin-top: 6px;
+      }
+      .modal-message {
+        font-size: 13px;
+        padding: 8px 10px;
+        border-radius: 6px;
+        margin-top: 8px;
+      }
+      .modal-message.success {
+        background: #e8f5e9;
+        color: #2e7d32;
+      }
+      .modal-message.error {
+        background: #fdecea;
+        color: #c62828;
+      }
+
+      /* Names list in modal */
+      .names-section {
+        margin-bottom: 14px;
+      }
+      .names-label {
+        font-size: 11px;
+        color: #888;
+        margin-bottom: 6px;
+      }
+      .names-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+      }
+      .name-chip {
+        font-size: 11px;
+        padding: 3px 9px;
+        background: #f0f0f0;
+        border-radius: 20px;
+        color: #444;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>補習校祭りボランティア</h1>
+    <div class="grid-wrapper">
+      <table id="grid"></table>
+    </div>
+
+    <div class="modal-overlay" id="modalOverlay">
+      <div class="modal">
+        <div class="modal-title" id="modalTitle"></div>
+        <div class="modal-subtitle" id="modalSubtitle"></div>
+        <div class="names-section" id="namesSection" style="display: none">
+          <div class="names-label">Already signed up:</div>
+          <div class="names-chips" id="namesChips"></div>
+        </div>
+        <input type="text" id="inputName" placeholder="保護者名" />
+        <input type="text" id="inputClass" placeholder="クラス" />
+        <input
+          type="text"
+          id="honeypot"
+          name="website"
+          autocomplete="off"
+          tabindex="-1"
+          style="display: none"
+        />
+        <button class="modal-btn" id="submitBtn">SIGNUP_BTN_TEXT</button>
+        <button class="modal-cancel" id="cancelBtn">キャンセル</button>
+        <div
+          class="modal-message"
+          id="modalMessage"
+          style="display: none"
+        ></div>
+      </div>
+    </div>
+
+    <script>
+              var SIGNUP_BTN_TEXT = '登録する';
+              var gridData = <?!= gridData ?>;
+              var currentEventId = null;
+
+              function buildGrid() {
+                var times = gridData.times;
+                var activities = gridData.activities;
+                var events = gridData.events;
+                var table = document.getElementById('grid');
+
+                // Header row
+                var thead = '<thead><tr><th class="time-header">Time</th>';
+                activities.forEach(function(a) {
+                  thead += '<th>' + a + '</th>';
+                });
+                thead += '</tr></thead>';
+
+                // Body rows
+                var tbody = '<tbody>';
+            times.forEach(function(time) {
+              tbody += '<tr><td class="time-cell">' + formatTimeRange(time, (function() {
+                var e = events.find(function(e) { return e.startTime === time; });
+                return e ? e.endTime : '';
+              })()) + '</td>';
+              activities.forEach(function(activity) {
+                var event = events.find(function(e) {
+                  return e.activity === activity && e.startTime === time;
+                });
+                    if (!event) {
+                      tbody += '<td><div class="slot slot-empty"></div></td>';
+                    } else if (event.remaining <= 0) {
+                      tbody += '<td><div class="slot slot-full">';
+                      tbody += '<div class="slot-full-text">Full</div>';
+                      if (event.signups.length > 0) {
+                      tbody += '<div class="slot-names">' + event.signups.map(function(s) { return s.name; }).join(', ') + '</div>';
+                      }
+                      tbody += '</div></td>';
+                    } else {
+                      tbody += '<td><div class="slot slot-available" onclick="openModal(' + event.eventId + ')">';
+                      tbody += '<div class="slot-spots">' + event.remaining + ' spot' + (event.remaining > 1 ? 's' : '') + ' left</div>';
+                      if (event.signups.length > 0) {
+                      tbody += '<div class="slot-names">' + event.signups.map(function(s) { return s.name; }).join(', ') + '</div>';
+                      }
+                      tbody += '</div></td>';
+                    }
+                  });
+                  tbody += '</tr>';
+                });
+                tbody += '</tbody>';
+
+                table.innerHTML = thead + tbody;
+              }
+
+            function formatTime(time) {
+              if (!time) return '';
+              var parts = time.split(':');
+              var h = parseInt(parts[0]);
+              var m = parts[1] || '00';
+              var ampm = h >= 12 ? 'pm' : 'am';
+              h = h % 12 || 12;
+              return h + ':' + m + ' ' + ampm;
+            }
+
+            function formatTimeRange(startTime, endTime) {
+              return formatTime(startTime) + ' - ' + formatTime(endTime);
+            }
+
+              function openModal(eventId) {
+                var event = gridData.events.find(function(e) { return e.eventId == eventId; });
+                if (!event || event.remaining <= 0) return;
+
+                currentEventId = eventId;
+
+                document.getElementById('modalTitle').textContent = event.activity;
+                document.getElementById('modalSubtitle').textContent =
+                  formatTimeRange(event.startTime, event.endTime) + ' — ' + event.location +
+                  ' — ' + event.remaining + ' spot' + (event.remaining > 1 ? 's' : '') + ' left';
+
+                var namesSection = document.getElementById('namesSection');
+                var namesChips = document.getElementById('namesChips');
+                if (event.signups.length > 0) {
+                namesChips.innerHTML = event.signups.map(function(s) {
+                    var label = s.name;
+                    if (s.cls) label += ' <span style="color:#888;font-size:10px;">— ' + s.cls + '</span>';
+                    return '<div class="name-chip">' + label + '</div>';
+                  }).join('');
+                  namesSection.style.display = 'block';
+                } else {
+                  namesSection.style.display = 'none';
+                }
+
+                document.getElementById('inputName').value = '';
+                document.getElementById('inputClass').value = '';
+                document.getElementById('modalMessage').style.display = 'none';
+                document.getElementById('submitBtn').disabled = false;
+                document.getElementById('submitBtn').textContent = SIGNUP_BTN_TEXT;
+                document.getElementById('modalOverlay').classList.add('active');
+                document.getElementById('inputName').focus();
+              }
+
+              function closeModal() {
+                document.getElementById('modalOverlay').classList.remove('active');
+                currentEventId = null;
+              }
+
+              function submitSignup() {
+                var name = document.getElementById('inputName').value.trim();
+                var cls = document.getElementById('inputClass').value.trim();
+                var btn = document.getElementById('submitBtn');
+                var msgDiv = document.getElementById('modalMessage');
+
+                if (document.getElementById('honeypot').value !== '') {
+                  return;
+                }
+                if (!name) {
+                  showModalMessage('名前を入力してください。', false);
+                  return;
+                }
+                if (!cls) {
+                  showModalMessage('クラスを入力してください。', false);
+                  return;
+                }
+
+                btn.disabled = true;
+                btn.textContent = 'Submitting...';
+                msgDiv.style.display = 'none';
+
+                google.script.run
+                  .withSuccessHandler(function(result) {
+                    showModalMessage(result.message, result.success);
+                    if (result.success) {
+                      // Update local data
+                      var event = gridData.events.find(function(e) { return e.eventId == currentEventId; });
+                      if (event) {
+                      event.signups.push({ name: name, cls: cls });
+                        event.remaining--;
+                      }
+                      // Rebuild grid
+                      buildGrid();
+                      // Close modal after short delay
+                      setTimeout(closeModal, 1500);
+                    } else {
+                      btn.disabled = false;
+                      btn.textContent = SIGNUP_BTN_TEXT;
+                    }
+                  })
+                  .withFailureHandler(function(error) {
+                    showModalMessage('Something went wrong. Please try again.', false);
+                    btn.disabled = false;
+                    btn.textContent = SIGNUP_BTN_TEXT;
+                  })
+                  .submitSignup(currentEventId, name, cls);
+              }
+
+              function showModalMessage(message, success) {
+                var msgDiv = document.getElementById('modalMessage');
+                msgDiv.textContent = message;
+                msgDiv.cls = 'modal-message ' + (success ? 'success' : 'error');
+                msgDiv.style.display = 'block';
+              }
+
+              // Close modal on overlay click
+              document.getElementById('modalOverlay').addEventListener('click', function(e) {
+                if (e.target === this) closeModal();
+              });
+
+              document.getElementById('cancelBtn').addEventListener('click', closeModal);
+              document.getElementById('submitBtn').addEventListener('click', submitSignup);
+
+              // Allow Enter key to submit
+              document.getElementById('inputName').addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') submitSignup();
+              });
+              document.getElementById('inputClass').addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') submitSignup();
+              });
+
+              buildGrid();
+    </script>
+  </body>
+</html>
