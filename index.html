@@ -398,7 +398,7 @@
         function showModalMessage(message, success) {
           var msgDiv = document.getElementById('modalMessage');
           msgDiv.textContent = message;
-          msgDiv.cls = 'modal-message ' + (success ? 'success' : 'error');
+          msgDiv.className = 'modal-message ' + (success ? 'success' : 'error');
           msgDiv.style.display = 'block';
         }
 
