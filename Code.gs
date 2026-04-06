@@ -99,8 +99,29 @@ function getGridData() {
  */
 function submitSignup(eventId, name, cls) {
   const lock = LockService.getScriptLock();
+
   try {
     lock.waitLock(10000);
+
+    // Input validation
+    if (!name || typeof name !== "string" || name.trim().length === 0) {
+      return { success: false, message: "名前を入力してください。" };
+    }
+    if (name.trim().length > 100) {
+      return {
+        success: false,
+        message: "名前は１００文字以下で入力してください。",
+      };
+    }
+    if (!cls || typeof cls !== "string" || cls.trim().length === 0) {
+      return { success: false, message: "クラスを入力してください" };
+    }
+    if (cls.trim().length > 100) {
+      return {
+        success: false,
+        message: "クラスは１００文字以下で入力してください。",
+      };
+    }
 
     const eventsSheet =
       SpreadsheetApp.openById(SHEET_ID).getSheetByName("Events");
@@ -116,7 +137,10 @@ function submitSignup(eventId, name, cls) {
     const existing = signupRows.slice(1).filter((r) => r[1] == eventId);
 
     if (existing.length >= maxSlots) {
-      return { success: false, message: "Sorry, this slot is now full!" };
+      return {
+        success: false,
+        message: "申し訳ありません、この枠のボランティア募集は終了しました。",
+      };
     }
 
     const duplicate = existing.find(
@@ -125,14 +149,17 @@ function submitSignup(eventId, name, cls) {
     if (duplicate) {
       return {
         success: false,
-        message: "You are already signed up for this slot!",
+        message: "既に同じ名前の方が入っています。違う名前を入力してください。",
       };
     }
 
     const signupId = new Date().getTime();
     signupsSheet.appendRow([signupId, eventId, name, String(cls), new Date()]);
 
-    return { success: true, message: "You are signed up!" };
+    return {
+      success: true,
+      message: "ありがとうございます！登録が完了しました！",
+    };
   } catch (e) {
     return { success: false, message: "Error: " + e.message };
   } finally {
