@@ -356,12 +356,14 @@
                 document.getElementById('modalOverlay').classList.add('active');
                 document.getElementById('inputName').focus();
               }
-
               function closeModal() {
                 document.getElementById('modalOverlay').classList.remove('active');
                 currentEventId = null;
+                document.body.scrollTop = 0;
+                document.documentElement.scrollTop = 0;
+                var top = document.querySelector('h1');
+                if (top) top.scrollIntoView({ behavior: 'smooth' });
               }
-
               function submitSignup() {
                 var name = document.getElementById('inputName').value.trim();
                 var cls = document.getElementById('inputClass').value.trim();
@@ -398,7 +400,7 @@
                       buildGrid();
                       // Close modal after short delay
                       setTimeout(closeModal, 1500);
-                    } else {
+                            } else {
                       btn.disabled = false;
                       btn.textContent = SIGNUP_BTN_TEXT;
                     }

@@ -150,7 +150,8 @@ function submitSignup(eventId, name, cls) {
     if (duplicate) {
       return {
         success: false,
-        message: "既に同じ名前の方が入っています。違う名前を入力してください。",
+        message:
+          "同じ名前の方がボランティアに入っています。違う名前を入力してください。",
       };
     }
 
