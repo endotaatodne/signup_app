@@ -220,26 +220,9 @@
           <div class="names-label">Already signed up:</div>
           <div class="names-chips" id="namesChips"></div>
         </div>
-        <input
-          type="text"
-          id="inputName"
-          placeholder="保護者名"
-          maxlength="100"
-        />
-        <input
-          type="text"
-          id="inputClass"
-          placeholder="クラス"
-          maxlength="100"
-        />
-        <input
-          type="text"
-          id="honeypot"
-          name="website"
-          autocomplete="off"
-          tabindex="-1"
-          style="display: none"
-        />
+      <input type="text" id="inputName" placeholder="保護者名" maxlength="10" />
+      <input type="text" id="inputClass" placeholder="クラス" maxlength="10" />
+      <input type="text" id="honeypot" name="website" autocomplete="off" tabindex="-1" style="display: none" />
         <button class="modal-btn" id="submitBtn">SIGNUP_BTN_TEXT</button>
         <button class="modal-cancel" id="cancelBtn">キャンセル</button>
         <div
@@ -431,11 +414,26 @@
                         showModalMessage('名前を入力してください。', false);
                         return;
                       }
+      if (name.length > 10) {
+        showModalMessage('名前は１０文字以下で入力してください。', false);
+        return;
+      }
+      if (!/^[\p{L}\p{N}\s\-'.]+$/u.test(name)) {
+        showModalMessage('名前に不正な文字が含まれています。', false);
+        return;
+      }
                       if (!cls) {
                         showModalMessage('クラスを入力してください。', false);
                         return;
                       }
-
+      if (cls.length > 10) {
+        showModalMessage('クラスは１０文字以下で入力してください。', false);
+        return;
+      }
+      if (!/^[\p{L}\p{N}\s\-'.]+$/u.test(cls)) {
+        showModalMessage('クラス名に不正な文字が含まれています。', false);
+        return;
+      }
                       btn.disabled = true;
                       btn.textContent = 'Submitting...';
                       msgDiv.style.display = 'none';

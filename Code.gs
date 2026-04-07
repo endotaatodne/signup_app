@@ -89,8 +89,8 @@ function getGridData() {
  * to prevent race conditions when multiple users submit simultaneously.
  *
  * @param {string|number} eventId - The EventID from the Events sheet
- * @param {string} name - The participant's name (required, max 100 chars)
- * @param {string} cls - The participant's class level (required, max 100 chars)
+ * @param {string} name - The participant's name (required, max 10 chars)
+ * @param {string} cls - The participant's class level (required, max 10 chars)
  * @returns {{success: boolean, message: string}}
  *   - success: true if signup was recorded, false otherwise
  *   - message: user-facing message describing the result
@@ -105,10 +105,10 @@ function submitSignup(eventId, name, cls) {
     if (!name || typeof name !== "string" || name.trim().length === 0) {
       return { success: false, message: "名前を入力してください。" };
     }
-    if (name.trim().length > 100) {
+    if (name.trim().length > 10) {
       return {
         success: false,
-        message: "名前は１００文字以下で入力してください。",
+        message: "名前は１０文字以下で入力してください。",
       };
     }
     if (!/^[\p{L}\p{N}\s\-'.]+$/u.test(name.trim())) {
@@ -117,10 +117,10 @@ function submitSignup(eventId, name, cls) {
     if (!cls || typeof cls !== "string" || cls.trim().length === 0) {
       return { success: false, message: "クラスを入力してください。" };
     }
-    if (cls.trim().length > 100) {
+    if (cls.trim().length > 10) {
       return {
         success: false,
-        message: "クラスは１００文字以下で入力してください。",
+        message: "クラスは１０文字以下で入力してください。",
       };
     }
     if (!/^[\p{L}\p{N}\s\-'.]+$/u.test(cls.trim())) {
