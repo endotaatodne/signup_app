@@ -18,10 +18,7 @@ const SHEET_ID = "xxxxxxxxx";
 function doGet() {
   const template = HtmlService.createTemplateFromFile("index");
   template.gridData = JSON.stringify(getGridData());
-  return template
-    .evaluate()
-    .setTitle("Signup App")
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.SAMEORIGIN);
+  return template.evaluate().setTitle("Signup App");
 }
 
 /**
