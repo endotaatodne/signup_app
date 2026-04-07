@@ -18,10 +18,7 @@ const SHEET_ID = "xxxxxxxxx";
 function doGet() {
   const template = HtmlService.createTemplateFromFile("index");
   template.gridData = JSON.stringify(getGridData());
-  return template
-    .evaluate()
-    .setTitle("Signup App")
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  return template.evaluate().setTitle("Signup App");
 }
 
 /**
@@ -114,8 +111,11 @@ function submitSignup(eventId, name, cls) {
         message: "名前は１００文字以下で入力してください。",
       };
     }
+    if (!/^[\p{L}\p{N}\s\-'.]+$/u.test(name.trim())) {
+      return { success: false, message: "名前に不正な文字が含まれています。" };
+    }
     if (!cls || typeof cls !== "string" || cls.trim().length === 0) {
-      return { success: false, message: "クラスを入力してください" };
+      return { success: false, message: "クラスを入力してください。" };
     }
     if (cls.trim().length > 100) {
       return {
@@ -123,6 +123,15 @@ function submitSignup(eventId, name, cls) {
         message: "クラスは１００文字以下で入力してください。",
       };
     }
+    if (!/^[\p{L}\p{N}\s\-'.]+$/u.test(cls.trim())) {
+      return {
+        success: false,
+        message: "クラス名に不正な文字が含まれています。",
+      };
+    }
+    // Trim inputs before storing
+    name = name.trim();
+    cls = cls.trim();
 
     const eventsSheet =
       SpreadsheetApp.openById(SHEET_ID).getSheetByName("Events");
