@@ -21,7 +21,7 @@ function doGet() {
   return template
     .evaluate()
     .setTitle("Signup App")
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.SAMEORIGIN);
 }
 
 /**
