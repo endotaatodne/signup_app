@@ -15,12 +15,17 @@ const SHEET_ID = "xxxxxxxxx";
  * @returns {HtmlOutput} The rendered HTML page
  */
 
-function doGet() {
-  const template = HtmlService.createTemplateFromFile("index");
-  template.gridData = JSON.stringify(getGridData());
-  return template.evaluate().setTitle("Signup App");
+function doGet(e) {
+  try {
+    const sheetId = SHEET_ID;
+    const template = HtmlService.createTemplateFromFile("index");
+    template.gridData = JSON.stringify(getGridData(sheetId));
+    template.sheetId = sheetId;
+    return template.evaluate().setTitle("Signup App");
+  } catch (err) {
+    return HtmlService.createHtmlOutput("Error: " + err.message);
+  }
 }
-
 /**
  * Retrieves all events and signup data from Google Sheets and structures
  * it for the grid view. Returns unique sorted time slots and activities
@@ -70,10 +75,11 @@ function getGridData() {
       "Australia/Brisbane",
       "HH:mm",
     ),
-    location: row[6],
-    maxSlots: row[7],
+    description: String(row[6]),
+    location: row[7],
+    maxSlots: row[8],
     signups: signupsMap[row[0]] || [],
-    remaining: row[7] - (signupsMap[row[0]] ? signupsMap[row[0]].length : 0),
+    remaining: row[8] - (signupsMap[row[0]] ? signupsMap[row[0]].length : 0),
   }));
 
   // Get unique sorted time slots and activities
@@ -141,7 +147,7 @@ function submitSignup(eventId, name, cls) {
     const eventRows = eventsSheet.getDataRange().getValues();
     const eventRow = eventRows.find((r) => r[0] == eventId);
     if (!eventRow) return { success: false, message: "Event not found." };
-    const maxSlots = eventRow[7];
+    const maxSlots = eventRow[8];
 
     const signupRows = signupsSheet.getDataRange().getValues();
     const existing = signupRows.slice(1).filter((r) => r[1] == eventId);
