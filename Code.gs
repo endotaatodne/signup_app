@@ -267,7 +267,7 @@ function submitSignup(eventId, name, cls, role, alias) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     if (eventDate < today) {
-      return { success: false, message: "This event has already passed." };
+      return { success: false, message: "このイベントは既に終了しています。" };
     }
 
     // Get max slots for the selected role
