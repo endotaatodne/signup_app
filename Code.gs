@@ -1,4 +1,4 @@
-const SHEET_ID = "xxxxxxxxx";
+const MASTER_SHEET_ID = "xxxxxxxxx";
 
 const ROLES = {
   general: "一般保護者",
@@ -10,7 +10,7 @@ const ROLES = {
  * @fileoverview Signup App - Google Apps Script backend.
  * Serves the web app and handles all interactions with Google Sheets.
  * @author endotaatodne
- * @version 0.0.x
+ * @version 0.0.2
  */
 
 /**
@@ -23,7 +23,24 @@ const ROLES = {
 
 function doGet(e) {
   try {
-    const sheetId = SHEET_ID;
+    const alias = e.parameter.event;
+
+    if (!alias) {
+      return HtmlService.createHtmlOutput(
+        '<p style="font-family:Arial;padding:20px;">No event specified. Please use a valid event link.</p>',
+      );
+    }
+
+    // Load config from master Sheet
+    const config = getEventConfig();
+    const sheetId = config[alias.toLowerCase()];
+
+    if (!sheetId) {
+      return HtmlService.createHtmlOutput(
+        '<p style="font-family:Arial;padding:20px;">Event not found. Please check your link.</p>',
+      );
+    }
+
     const spreadsheet = SpreadsheetApp.openById(sheetId);
     const title = spreadsheet.getName();
     const template = HtmlService.createTemplateFromFile("index");
@@ -168,7 +185,10 @@ function submitSignup(eventId, name, cls, role, sheetId) {
     }
 
     // Safety check
-    if (sheetId !== SHEET_ID) {
+    // Security: validate sheetId against config
+    const config = getEventConfig();
+    const allowedSheetIds = Object.values(config);
+    if (!allowedSheetIds.includes(sheetId)) {
       return { success: false, message: "エラーが発生しました" };
     }
 
@@ -242,4 +262,23 @@ function submitSignup(eventId, name, cls, role, sheetId) {
   } finally {
     lock.releaseLock();
   }
+}
+
+/**
+ * Reads allowed event aliases and Sheet IDs from the Config tab
+ * of the master Sheet.
+ * @returns {Object} Map of alias to Sheet ID
+ */
+function getEventConfig() {
+  const sheet =
+    SpreadsheetApp.openById(MASTER_SHEET_ID).getSheetByName("Config");
+  if (!sheet) return {};
+  const rows = sheet.getDataRange().getValues();
+  const config = {};
+  rows.slice(1).forEach(function (row) {
+    const alias = row[0].toString().trim().toLowerCase();
+    const sheetId = row[1].toString().trim();
+    if (alias && sheetId) config[alias] = sheetId;
+  });
+  return config;
 }
