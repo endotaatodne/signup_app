@@ -2,7 +2,7 @@
 
 [English](README.en.md)
 
-Google Apps ScriptとGoogle Sheetsで構築した、無料のオープンソースボランティア募集アプリです。日本の学校のイベントのボランティア募集を想定して作成しました。
+Google Apps ScriptとGoogle Sheetsで構築した、無料のオープンソースボランティア募集アプリです。日本の学校におけるイベントのボランティア募集を想定して作成しました。
 
 ---
 
