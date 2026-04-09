@@ -1,3 +1,7 @@
+## v0.0.4 - 2026-04-10
+
+- Adds security patches
+
 ## v0.0.3 - 2026-04-09
 
 - Minor documentation updates

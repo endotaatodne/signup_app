@@ -10,7 +10,7 @@ const ROLES = {
  * @fileoverview Signup App - Google Apps Script backend.
  * Serves the web app and handles all interactions with Google Sheets.
  * @author endotaatodne
- * @version 0.0.2
+ * @version 0.0.4
  */
 
 /**
@@ -68,9 +68,9 @@ function doGet(e) {
 
     return template.evaluate().setTitle(title);
   } catch (err) {
-return HtmlService.createHtmlOutput(
+    return HtmlService.createHtmlOutput(
       '<p style="font-family:Arial;padding:20px;">Something went wrong. Please try again later.</p>',
-);
+    );
   }
 }
 /**
