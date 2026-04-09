@@ -363,6 +363,4 @@ MIT — see [LICENSE](LICENSE) for details.
 
 ---
 
-## Acknowledgements
-
 Built with [Google Apps Script](https://developers.google.com/apps-script) and [Google Sheets](https://sheets.google.com).

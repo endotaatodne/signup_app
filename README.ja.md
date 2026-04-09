@@ -363,6 +363,4 @@ MIT — 詳細は[LICENSE](LICENSE)を参照してください。
 
 ---
 
-## 謝辞
-
 [Google Apps Script](https://developers.google.com/apps-script)と[Google Sheets](https://sheets.google.com)を使用して構築されました。
