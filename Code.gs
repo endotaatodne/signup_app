@@ -10,7 +10,7 @@ const ROLES = {
  * @fileoverview Signup App - Google Apps Script backend.
  * Serves the web app and handles all interactions with Google Sheets.
  * @author endotaatodne
- * @version 0.0.2
+ * @version 0.0.4
  */
 
 /**
@@ -43,14 +43,34 @@ function doGet(e) {
 
     const spreadsheet = SpreadsheetApp.openById(sheetId);
     const title = spreadsheet.getName();
+    const gridData = JSON.stringify(getGridData(sheetId));
+
+    // Base64 encode to prevent script injection
+    const encodedGridData = Utilities.base64Encode(
+      gridData,
+      Utilities.Charset.UTF_8,
+    );
+    const encodedSheetId = Utilities.base64Encode(
+      sheetId,
+      Utilities.Charset.UTF_8,
+    );
+    const encodedRoles = Utilities.base64Encode(
+      JSON.stringify(ROLES),
+      Utilities.Charset.UTF_8,
+    );
+    const encodedTitle = Utilities.base64Encode(title, Utilities.Charset.UTF_8);
+
     const template = HtmlService.createTemplateFromFile("index");
-    template.gridData = JSON.stringify(getGridData(sheetId));
-    template.sheetId = sheetId;
-    template.roles = JSON.stringify(ROLES);
-    template.title = title;
+    template.gridData = encodedGridData;
+    template.alias = Utilities.base64Encode(alias, Utilities.Charset.UTF_8);
+    template.roles = encodedRoles;
+    template.title = encodedTitle;
+
     return template.evaluate().setTitle(title);
   } catch (err) {
-    return HtmlService.createHtmlOutput("Error: " + err.message);
+    return HtmlService.createHtmlOutput(
+      '<p style="font-family:Arial;padding:20px;">Something went wrong. Please try again later.</p>',
+    );
   }
 }
 /**
@@ -76,9 +96,9 @@ function getGridData(sheetId) {
   const signupsMap = {};
   signupRows.slice(1).forEach((row) => {
     const eventId = row[1];
-    const name = row[2];
-    const cls = String(row[3]);
-    const role = row[4];
+    const name = sanitiseForScript(row[2]);
+    const cls = sanitiseForScript(String(row[3]));
+    const role = sanitiseForScript(row[4]);
     if (!signupsMap[eventId]) signupsMap[eventId] = [];
     signupsMap[eventId].push({ name, cls, role });
   });
@@ -92,8 +112,8 @@ function getGridData(sheetId) {
 
     return {
       eventId: eventId,
-      activity: row[1],
-      person: String(row[2]),
+      activity: sanitiseForScript(row[1]),
+      person: sanitiseForScript(String(row[2])),
       date: Utilities.formatDate(
         new Date(row[3]),
         "Australia/Brisbane",
@@ -109,8 +129,8 @@ function getGridData(sheetId) {
         "Australia/Brisbane",
         "HH:mm",
       ),
-      description: String(row[6]),
-      location: row[7],
+      description: sanitiseForScript(String(row[6])),
+      location: sanitiseForScript(String(row[7])),
       slots: {
         general: {
           max: generalMax,
@@ -144,10 +164,17 @@ function getGridData(sheetId) {
  * @param {string} role - The participant's role
  * @returns {{success: boolean, message: string}}
  */
-function submitSignup(eventId, name, cls, role, sheetId) {
+function submitSignup(eventId, name, cls, role, alias) {
   const lock = LockService.getScriptLock();
   try {
     lock.waitLock(10000);
+
+    // Derive sheetId server-side from alias — never trust client-supplied sheet identifiers
+    const config = getEventConfig();
+    const sheetId = config[alias.toLowerCase()];
+    if (!sheetId) {
+      return { success: false, message: "Invalid request." };
+    }
 
     // Input validation
     if (!name || typeof name !== "string" || name.trim().length === 0) {
@@ -182,14 +209,6 @@ function submitSignup(eventId, name, cls, role, sheetId) {
     const validRoles = Object.values(ROLES);
     if (!validRoles.includes(role)) {
       return { success: false, message: "ロールを選択してください" };
-    }
-
-    // Safety check
-    // Security: validate sheetId against config
-    const config = getEventConfig();
-    const allowedSheetIds = Object.values(config);
-    if (!allowedSheetIds.includes(sheetId)) {
-      return { success: false, message: "エラーが発生しました" };
     }
 
     name = name.trim();
@@ -258,7 +277,7 @@ function submitSignup(eventId, name, cls, role, sheetId) {
       role: role,
     };
   } catch (e) {
-    return { success: false, message: "Error: " + e.message };
+    return { success: false, message: "An error occurred. Please try again." };
   } finally {
     lock.releaseLock();
   }
@@ -281,4 +300,21 @@ function getEventConfig() {
     if (alias && sheetId) config[alias] = sheetId;
   });
   return config;
+}
+
+/**
+ * Sanitises a string for safe embedding in a JSON/script context.
+ * Escapes characters that could break out of a script block.
+ * @param {string} str - The string to sanitise
+ * @returns {string} Sanitised string
+ */
+function sanitiseForScript(str) {
+  if (!str) return "";
+  return String(str)
+    .replace(/&/g, "\\u0026")
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/"/g, "\\u0022")
+    .replace(/'/g, "\\u0027")
+    .replace(/\//g, "\\u002f");
 }
