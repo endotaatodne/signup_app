@@ -10,28 +10,34 @@ const ROLES = {
  * @fileoverview Signup App - Google Apps Script backend.
  * Serves the web app and handles all interactions with Google Sheets.
  * @author endotaatodne
- * @version 0.0.4
+ * @version 0.0.5
  */
 
 /**
  * Entry point for the web app. Called automatically by Google Apps Script
  * when the public URL is visited. Builds the HTML page server-side and
  * returns it to the browser.
- *
+ * @param {Object} e - Event object containing URL parameters
  * @returns {HtmlOutput} The rendered HTML page
  */
-
 function doGet(e) {
   try {
     const alias = e.parameter.event;
 
+    // No alias provided
     if (!alias) {
       return HtmlService.createHtmlOutput(
         '<p style="font-family:Arial;padding:20px;">No event specified. Please use a valid event link.</p>',
       );
     }
 
-    // Load config from master Sheet
+    // Sanitise alias — only allow alphanumeric and hyphens, max 50 chars
+    if (!/^[a-zA-Z0-9\-]{1,50}$/.test(alias)) {
+      return HtmlService.createHtmlOutput(
+        '<p style="font-family:Arial;padding:20px;">Invalid event link.</p>',
+      );
+    }
+
     const config = getEventConfig();
     const sheetId = config[alias.toLowerCase()];
 
@@ -45,15 +51,12 @@ function doGet(e) {
     const title = spreadsheet.getName();
     const gridData = JSON.stringify(getGridData(sheetId));
 
-    // Base64 encode to prevent script injection
+    // Base64 encode all template data to prevent script injection
     const encodedGridData = Utilities.base64Encode(
       gridData,
       Utilities.Charset.UTF_8,
     );
-    const encodedSheetId = Utilities.base64Encode(
-      sheetId,
-      Utilities.Charset.UTF_8,
-    );
+    const encodedAlias = Utilities.base64Encode(alias, Utilities.Charset.UTF_8);
     const encodedRoles = Utilities.base64Encode(
       JSON.stringify(ROLES),
       Utilities.Charset.UTF_8,
@@ -62,27 +65,24 @@ function doGet(e) {
 
     const template = HtmlService.createTemplateFromFile("index");
     template.gridData = encodedGridData;
-    template.alias = Utilities.base64Encode(alias, Utilities.Charset.UTF_8);
+    template.alias = encodedAlias;
     template.roles = encodedRoles;
     template.title = encodedTitle;
 
     return template.evaluate().setTitle(title);
   } catch (err) {
+    console.error("doGet error: " + err.message);
     return HtmlService.createHtmlOutput(
       '<p style="font-family:Arial;padding:20px;">Something went wrong. Please try again later.</p>',
     );
   }
 }
+
 /**
  * Retrieves all events and signup data from Google Sheets and structures
- * it for the grid view. Returns unique sorted time slots and activities
- * as separate arrays so the frontend can build the grid headers.
- *
+ * it for the grid view.
  * @param {string} sheetId - The Google Sheet ID
  * @returns {{events: Object[], times: string[], activities: string[]}}
- *   - events: array of event objects with signup counts and remaining slots
- *   - times: sorted unique start times in HH:mm format
- *   - activities: unique activity names for column headers
  */
 function getGridData(sheetId) {
   const eventsSheet = SpreadsheetApp.openById(sheetId).getSheetByName("Events");
@@ -157,26 +157,40 @@ function getGridData(sheetId) {
 
 /**
  * Submits a new signup for a given event and role.
- * @param {string} sheetId - The Google Sheet ID
+ * SheetId is derived server-side from the alias — never trusted from client.
  * @param {number} eventId - The EventID from the Events sheet
  * @param {string} name - The participant's name
  * @param {string} cls - The participant's class
  * @param {string} role - The participant's role
+ * @param {string} alias - The event alias from the URL
  * @returns {{success: boolean, message: string}}
  */
 function submitSignup(eventId, name, cls, role, alias) {
   const lock = LockService.getScriptLock();
   try {
-    lock.waitLock(10000);
+    // Acquire lock with graceful timeout handling
+    try {
+      lock.waitLock(5000);
+    } catch (e) {
+      return {
+        success: false,
+        message: "The system is busy. Please try again in a moment.",
+      };
+    }
 
-    // Derive sheetId server-side from alias — never trust client-supplied sheet identifiers
+    // Validate and sanitise alias
+    if (!alias || !/^[a-zA-Z0-9\-]{1,50}$/.test(alias)) {
+      return { success: false, message: "Invalid request." };
+    }
+
+    // Derive sheetId server-side — never trust client-supplied sheet identifiers
     const config = getEventConfig();
     const sheetId = config[alias.toLowerCase()];
     if (!sheetId) {
       return { success: false, message: "Invalid request." };
     }
 
-    // Input validation
+    // Input validation — name
     if (!name || typeof name !== "string" || name.trim().length === 0) {
       return { success: false, message: "名前を入力してください。" };
     }
@@ -189,6 +203,8 @@ function submitSignup(eventId, name, cls, role, alias) {
     if (!/^[\p{L}\p{N}\s\-'.]+$/u.test(name.trim())) {
       return { success: false, message: "名前に不正な文字が含まれています。" };
     }
+
+    // Input validation — class
     if (!cls || typeof cls !== "string" || cls.trim().length === 0) {
       return { success: false, message: "クラスを入力してください。" };
     }
@@ -202,6 +218,29 @@ function submitSignup(eventId, name, cls, role, alias) {
       return {
         success: false,
         message: "クラス名に不正な文字が含まれています。",
+      };
+    }
+
+    // Validate role against canonical values
+    const roleKeyMap = {
+      [ROLES.general]: ROLES.general,
+      [ROLES.classRep]: ROLES.classRep,
+      [ROLES.committee]: ROLES.committee,
+    };
+    const canonicalRole = roleKeyMap[role];
+    if (!canonicalRole) {
+      return {
+        success: false,
+        message: "ロールを選択してください",
+      };
+    }
+
+    // Rate limiting — max 3 submissions per name per 60 seconds
+    if (!checkRateLimit(name)) {
+      return {
+        success: false,
+        message:
+          "1分間内の回数制限を超過しました。少し待ってから再度試してください。",
       };
     }
 
@@ -223,13 +262,21 @@ function submitSignup(eventId, name, cls, role, alias) {
     const eventRow = eventRows.find((r) => r[0] == eventId);
     if (!eventRow) return { success: false, message: "Event not found." };
 
+    // Check event date has not passed
+    const eventDate = new Date(eventRow[3]);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (eventDate < today) {
+      return { success: false, message: "This event has already passed." };
+    }
+
     // Get max slots for the selected role
     const roleMaxMap = {
       [ROLES.general]: Number(eventRow[8]) || 0,
       [ROLES.classRep]: Number(eventRow[9]) || 0,
       [ROLES.committee]: Number(eventRow[10]) || 0,
     };
-    const maxSlots = roleMaxMap[role];
+    const maxSlots = roleMaxMap[canonicalRole];
     if (maxSlots === 0) {
       return {
         success: false,
@@ -241,7 +288,7 @@ function submitSignup(eventId, name, cls, role, alias) {
     const existing = signupRows.slice(1).filter((r) => r[1] == eventId);
 
     // Check slot capacity for this role
-    const roleSignups = existing.filter((r) => r[4] === role);
+    const roleSignups = existing.filter((r) => r[4] === canonicalRole);
     if (roleSignups.length >= maxSlots) {
       return {
         success: false,
@@ -249,7 +296,7 @@ function submitSignup(eventId, name, cls, role, alias) {
       };
     }
 
-    // Duplicate check per slot (regardless of role)
+    // Duplicate check per slot regardless of role
     const duplicate = existing.find(
       (r) => r[2].toString().toLowerCase() === name.toLowerCase(),
     );
@@ -267,16 +314,17 @@ function submitSignup(eventId, name, cls, role, alias) {
       eventId,
       name,
       String(cls),
-      role,
+      canonicalRole,
       new Date(),
     ]);
 
     return {
       success: true,
       message: "ありがとうございます！登録が完了しました！",
-      role: role,
+      role: canonicalRole,
     };
   } catch (e) {
+    console.error("submitSignup error: " + e.message);
     return { success: false, message: "An error occurred. Please try again." };
   } finally {
     lock.releaseLock();
@@ -284,8 +332,26 @@ function submitSignup(eventId, name, cls, role, alias) {
 }
 
 /**
+ * Rate limiter — allows max 3 submissions per name per 60 seconds.
+ * Uses CacheService to track submission counts.
+ * @param {string} name - The participant's name
+ * @returns {boolean} true if allowed, false if rate limited
+ */
+function checkRateLimit(name) {
+  const cache = CacheService.getScriptCache();
+  const key =
+    "ratelimit_" + name.toLowerCase().replace(/\s/g, "_").substring(0, 50);
+  const hits = cache.get(key);
+  if (hits && parseInt(hits) >= 3) {
+    return false;
+  }
+  cache.put(key, hits ? String(parseInt(hits) + 1) : "1", 60);
+  return true;
+}
+
+/**
  * Reads allowed event aliases and Sheet IDs from the Config tab
- * of the master Sheet.
+ * of the master Sheet. Validates Sheet ID format before trusting.
  * @returns {Object} Map of alias to Sheet ID
  */
 function getEventConfig() {
@@ -297,7 +363,10 @@ function getEventConfig() {
   rows.slice(1).forEach(function (row) {
     const alias = row[0].toString().trim().toLowerCase();
     const sheetId = row[1].toString().trim();
-    if (alias && sheetId) config[alias] = sheetId;
+    // Validate Sheet ID format before trusting
+    if (alias && sheetId && /^[a-zA-Z0-9_\-]{20,60}$/.test(sheetId)) {
+      config[alias] = sheetId;
+    }
   });
   return config;
 }
