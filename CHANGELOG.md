@@ -1,3 +1,7 @@
+## v0.0.7 - 2026-04-10
+
+- Minor update - changed the column name in the original Google Sheet for clarity
+
 ## v0.0.6 - 2026-04-10
 
 - Bug fix - should only allow 10 chars for names and class

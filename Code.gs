@@ -10,7 +10,7 @@ const ROLES = {
  * @fileoverview Signup App - Google Apps Script backend.
  * Serves the web app and handles all interactions with Google Sheets.
  * @author endotaatodne
- * @version 0.0.6
+ * @version 0.0.7
  */
 
 /**
@@ -113,7 +113,7 @@ function getGridData(sheetId) {
     return {
       eventId: eventId,
       activity: sanitiseForScript(row[1]),
-      person: sanitiseForScript(String(row[2])),
+      subtitle: sanitiseForScript(String(row[2])),
       date: Utilities.formatDate(
         new Date(row[3]),
         "Australia/Brisbane",

@@ -455,7 +455,7 @@
 
         var descHeader = document.createElement("th");
         descHeader.className = "time-header";
-        descHeader.textContent = "Notes";
+        descHeader.textContent = "";
         descHeader.style.cssText =
           "max-width:120px;width:120px;word-wrap:break-word;overflow-wrap:break-word;white-space:normal;";
         headerRow.appendChild(descHeader);
@@ -469,11 +469,11 @@
           actDiv.style.cssText = "font-size:13px;font-weight:600;";
           actDiv.textContent = a;
           th.appendChild(actDiv);
-          if (event && event.person) {
+          if (event && event.subtitle) {
             var personDiv = document.createElement("div");
             personDiv.style.cssText =
               "font-size:11px;font-weight:400;color:#888;margin-top:2px;";
-            personDiv.textContent = event.person;
+            personDiv.textContent = event.subtitle;
             th.appendChild(personDiv);
           }
           headerRow.appendChild(th);
