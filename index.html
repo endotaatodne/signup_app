@@ -386,398 +386,494 @@
     </div>
 
     <script>
-            var SIGNUP_BTN_TEXT = "登録する";
-            var gridData = <?!= gridData ?>;
-            var sheetId = '<?!= sheetId ?>';
-            var ROLES = JSON.parse('<?!= roles ?>');
-            var PAGE_TITLE = '<?!= title ?>';
-            var currentEventId = null;
-            var currentRole = null;
+      function b64decode(str) {
+        return decodeURIComponent(
+          atob(str)
+            .split("")
+            .map(function (c) {
+              return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
+            })
+            .join(""),
+        );
+      }
+      var SIGNUP_BTN_TEXT = "登録する";
+      var gridData = JSON.parse(b64decode("<?!= gridData ?>"));
+      var alias = b64decode("<?!= alias ?>");
+      var ROLES = JSON.parse(b64decode("<?!= roles ?>"));
+      var PAGE_TITLE = b64decode("<?!= title ?>");
+      var currentEventId = null;
+      var currentRole = null;
 
-            var ROLE_KEYS = [
-              { key: 'general',   label: ROLES.general,   btnClass: 'role-btn-general',   countClass: 'count-general',   labelClass: 'names-role-label-general' },
-              { key: 'classRep',  label: ROLES.classRep,  btnClass: 'role-btn-classrep',  countClass: 'count-classrep',  labelClass: 'names-role-label-classrep' },
-              { key: 'committee', label: ROLES.committee, btnClass: 'role-btn-committee', countClass: 'count-committee', labelClass: 'names-role-label-committee' }
-            ];
+      var ROLE_KEYS = [
+        {
+          key: "general",
+          label: ROLES.general,
+          btnClass: "role-btn-general",
+          countClass: "count-general",
+          labelClass: "names-role-label-general",
+        },
+        {
+          key: "classRep",
+          label: ROLES.classRep,
+          btnClass: "role-btn-classrep",
+          countClass: "count-classrep",
+          labelClass: "names-role-label-classrep",
+        },
+        {
+          key: "committee",
+          label: ROLES.committee,
+          btnClass: "role-btn-committee",
+          countClass: "count-committee",
+          labelClass: "names-role-label-committee",
+        },
+      ];
 
-            function getSlotColorClass(slots) {
-              return 'slot-mixed';
-            }
+      function getSlotColorClass(slots) {
+        return "slot-mixed";
+      }
 
-            function hasAnyAvailable(slots) {
-              return ROLE_KEYS.some(function(r) {
-                return slots[r.key].max > 0 && slots[r.key].filled < slots[r.key].max;
-              });
-            }
+      function hasAnyAvailable(slots) {
+        return ROLE_KEYS.some(function (r) {
+          return slots[r.key].max > 0 && slots[r.key].filled < slots[r.key].max;
+        });
+      }
 
-            function buildGrid() {
-              var times      = gridData.times;
-              var activities = gridData.activities;
-              var events     = gridData.events;
-              var table      = document.getElementById('grid');
+      function buildGrid() {
+        var times = gridData.times;
+        var activities = gridData.activities;
+        var events = gridData.events;
+        var table = document.getElementById("grid");
 
-                          // Build header
-                          var thead = document.createElement("thead");
-                          var headerRow = document.createElement("tr");
+        // Build header
+        var thead = document.createElement("thead");
+        var headerRow = document.createElement("tr");
 
-              var timeHeader = document.createElement('th');
-              timeHeader.className = 'time-header';
-              timeHeader.textContent = 'Time';
-              headerRow.appendChild(timeHeader);
+        var timeHeader = document.createElement("th");
+        timeHeader.className = "time-header";
+        timeHeader.textContent = "Time";
+        headerRow.appendChild(timeHeader);
 
-              var descHeader = document.createElement('th');
-              descHeader.className = 'time-header';
-              descHeader.textContent = 'Notes';
-              descHeader.style.cssText = 'max-width:120px;width:120px;word-wrap:break-word;overflow-wrap:break-word;white-space:normal;';
-              headerRow.appendChild(descHeader);
+        var descHeader = document.createElement("th");
+        descHeader.className = "time-header";
+        descHeader.textContent = "Notes";
+        descHeader.style.cssText =
+          "max-width:120px;width:120px;word-wrap:break-word;overflow-wrap:break-word;white-space:normal;";
+        headerRow.appendChild(descHeader);
 
-              activities.forEach(function(a) {
-                var th = document.createElement('th');
-                var event = events.find(function(e) { return e.activity === a; });
-                var actDiv = document.createElement('div');
-                actDiv.style.cssText = 'font-size:13px;font-weight:600;';
-                actDiv.textContent = a;
-                th.appendChild(actDiv);
-                if (event && event.person) {
-                  var personDiv = document.createElement('div');
-                  personDiv.style.cssText = 'font-size:11px;font-weight:400;color:#888;margin-top:2px;';
-                  personDiv.textContent = event.person;
-                  th.appendChild(personDiv);
-                }
-                headerRow.appendChild(th);
-              });
+        activities.forEach(function (a) {
+          var th = document.createElement("th");
+          var event = events.find(function (e) {
+            return e.activity === a;
+          });
+          var actDiv = document.createElement("div");
+          actDiv.style.cssText = "font-size:13px;font-weight:600;";
+          actDiv.textContent = a;
+          th.appendChild(actDiv);
+          if (event && event.person) {
+            var personDiv = document.createElement("div");
+            personDiv.style.cssText =
+              "font-size:11px;font-weight:400;color:#888;margin-top:2px;";
+            personDiv.textContent = event.person;
+            th.appendChild(personDiv);
+          }
+          headerRow.appendChild(th);
+        });
 
-              thead.appendChild(headerRow);
+        thead.appendChild(headerRow);
 
-                          // Build body
-                          var tbody = document.createElement("tbody");
+        // Build body
+        var tbody = document.createElement("tbody");
 
-              times.forEach(function(time) {
-                var tr = document.createElement('tr');
-                var matchedEvent = events.find(function(e) { return e.startTime === time; });
+        times.forEach(function (time) {
+          var tr = document.createElement("tr");
+          var matchedEvent = events.find(function (e) {
+            return e.startTime === time;
+          });
 
-                var timeTd = document.createElement('td');
-                timeTd.className = 'time-cell';
-                timeTd.textContent = formatTimeRange(time, matchedEvent ? matchedEvent.endTime : '');
-                tr.appendChild(timeTd);
+          var timeTd = document.createElement("td");
+          timeTd.className = "time-cell";
+          timeTd.textContent = formatTimeRange(
+            time,
+            matchedEvent ? matchedEvent.endTime : "",
+          );
+          tr.appendChild(timeTd);
 
-                var descTd = document.createElement('td');
-                descTd.className = 'desc-cell';
-                descTd.textContent = matchedEvent ? matchedEvent.description : '';
-                tr.appendChild(descTd);
+          var descTd = document.createElement("td");
+          descTd.className = "desc-cell";
+          descTd.textContent = matchedEvent ? matchedEvent.description : "";
+          tr.appendChild(descTd);
 
-                activities.forEach(function(activity) {
-                  var td = document.createElement('td');
-                  var event = events.find(function(e) {
-                    return e.activity === activity && e.startTime === time;
-                  });
+          activities.forEach(function (activity) {
+            var td = document.createElement("td");
+            var event = events.find(function (e) {
+              return e.activity === activity && e.startTime === time;
+            });
 
-                  if (!event) {
-                    var emptyDiv = document.createElement('div');
-                    emptyDiv.className = 'slot slot-empty';
-                    td.appendChild(emptyDiv);
-                  } else {
-                    var slotDiv = document.createElement('div');
-                    var colorClass = getSlotColorClass(event.slots);
-                    var available = hasAnyAvailable(event.slots);
-                    if (!available) {
-                      slotDiv.className = 'slot slot-all-full';
-                      slotDiv.style.cursor = 'pointer';
-                      slotDiv.addEventListener('click', (function(eid) {
-                        return function() { openModal(eid); };
-                      })(event.eventId));
-                      var fullText = document.createElement('div');
-                      fullText.style.cssText = 'font-size:11px;color:#999;';
-                      fullText.textContent = 'Full';
-                      slotDiv.appendChild(fullText);
-                    } else {
-                      slotDiv.className = 'slot ' + colorClass;
-                      slotDiv.addEventListener('click', (function(eid) {
-                        return function() { openModal(eid); };
-                      })(event.eventId));
+            if (!event) {
+              var emptyDiv = document.createElement("div");
+              emptyDiv.className = "slot slot-empty";
+              td.appendChild(emptyDiv);
+            } else {
+              var slotDiv = document.createElement("div");
+              var colorClass = getSlotColorClass(event.slots);
+              var available = hasAnyAvailable(event.slots);
+              if (!available) {
+                slotDiv.className = "slot slot-all-full";
+                slotDiv.style.cursor = "pointer";
+                slotDiv.addEventListener(
+                  "click",
+                  (function (eid) {
+                    return function () {
+                      openModal(eid);
+                    };
+                  })(event.eventId),
+                );
+                var fullText = document.createElement("div");
+                fullText.style.cssText = "font-size:11px;color:#999;";
+                fullText.textContent = "Full";
+                slotDiv.appendChild(fullText);
+              } else {
+                slotDiv.className = "slot " + colorClass;
+                slotDiv.addEventListener(
+                  "click",
+                  (function (eid) {
+                    return function () {
+                      openModal(eid);
+                    };
+                  })(event.eventId),
+                );
 
-                      ROLE_KEYS.forEach(function(r, idx) {
-                        var s = event.slots[r.key];
-                        if (s.max === 0) return;
+                ROLE_KEYS.forEach(function (r, idx) {
+                  var s = event.slots[r.key];
+                  if (s.max === 0) return;
 
-                        if (idx > 0) {
-                          var divider = document.createElement('hr');
-                          divider.className = 'role-divider';
-                          slotDiv.appendChild(divider);
-                        }
-
-                        var roleRow = document.createElement('div');
-                        roleRow.className = 'role-row';
-
-                        var roleLabel = document.createElement('span');
-                        roleLabel.className = 'role-label ' + r.countClass;
-                        roleLabel.textContent = r.label;
-                        var roleCount = document.createElement('span');
-                        roleCount.className = 'role-count ' + r.countClass;
-                        var remaining = s.max - s.filled;
-                        roleCount.textContent = remaining <= 0 ? 'Full' : remaining + ' left';
-                        roleRow.appendChild(roleLabel);
-                        roleRow.appendChild(roleCount);
-                        slotDiv.appendChild(roleRow);
-                      });
-                    }
-
-                    if (event.signups.length > 0) {
-                      var namesDiv = document.createElement('div');
-                      namesDiv.className = 'slot-names';
-                      namesDiv.textContent = event.signups.map(function(s) { return s.name; }).join(', ');
-                      slotDiv.appendChild(namesDiv);
-                    }
-
-                    td.appendChild(slotDiv);
+                  if (idx > 0) {
+                    var divider = document.createElement("hr");
+                    divider.className = "role-divider";
+                    slotDiv.appendChild(divider);
                   }
 
-                  tr.appendChild(td);
+                  var roleRow = document.createElement("div");
+                  roleRow.className = "role-row";
+
+                  var roleLabel = document.createElement("span");
+                  roleLabel.className = "role-label " + r.countClass;
+                  roleLabel.textContent = r.label;
+                  var roleCount = document.createElement("span");
+                  roleCount.className = "role-count " + r.countClass;
+                  var remaining = s.max - s.filled;
+                  roleCount.textContent =
+                    remaining <= 0 ? "Full" : remaining + " left";
+                  roleRow.appendChild(roleLabel);
+                  roleRow.appendChild(roleCount);
+                  slotDiv.appendChild(roleRow);
                 });
-
-                tbody.appendChild(tr);
-              });
-
-              table.innerHTML = '';
-              table.appendChild(thead);
-              table.appendChild(tbody);
-            }
-
-            function formatTime(time) {
-              if (!time) return '';
-              var parts = time.split(':');
-              var h = parseInt(parts[0]);
-              var m = parts[1] || '00';
-              var ampm = h >= 12 ? 'pm' : 'am';
-              h = h % 12 || 12;
-              return h + ':' + m + ' ' + ampm;
-            }
-
-            function formatTimeRange(startTime, endTime) {
-              return formatTime(startTime) + ' - ' + formatTime(endTime);
-            }
-
-            function openModal(eventId) {
-                document.body.scrollTop = 0;
-                document.documentElement.scrollTop = 0;
-              var event = gridData.events.find(function(e) { return e.eventId == eventId; });
-              if (!event) return;
-
-              currentEventId = eventId;
-              currentRole = null;
-
-              document.getElementById('modalTitle').textContent = event.activity;
-              document.getElementById('modalSubtitle').textContent =
-                formatTimeRange(event.startTime, event.endTime) + ' — ' + event.location;
-
-              // Names grouped by role
-              var namesSection = document.getElementById('namesSection');
-              var namesGroups  = document.getElementById('namesGroups');
-              namesGroups.innerHTML = '';
-
-              var hasAnySignups = false;
-              ROLE_KEYS.forEach(function(r) {
-                var roleSignups = event.signups.filter(function(s) { return s.role === r.label; });
-                if (roleSignups.length === 0) return;
-                hasAnySignups = true;
-
-                var group = document.createElement('div');
-                group.className = 'names-role-group';
-
-                var label = document.createElement('div');
-                label.className = 'names-role-label ' + r.labelClass;
-                label.textContent = r.label;
-                group.appendChild(label);
-
-                var chips = document.createElement('div');
-                chips.className = 'names-chips';
-                roleSignups.forEach(function(s) {
-                  var chip = document.createElement('div');
-                  chip.className = 'name-chip';
-                  chip.textContent = s.name;
-                  if (s.cls) {
-                    var clsSpan = document.createElement('span');
-                    clsSpan.style.cssText = 'color:#888;font-size:10px;';
-                    clsSpan.textContent = ' — ' + s.cls;
-                    chip.appendChild(clsSpan);
-                  }
-                  chips.appendChild(chip);
-                });
-                group.appendChild(chips);
-                namesGroups.appendChild(group);
-              });
-              namesSection.style.display = hasAnySignups ? 'block' : 'none';
-
-              // Role buttons
-              var roleButtons = document.getElementById('roleButtons');
-              roleButtons.innerHTML = '';
-
-              ROLE_KEYS.forEach(function(r) {
-                var s = event.slots[r.key];
-                if (s.max === 0) return;
-
-                var btn = document.createElement('button');
-                btn.className = 'role-btn ' + r.btnClass;
-                btn.setAttribute('data-role', r.label);
-
-                var remaining = s.max - s.filled;
-                var isFull = remaining <= 0;
-
-                if (isFull) {
-                  btn.classList.add('role-btn-full');
-                  btn.disabled = true;
-                } else {
-                  btn.addEventListener('click', function() {
-                    selectRole(r.label, btn);
-                  });
-                }
-
-                var labelDiv = document.createElement('div');
-                labelDiv.className = 'role-btn-label';
-                labelDiv.textContent = r.label;
-
-                var countDiv = document.createElement('div');
-                countDiv.className = 'role-btn-count';
-                countDiv.textContent = isFull ? 'Full' : remaining + ' spot' + (remaining > 1 ? 's' : '') + ' left';
-
-                btn.appendChild(labelDiv);
-                btn.appendChild(countDiv);
-                roleButtons.appendChild(btn);
-              });
-
-
-              // Add this block immediately here ↓
-              var allFull = ROLE_KEYS.every(function(r) {
-                var s = event.slots[r.key];
-                return s.max === 0 || s.filled >= s.max;
-              });
-              if (allFull) {
-                var fullMsg = document.createElement('div');
-                fullMsg.style.cssText = 'font-size:13px;color:#999;text-align:center;padding:8px 0;';
-                fullMsg.textContent = 'This slot is full.';
-                roleButtons.appendChild(fullMsg);
-                document.getElementById('modalForm').className = 'modal-form';
               }
 
-              // Hide form until role selected
-              var modalForm = document.getElementById('modalForm');
-              modalForm.className = 'modal-form';
-              document.getElementById('inputName').value = '';
-              document.getElementById('inputClass').value = '';
-              document.getElementById('modalMessage').style.display = 'none';
-              document.getElementById('submitBtn').textContent = SIGNUP_BTN_TEXT;
-              document.getElementById('submitBtn').disabled = false;
-              document.getElementById('modalOverlay').scrollTop = 0;
-              document.getElementById('modalOverlay').classList.add('active');
-              document.getElementById('modalOverlay').classList.add('active');
-            }
-
-            function selectRole(roleLabel, btn) {
-              currentRole = roleLabel;
-
-              // Highlight selected button
-              document.querySelectorAll('.role-btn').forEach(function(b) {
-                b.classList.remove('selected');
-              });
-              btn.classList.add('selected');
-
-              // Show form with matching submit button colour
-              var modalForm = document.getElementById('modalForm');
-              modalForm.className = 'modal-form visible';
-
-              var submitBtn = document.getElementById('submitBtn');
-              submitBtn.className = 'modal-submit';
-              var roleKey = ROLE_KEYS.find(function(r) { return r.label === roleLabel; });
-              if (roleKey) {
-                submitBtn.classList.add('modal-submit-' + roleKey.key.replace('classRep', 'classrep'));
+              if (event.signups.length > 0) {
+                var namesDiv = document.createElement("div");
+                namesDiv.className = "slot-names";
+                namesDiv.textContent = event.signups
+                  .map(function (s) {
+                    return s.name;
+                  })
+                  .join(", ");
+                slotDiv.appendChild(namesDiv);
               }
-              submitBtn.textContent = SIGNUP_BTN_TEXT;
 
-              document.getElementById('modalMessage').style.display = 'none';
-              document.getElementById('inputName').focus();
+              td.appendChild(slotDiv);
             }
+
+            tr.appendChild(td);
+          });
+
+          tbody.appendChild(tr);
+        });
+
+        table.innerHTML = "";
+        table.appendChild(thead);
+        table.appendChild(tbody);
+      }
+
+      function formatTime(time) {
+        if (!time) return "";
+        var parts = time.split(":");
+        var h = parseInt(parts[0]);
+        var m = parts[1] || "00";
+        var ampm = h >= 12 ? "pm" : "am";
+        h = h % 12 || 12;
+        return h + ":" + m + " " + ampm;
+      }
+
+      function formatTimeRange(startTime, endTime) {
+        return formatTime(startTime) + " - " + formatTime(endTime);
+      }
+
+      function openModal(eventId) {
+        document.body.scrollTop = 0;
+        document.documentElement.scrollTop = 0;
+        var event = gridData.events.find(function (e) {
+          return e.eventId == eventId;
+        });
+        if (!event) return;
+
+        currentEventId = eventId;
+        currentRole = null;
+
+        document.getElementById("modalTitle").textContent = event.activity;
+        document.getElementById("modalSubtitle").textContent =
+          formatTimeRange(event.startTime, event.endTime) +
+          " — " +
+          event.location;
+
+        // Names grouped by role
+        var namesSection = document.getElementById("namesSection");
+        var namesGroups = document.getElementById("namesGroups");
+        namesGroups.innerHTML = "";
+
+        var hasAnySignups = false;
+        ROLE_KEYS.forEach(function (r) {
+          var roleSignups = event.signups.filter(function (s) {
+            return s.role === r.label;
+          });
+          if (roleSignups.length === 0) return;
+          hasAnySignups = true;
+
+          var group = document.createElement("div");
+          group.className = "names-role-group";
+
+          var label = document.createElement("div");
+          label.className = "names-role-label " + r.labelClass;
+          label.textContent = r.label;
+          group.appendChild(label);
+
+          var chips = document.createElement("div");
+          chips.className = "names-chips";
+          roleSignups.forEach(function (s) {
+            var chip = document.createElement("div");
+            chip.className = "name-chip";
+            chip.textContent = s.name;
+            if (s.cls) {
+              var clsSpan = document.createElement("span");
+              clsSpan.style.cssText = "color:#888;font-size:10px;";
+              clsSpan.textContent = " — " + s.cls;
+              chip.appendChild(clsSpan);
+            }
+            chips.appendChild(chip);
+          });
+          group.appendChild(chips);
+          namesGroups.appendChild(group);
+        });
+        namesSection.style.display = hasAnySignups ? "block" : "none";
+
+        // Role buttons
+        var roleButtons = document.getElementById("roleButtons");
+        roleButtons.innerHTML = "";
+
+        ROLE_KEYS.forEach(function (r) {
+          var s = event.slots[r.key];
+          if (s.max === 0) return;
+
+          var btn = document.createElement("button");
+          btn.className = "role-btn " + r.btnClass;
+          btn.setAttribute("data-role", r.label);
+
+          var remaining = s.max - s.filled;
+          var isFull = remaining <= 0;
+
+          if (isFull) {
+            btn.classList.add("role-btn-full");
+            btn.disabled = true;
+          } else {
+            btn.addEventListener("click", function () {
+              selectRole(r.label, btn);
+            });
+          }
+
+          var labelDiv = document.createElement("div");
+          labelDiv.className = "role-btn-label";
+          labelDiv.textContent = r.label;
+
+          var countDiv = document.createElement("div");
+          countDiv.className = "role-btn-count";
+          countDiv.textContent = isFull
+            ? "Full"
+            : remaining + " spot" + (remaining > 1 ? "s" : "") + " left";
+
+          btn.appendChild(labelDiv);
+          btn.appendChild(countDiv);
+          roleButtons.appendChild(btn);
+        });
+
+        // Add this block immediately here ↓
+        var allFull = ROLE_KEYS.every(function (r) {
+          var s = event.slots[r.key];
+          return s.max === 0 || s.filled >= s.max;
+        });
+        if (allFull) {
+          var fullMsg = document.createElement("div");
+          fullMsg.style.cssText =
+            "font-size:13px;color:#999;text-align:center;padding:8px 0;";
+          fullMsg.textContent = "This slot is full.";
+          roleButtons.appendChild(fullMsg);
+          document.getElementById("modalForm").className = "modal-form";
+        }
+
+        // Hide form until role selected
+        var modalForm = document.getElementById("modalForm");
+        modalForm.className = "modal-form";
+        document.getElementById("inputName").value = "";
+        document.getElementById("inputClass").value = "";
+        document.getElementById("modalMessage").style.display = "none";
+        document.getElementById("submitBtn").textContent = SIGNUP_BTN_TEXT;
+        document.getElementById("submitBtn").disabled = false;
+        document.getElementById("modalOverlay").scrollTop = 0;
+        document.getElementById("modalOverlay").classList.add("active");
+        document.getElementById("modalOverlay").classList.add("active");
+      }
+
+      function selectRole(roleLabel, btn) {
+        currentRole = roleLabel;
+
+        // Highlight selected button
+        document.querySelectorAll(".role-btn").forEach(function (b) {
+          b.classList.remove("selected");
+        });
+        btn.classList.add("selected");
+
+        // Show form with matching submit button colour
+        var modalForm = document.getElementById("modalForm");
+        modalForm.className = "modal-form visible";
+
+        var submitBtn = document.getElementById("submitBtn");
+        submitBtn.className = "modal-submit";
+        var roleKey = ROLE_KEYS.find(function (r) {
+          return r.label === roleLabel;
+        });
+        if (roleKey) {
+          submitBtn.classList.add(
+            "modal-submit-" + roleKey.key.replace("classRep", "classrep"),
+          );
+        }
+        submitBtn.textContent = SIGNUP_BTN_TEXT;
+
+        document.getElementById("modalMessage").style.display = "none";
+        document.getElementById("inputName").focus();
+      }
 
       function closeModal() {
-        var overlay = document.getElementById('modalOverlay');
-        overlay.classList.remove('active');
+        var overlay = document.getElementById("modalOverlay");
+        overlay.classList.remove("active");
         overlay.scrollTop = 0;
         currentEventId = null;
         currentRole = null;
         document.body.scrollTop = 0;
         document.documentElement.scrollTop = 0;
-        var top = document.querySelector('h1');
-        if (top) top.scrollIntoView({ behavior: 'smooth' });
+        var top = document.querySelector("h1");
+        if (top) top.scrollIntoView({ behavior: "smooth" });
       }
 
-            function submitSignup() {
-              if (document.getElementById('honeypot').value !== '') return;
+      function submitSignup() {
+        if (document.getElementById("honeypot").value !== "") return;
 
-              if (!currentRole) {
-                showModalMessage('Please select a role.', false);
-                return;
+        if (!currentRole) {
+          showModalMessage("Please select a role.", false);
+          return;
+        }
+
+        var name = document.getElementById("inputName").value.trim();
+        var cls = document.getElementById("inputClass").value.trim();
+        var btn = document.getElementById("submitBtn");
+
+        if (!name) {
+          showModalMessage("名前を入力してください。", false);
+          return;
+        }
+        if (name.length > 10) {
+          showModalMessage("名前は１０文字以下で入力してください。", false);
+          return;
+        }
+        if (!/^[\p{L}\p{N}\s\-'.]+$/u.test(name)) {
+          showModalMessage("名前に不正な文字が含まれています。", false);
+          return;
+        }
+        if (!cls) {
+          showModalMessage("クラスを入力してください。", false);
+          return;
+        }
+        if (cls.length > 10) {
+          showModalMessage("クラスは１０文字以下で入力してください。", false);
+          return;
+        }
+        if (!/^[\p{L}\p{N}\s\-'.]+$/u.test(cls)) {
+          showModalMessage("クラス名に不正な文字が含まれています。", false);
+          return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = "Submitting...";
+        document.getElementById("modalMessage").style.display = "none";
+
+        google.script.run
+          .withSuccessHandler(function (result) {
+            showModalMessage(result.message, result.success);
+            if (result.success) {
+              // Update local data
+              var event = gridData.events.find(function (e) {
+                return e.eventId == currentEventId;
+              });
+              if (event) {
+                event.signups.push({ name: name, cls: cls, role: currentRole });
+                var roleKey = ROLE_KEYS.find(function (r) {
+                  return r.label === currentRole;
+                });
+                if (roleKey) event.slots[roleKey.key].filled++;
               }
-
-              var name = document.getElementById('inputName').value.trim();
-              var cls  = document.getElementById('inputClass').value.trim();
-              var btn  = document.getElementById('submitBtn');
-
-              if (!name) { showModalMessage('名前を入力してください。', false); return; }
-              if (name.length > 10) { showModalMessage('名前は１０文字以下で入力してください。', false); return; }
-              if (!/^[\p{L}\p{N}\s\-'.]+$/u.test(name)) { showModalMessage('名前に不正な文字が含まれています。', false); return; }
-              if (!cls) { showModalMessage('クラスを入力してください。', false); return; }
-              if (cls.length > 10) { showModalMessage('クラスは１０文字以下で入力してください。', false); return; }
-              if (!/^[\p{L}\p{N}\s\-'.]+$/u.test(cls)) { showModalMessage('クラス名に不正な文字が含まれています。', false); return; }
-
-              btn.disabled = true;
-              btn.textContent = 'Submitting...';
-              document.getElementById('modalMessage').style.display = 'none';
-
-              google.script.run
-                .withSuccessHandler(function(result) {
-                  showModalMessage(result.message, result.success);
-                  if (result.success) {
-                    // Update local data
-                    var event = gridData.events.find(function(e) { return e.eventId == currentEventId; });
-                    if (event) {
-                      event.signups.push({ name: name, cls: cls, role: currentRole });
-                      var roleKey = ROLE_KEYS.find(function(r) { return r.label === currentRole; });
-                      if (roleKey) event.slots[roleKey.key].filled++;
-                    }
-                    buildGrid();
-                    setTimeout(closeModal, 1500);
-                  } else {
-                    btn.disabled = false;
-                    btn.textContent = SIGNUP_BTN_TEXT;
-                  }
-                })
-                .withFailureHandler(function(error) {
-                  showModalMessage('Something went wrong. Please try again.', false);
-                  btn.disabled = false;
-                  btn.textContent = SIGNUP_BTN_TEXT;
-                })
-                .submitSignup(currentEventId, name, cls, currentRole, sheetId);
+              buildGrid();
+              setTimeout(closeModal, 1500);
+            } else {
+              btn.disabled = false;
+              btn.textContent = SIGNUP_BTN_TEXT;
             }
+          })
+          .withFailureHandler(function (error) {
+            showModalMessage("Something went wrong. Please try again.", false);
+            btn.disabled = false;
+            btn.textContent = SIGNUP_BTN_TEXT;
+          })
+          .submitSignup(currentEventId, name, cls, currentRole, alias);
+      }
 
-            function showModalMessage(message, success) {
-              var msgDiv = document.getElementById('modalMessage');
-              msgDiv.textContent = message;
-              msgDiv.className = 'modal-message ' + (success ? 'success' : 'error');
-              msgDiv.style.display = 'block';
-            }
+      function showModalMessage(message, success) {
+        var msgDiv = document.getElementById("modalMessage");
+        msgDiv.textContent = message;
+        msgDiv.className = "modal-message " + (success ? "success" : "error");
+        msgDiv.style.display = "block";
+      }
 
-            document.getElementById('modalOverlay').addEventListener('click', function(e) {
-              if (e.target === this) closeModal();
-            });
-            document.getElementById('cancelBtn').addEventListener('click', closeModal);
-            document.getElementById('submitBtn').addEventListener('click', submitSignup);
-            document.getElementById('inputName').addEventListener('keydown', function(e) {
-              if (e.key === 'Enter') submitSignup();
-            });
-            document.getElementById('inputClass').addEventListener('keydown', function(e) {
-              if (e.key === 'Enter') submitSignup();
-            });
-            document.getElementById('pageTitle').textContent = PAGE_TITLE;
-            buildGrid();
+      document
+        .getElementById("modalOverlay")
+        .addEventListener("click", function (e) {
+          if (e.target === this) closeModal();
+        });
+      document
+        .getElementById("cancelBtn")
+        .addEventListener("click", closeModal);
+      document
+        .getElementById("submitBtn")
+        .addEventListener("click", submitSignup);
+      document
+        .getElementById("inputName")
+        .addEventListener("keydown", function (e) {
+          if (e.key === "Enter") submitSignup();
+        });
+      document
+        .getElementById("inputClass")
+        .addEventListener("keydown", function (e) {
+          if (e.key === "Enter") submitSignup();
+        });
+      document.getElementById("pageTitle").textContent = PAGE_TITLE;
+      buildGrid();
     </script>
     <div
       style="margin-top: 2rem; font-size: 12px; color: #888; text-align: center"
