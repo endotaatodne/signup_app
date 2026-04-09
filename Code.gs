@@ -69,8 +69,9 @@ function doGet(e) {
     return template.evaluate().setTitle(title);
   } catch (err) {
 return HtmlService.createHtmlOutput(
-  '<p style="font-family:Arial;padding:20px;">Something went wrong. Please try again later.</p>'
+      '<p style="font-family:Arial;padding:20px;">Something went wrong. Please try again later.</p>',
 );
+  }
 }
 /**
  * Retrieves all events and signup data from Google Sheets and structures
@@ -198,7 +199,10 @@ function submitSignup(eventId, name, cls, role, alias) {
       };
     }
     if (!/^[\p{L}\p{N}\s\-'.]+$/u.test(cls.trim())) {
-      return { success: false, message: "クラス名に不正な文字が含まれています。" };
+      return {
+        success: false,
+        message: "クラス名に不正な文字が含まれています。",
+      };
     }
 
     // Validate role
