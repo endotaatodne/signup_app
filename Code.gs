@@ -24,11 +24,14 @@ const ROLES = {
 function doGet(e) {
   try {
     const sheetId = SHEET_ID;
+    const spreadsheet = SpreadsheetApp.openById(sheetId);
+    const title = spreadsheet.getName();
     const template = HtmlService.createTemplateFromFile("index");
     template.gridData = JSON.stringify(getGridData(sheetId));
     template.sheetId = sheetId;
     template.roles = JSON.stringify(ROLES);
-    return template.evaluate().setTitle("Signup App");
+    template.title = title;
+    return template.evaluate().setTitle(title);
   } catch (err) {
     return HtmlService.createHtmlOutput("Error: " + err.message);
   }
