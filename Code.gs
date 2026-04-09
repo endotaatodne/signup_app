@@ -1,11 +1,17 @@
+const SHEET_ID = "xxxxxxxxx";
+
+const ROLES = {
+  general: "一般保護者",
+  classRep: "学年委員",
+  committee: "運営委員・役員",
+};
+
 /**
  * @fileoverview Signup App - Google Apps Script backend.
  * Serves the web app and handles all interactions with Google Sheets.
  * @author endotaatodne
- * @version 0.0.1
+ * @version 0.0.x
  */
-
-const SHEET_ID = "xxxxxxxxx";
 
 /**
  * Entry point for the web app. Called automatically by Google Apps Script
@@ -21,6 +27,7 @@ function doGet(e) {
     const template = HtmlService.createTemplateFromFile("index");
     template.gridData = JSON.stringify(getGridData(sheetId));
     template.sheetId = sheetId;
+    template.roles = JSON.stringify(ROLES);
     return template.evaluate().setTitle("Signup App");
   } catch (err) {
     return HtmlService.createHtmlOutput("Error: " + err.message);
@@ -31,58 +38,77 @@ function doGet(e) {
  * it for the grid view. Returns unique sorted time slots and activities
  * as separate arrays so the frontend can build the grid headers.
  *
+ * @param {string} sheetId - The Google Sheet ID
  * @returns {{events: Object[], times: string[], activities: string[]}}
  *   - events: array of event objects with signup counts and remaining slots
  *   - times: sorted unique start times in HH:mm format
  *   - activities: unique activity names for column headers
  */
-function getGridData() {
-  const eventsSheet =
-    SpreadsheetApp.openById(SHEET_ID).getSheetByName("Events");
+function getGridData(sheetId) {
+  const eventsSheet = SpreadsheetApp.openById(sheetId).getSheetByName("Events");
   const signupsSheet =
-    SpreadsheetApp.openById(SHEET_ID).getSheetByName("Signups");
+    SpreadsheetApp.openById(sheetId).getSheetByName("Signups");
 
   const eventRows = eventsSheet.getDataRange().getValues();
   const signupRows = signupsSheet.getDataRange().getValues();
 
-  // Build signups lookup: eventId -> [names]
+  // Build signups lookup: eventId -> [{name, cls, role}]
   const signupsMap = {};
   signupRows.slice(1).forEach((row) => {
     const eventId = row[1];
     const name = row[2];
     const cls = String(row[3]);
+    const role = row[4];
     if (!signupsMap[eventId]) signupsMap[eventId] = [];
-    signupsMap[eventId].push({ name: name, cls: cls });
+    signupsMap[eventId].push({ name, cls, role });
   });
 
-  // Build events list
-  const events = eventRows.slice(1).map((row) => ({
-    eventId: row[0],
-    activity: row[1],
-    person: String(row[2]),
-    date: Utilities.formatDate(
-      new Date(row[3]),
-      "Australia/Brisbane",
-      "dd MMM yyyy",
-    ),
-    startTime: Utilities.formatDate(
-      new Date(row[4]),
-      "Australia/Brisbane",
-      "HH:mm",
-    ),
-    endTime: Utilities.formatDate(
-      new Date(row[5]),
-      "Australia/Brisbane",
-      "HH:mm",
-    ),
-    description: String(row[6]),
-    location: row[7],
-    maxSlots: row[8],
-    signups: signupsMap[row[0]] || [],
-    remaining: row[8] - (signupsMap[row[0]] ? signupsMap[row[0]].length : 0),
-  }));
+  const events = eventRows.slice(1).map((row) => {
+    const eventId = row[0];
+    const allSignups = signupsMap[eventId] || [];
+    const generalMax = Number(row[8]) || 0;
+    const classRepMax = Number(row[9]) || 0;
+    const committeeMax = Number(row[10]) || 0;
 
-  // Get unique sorted time slots and activities
+    return {
+      eventId: eventId,
+      activity: row[1],
+      person: String(row[2]),
+      date: Utilities.formatDate(
+        new Date(row[3]),
+        "Australia/Brisbane",
+        "dd MMM yyyy",
+      ),
+      startTime: Utilities.formatDate(
+        new Date(row[4]),
+        "Australia/Brisbane",
+        "HH:mm",
+      ),
+      endTime: Utilities.formatDate(
+        new Date(row[5]),
+        "Australia/Brisbane",
+        "HH:mm",
+      ),
+      description: String(row[6]),
+      location: row[7],
+      slots: {
+        general: {
+          max: generalMax,
+          filled: allSignups.filter((s) => s.role === ROLES.general).length,
+        },
+        classRep: {
+          max: classRepMax,
+          filled: allSignups.filter((s) => s.role === ROLES.classRep).length,
+        },
+        committee: {
+          max: committeeMax,
+          filled: allSignups.filter((s) => s.role === ROLES.committee).length,
+        },
+      },
+      signups: allSignups,
+    };
+  });
+
   const times = [...new Set(events.map((e) => e.startTime))].sort();
   const activities = [...new Set(events.map((e) => e.activity))];
 
@@ -90,20 +116,16 @@ function getGridData() {
 }
 
 /**
- * Submits a new signup for a given event. Checks slot availability and
- * duplicate names before writing to the Signups sheet. Uses LockService
- * to prevent race conditions when multiple users submit simultaneously.
- *
- * @param {string|number} eventId - The EventID from the Events sheet
- * @param {string} name - The participant's name (required, max 10 chars)
- * @param {string} cls - The participant's class level (required, max 10 chars)
+ * Submits a new signup for a given event and role.
+ * @param {string} sheetId - The Google Sheet ID
+ * @param {number} eventId - The EventID from the Events sheet
+ * @param {string} name - The participant's name
+ * @param {string} cls - The participant's class
+ * @param {string} role - The participant's role
  * @returns {{success: boolean, message: string}}
- *   - success: true if signup was recorded, false otherwise
- *   - message: user-facing message describing the result
  */
-function submitSignup(eventId, name, cls) {
+function submitSignup(eventId, name, cls, role, sheetId) {
   const lock = LockService.getScriptLock();
-
   try {
     lock.waitLock(10000);
 
@@ -111,7 +133,7 @@ function submitSignup(eventId, name, cls) {
     if (!name || typeof name !== "string" || name.trim().length === 0) {
       return { success: false, message: "名前を入力してください。" };
     }
-    if (name.trim().length > 10) {
+    if (name.trim().length > 100) {
       return {
         success: false,
         message: "名前は１０文字以下で入力してください。",
@@ -123,7 +145,7 @@ function submitSignup(eventId, name, cls) {
     if (!cls || typeof cls !== "string" || cls.trim().length === 0) {
       return { success: false, message: "クラスを入力してください。" };
     }
-    if (cls.trim().length > 10) {
+    if (cls.trim().length > 100) {
       return {
         success: false,
         message: "クラスは１０文字以下で入力してください。",
@@ -135,30 +157,57 @@ function submitSignup(eventId, name, cls) {
         message: "クラス名に不正な文字が含まれています。",
       };
     }
-    // Trim inputs before storing
+
+    // Validate role
+    const validRoles = Object.values(ROLES);
+    if (!validRoles.includes(role)) {
+      return { success: false, message: "ロールを選択してください" };
+    }
+
+    // Safety check
+    if (sheetId !== SHEET_ID) {
+      return { success: false, message: "エラーが発生しました" };
+    }
+
     name = name.trim();
     cls = cls.trim();
 
     const eventsSheet =
-      SpreadsheetApp.openById(SHEET_ID).getSheetByName("Events");
+      SpreadsheetApp.openById(sheetId).getSheetByName("Events");
     const signupsSheet =
-      SpreadsheetApp.openById(SHEET_ID).getSheetByName("Signups");
+      SpreadsheetApp.openById(sheetId).getSheetByName("Signups");
 
     const eventRows = eventsSheet.getDataRange().getValues();
     const eventRow = eventRows.find((r) => r[0] == eventId);
     if (!eventRow) return { success: false, message: "Event not found." };
-    const maxSlots = eventRow[8];
+
+    // Get max slots for the selected role
+    const roleMaxMap = {
+      [ROLES.general]: Number(eventRow[8]) || 0,
+      [ROLES.classRep]: Number(eventRow[9]) || 0,
+      [ROLES.committee]: Number(eventRow[10]) || 0,
+    };
+    const maxSlots = roleMaxMap[role];
+    if (maxSlots === 0) {
+      return {
+        success: false,
+        message: "このボランティア枠は存在しません。",
+      };
+    }
 
     const signupRows = signupsSheet.getDataRange().getValues();
     const existing = signupRows.slice(1).filter((r) => r[1] == eventId);
 
-    if (existing.length >= maxSlots) {
+    // Check slot capacity for this role
+    const roleSignups = existing.filter((r) => r[4] === role);
+    if (roleSignups.length >= maxSlots) {
       return {
         success: false,
         message: "申し訳ありません、この枠のボランティア募集は終了しました。",
       };
     }
 
+    // Duplicate check per slot (regardless of role)
     const duplicate = existing.find(
       (r) => r[2].toString().toLowerCase() === name.toLowerCase(),
     );
@@ -171,11 +220,19 @@ function submitSignup(eventId, name, cls) {
     }
 
     const signupId = new Date().getTime();
-    signupsSheet.appendRow([signupId, eventId, name, String(cls), new Date()]);
+    signupsSheet.appendRow([
+      signupId,
+      eventId,
+      name,
+      String(cls),
+      role,
+      new Date(),
+    ]);
 
     return {
       success: true,
       message: "ありがとうございます！登録が完了しました！",
+      role: role,
     };
   } catch (e) {
     return { success: false, message: "Error: " + e.message };
