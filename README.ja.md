@@ -341,7 +341,7 @@ signup-app/
 
 ## コントリビューション
 
-コントリビューションを歓迎します！Issueの作成やPull Requestの送信をお気軽にどうぞ。
+Issueの作成やPull Requestの送信をお気軽にどうぞ。
 
 1. リポジトリをフォーク
 2. フィーチャーブランチを作成（`git checkout -b feature/my-feature`）
