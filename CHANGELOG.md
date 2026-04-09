@@ -1,3 +1,7 @@
+## v0.0.3 - 2026-04-09
+
+- Minor documentation updates
+
 ## v0.0.2 - 2026-04-09
 
 - Major update
