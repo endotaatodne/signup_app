@@ -1,4 +1,6 @@
-This repository has documentation in multiple languages.
+# Signup App
+
+This repository has documentation in Japanese and English languages.
 
 - [日本語](README.ja.md)
 
