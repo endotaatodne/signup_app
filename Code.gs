@@ -10,7 +10,7 @@ const ROLES = {
  * @fileoverview Signup App - Google Apps Script backend.
  * Serves the web app and handles all interactions with Google Sheets.
  * @author endotaatodne
- * @version 0.0.5
+ * @version 0.0.6
  */
 
 /**

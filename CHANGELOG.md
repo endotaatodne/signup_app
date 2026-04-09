@@ -1,3 +1,7 @@
+## v0.0.6 - 2026-04-10
+
+- Bug fix - should only allow 10 chars for names and class
+
 ## v0.0.5 - 2026-04-10
 
 - Adds further security patches
