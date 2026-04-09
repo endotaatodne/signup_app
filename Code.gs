@@ -10,7 +10,7 @@ const ROLES = {
  * @fileoverview Signup App - Google Apps Script backend.
  * Serves the web app and handles all interactions with Google Sheets.
  * @author endotaatodne
- * @version 0.0.5
+ * @version 0.0.6
  */
 
 /**
@@ -194,7 +194,7 @@ function submitSignup(eventId, name, cls, role, alias) {
     if (!name || typeof name !== "string" || name.trim().length === 0) {
       return { success: false, message: "名前を入力してください。" };
     }
-    if (name.trim().length > 100) {
+    if (name.trim().length > 10) {
       return {
         success: false,
         message: "名前は１０文字以下で入力してください。",
@@ -208,7 +208,7 @@ function submitSignup(eventId, name, cls, role, alias) {
     if (!cls || typeof cls !== "string" || cls.trim().length === 0) {
       return { success: false, message: "クラスを入力してください。" };
     }
-    if (cls.trim().length > 100) {
+    if (cls.trim().length > 10) {
       return {
         success: false,
         message: "クラスは１０文字以下で入力してください。",
