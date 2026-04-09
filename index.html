@@ -336,7 +336,7 @@
     </style>
   </head>
   <body>
-    <h1>補習校祭りボランティア</h1>
+    <h1 id="pageTitle"></h1>
     <div class="grid-wrapper">
       <table id="grid"></table>
     </div>
@@ -386,10 +386,11 @@
     </div>
 
     <script>
-                        var SIGNUP_BTN_TEXT = "登録する";
+            var SIGNUP_BTN_TEXT = "登録する";
             var gridData = <?!= gridData ?>;
             var sheetId = '<?!= sheetId ?>';
             var ROLES = JSON.parse('<?!= roles ?>');
+            var PAGE_TITLE = '<?!= title ?>';
             var currentEventId = null;
             var currentRole = null;
 
@@ -775,7 +776,7 @@
             document.getElementById('inputClass').addEventListener('keydown', function(e) {
               if (e.key === 'Enter') submitSignup();
             });
-
+            document.getElementById('pageTitle').textContent = PAGE_TITLE;
             buildGrid();
     </script>
     <div
