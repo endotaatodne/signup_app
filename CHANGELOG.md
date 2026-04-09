@@ -1,3 +1,11 @@
+## v0.0.5 - 2026-04-10
+
+- Adds further security patches
+  - limit the number of entries in a minute
+  - checks the date in submitSignup()
+  - added timeout
+  - further sanitisation on alias
+
 ## v0.0.4 - 2026-04-10
 
 - Adds security patches
