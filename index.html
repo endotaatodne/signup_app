@@ -621,10 +621,14 @@
         currentRole = null;
 
         document.getElementById("modalTitle").textContent = event.activity;
-        document.getElementById("modalSubtitle").textContent =
+        var subtitle =
           formatTimeRange(event.startTime, event.endTime) +
           " — " +
           event.location;
+        if (event.description && event.description.trim() !== "") {
+          subtitle += " — " + event.description;
+        }
+        document.getElementById("modalSubtitle").textContent = subtitle;
 
         // Names grouped by role
         var namesSection = document.getElementById("namesSection");
