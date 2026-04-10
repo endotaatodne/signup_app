@@ -1,3 +1,9 @@
+## v0.0.7 - 2026-04-10
+
+- Minor update
+  - changed the column name in the original Google Sheet for clarity
+  - adds SubTitle column in the pop-up
+
 ## v0.0.6 - 2026-04-10
 
 - Bug fix - should only allow 10 chars for names and class

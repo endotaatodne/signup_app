@@ -18,7 +18,6 @@ A free, open source volunteer signup app built on Google Apps Script and Google 
 - Names grouped by role in the signup modal
 - Slot limits enforced server-side with race condition protection
 - Duplicate name prevention per slot
-- Responsible person shown per activity column
 - Notes/description column per time slot
 - Page title driven dynamically by the Google Sheet name
 - Multiple events supported via URL parameter — no redeployment needed
@@ -84,9 +83,9 @@ https://docs.google.com/spreadsheets/d/YOUR_MASTER_SHEET_ID/edit
 
 **Events tab** — add these headers in row 1:
 
-| A       | B        | C      | D    | E         | F       | G           | H        | I            | J             | K              |
-| ------- | -------- | ------ | ---- | --------- | ------- | ----------- | -------- | ------------ | ------------- | -------------- |
-| EventID | Activity | Person | Date | StartTime | EndTime | Description | Location | GeneralSlots | ClassRepSlots | CommitteeSlots |
+| A       | B        | C        | D    | E         | F       | G           | H        | I            | J             | K              |
+| ------- | -------- | -------- | ---- | --------- | ------- | ----------- | -------- | ------------ | ------------- | -------------- |
+| EventID | Activity | SubTitle | Date | StartTime | EndTime | Description | Location | GeneralSlots | ClassRepSlots | CommitteeSlots |
 
 **Signups tab** — add these headers in row 1:
 
@@ -215,19 +214,19 @@ All signups are in the **Signups tab** of each event Sheet with:
 
 ## Events Tab Column Reference
 
-| Column | Field          | Description                                    |
-| ------ | -------------- | ---------------------------------------------- |
-| A      | EventID        | Unique number per row (e.g. 1, 2, 3)           |
-| B      | Activity       | Activity name — shown as grid column header    |
-| C      | Person         | Responsible person — shown below activity name |
-| D      | Date           | Date in YYYY-MM-DD format                      |
-| E      | StartTime      | Start time in HH:MM format (e.g. 09:00)        |
-| F      | EndTime        | End time in HH:MM format (e.g. 10:00)          |
-| G      | Description    | Short notes shown in the grid                  |
-| H      | Location       | Room or location name                          |
-| I      | GeneralSlots   | Max General volunteer spots (0 = not needed)   |
-| J      | ClassRepSlots  | Max Class Rep spots (0 = not needed)           |
-| K      | CommitteeSlots | Max Committee spots (0 = not needed)           |
+| Column | Field          | Description                                                             |
+| ------ | -------------- | ----------------------------------------------------------------------- |
+| A      | EventID        | Unique number per row (e.g. 1, 2, 3)                                    |
+| B      | Activity       | Activity name — shown as grid column header                             |
+| C      | SubTitle       | Subtitle to be shown below the column title — shown below activity name |
+| D      | Date           | Date in YYYY-MM-DD format                                               |
+| E      | StartTime      | Start time in HH:MM format (e.g. 09:00)                                 |
+| F      | EndTime        | End time in HH:MM format (e.g. 10:00)                                   |
+| G      | Description    | Short notes shown in the grid                                           |
+| H      | Location       | Room or location name                                                   |
+| I      | GeneralSlots   | Max General volunteer spots (0 = not needed)                            |
+| J      | ClassRepSlots  | Max Class Rep spots (0 = not needed)                                    |
+| K      | CommitteeSlots | Max Committee spots (0 = not needed)                                    |
 
 ---
 
