@@ -1,3 +1,9 @@
+## v0.0.7 - 2026-04-11
+
+- Minor update
+  - changed the "Spot is full" message to Japanese
+  - changed the colour of names being displayed after registered
+
 ## v0.0.7 - 2026-04-10
 
 - Minor update

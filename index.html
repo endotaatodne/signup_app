@@ -115,11 +115,10 @@
       }
       .slot-names {
         font-size: 10px;
-        color: #555;
         margin-top: 4px;
         padding-top: 4px;
         border-top: 1px solid rgba(0, 0, 0, 0.08);
-        line-height: 1.4;
+        line-height: 1.6;
       }
 
       /* Role colours */
@@ -529,7 +528,8 @@
                   })(event.eventId),
                 );
                 var fullText = document.createElement("div");
-                fullText.style.cssText = "font-size:11px;color:#999;";
+                fullText.style.cssText =
+                  "font-size:11px;color:#999;margin-bottom:4px;";
                 fullText.textContent = "Full";
                 slotDiv.appendChild(fullText);
               } else {
@@ -573,11 +573,27 @@
               if (event.signups.length > 0) {
                 var namesDiv = document.createElement("div");
                 namesDiv.className = "slot-names";
-                namesDiv.textContent = event.signups
-                  .map(function (s) {
-                    return s.name;
-                  })
-                  .join(", ");
+
+                ROLE_KEYS.forEach(function (r) {
+                  var roleSignups = event.signups.filter(function (s) {
+                    return s.role === r.label;
+                  });
+                  if (roleSignups.length === 0) return;
+
+                  var roleSpan = document.createElement("span");
+                  roleSpan.className = r.countClass;
+                  roleSpan.style.cssText = "font-size:10px;font-weight:500;";
+                  roleSpan.textContent = roleSignups
+                    .map(function (s) {
+                      return s.name;
+                    })
+                    .join(", ");
+                  namesDiv.appendChild(roleSpan);
+
+                  // Add a line break between role groups if more than one role has signups
+                  namesDiv.appendChild(document.createElement("br"));
+                });
+
                 slotDiv.appendChild(namesDiv);
               }
 
@@ -718,7 +734,8 @@
           var fullMsg = document.createElement("div");
           fullMsg.style.cssText =
             "font-size:13px;color:#999;text-align:center;padding:8px 0;";
-          fullMsg.textContent = "This slot is full.";
+          fullMsg.textContent =
+            "この枠はおかげさまで定員に達しました。ありがとうございます。";
           roleButtons.appendChild(fullMsg);
           document.getElementById("modalForm").className = "modal-form";
         }
