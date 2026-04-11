@@ -367,10 +367,19 @@
           <input
             type="text"
             id="honeypot"
-            name="website"
+            name="email_confirm"
             autocomplete="off"
             tabindex="-1"
-            style="display: none"
+            aria-hidden="true"
+            style="
+              opacity: 0;
+              position: absolute;
+              top: 0;
+              left: 0;
+              height: 0;
+              width: 0;
+              z-index: -1;
+            "
           />
           <button class="modal-submit" id="submitBtn">SIGNUP_BTN_TEXT</button>
           <div
@@ -395,6 +404,7 @@
             .join(""),
         );
       }
+      var PAGE_LOAD_TIME = Date.now();
       var SIGNUP_BTN_TEXT = "登録する";
       var gridData = JSON.parse(b64decode("<?!= gridData ?>"));
       var alias = b64decode("<?!= alias ?>");
@@ -796,9 +806,17 @@
 
       function submitSignup() {
         if (document.getElementById("honeypot").value !== "") return;
+        // Reject submissions that arrive too quickly — likely automated
+        if (Date.now() - PAGE_LOAD_TIME < 3000) {
+          showModalMessage(
+            "Please take a moment to review before submitting.",
+            false,
+          );
+          return;
+        }
 
         if (!currentRole) {
-          showModalMessage("Please select a role.", false);
+          showModalMessage("ロールを選択してください。", false);
           return;
         }
 
@@ -858,7 +876,7 @@
             }
           })
           .withFailureHandler(function (error) {
-            showModalMessage("Something went wrong. Please try again.", false);
+            showModalMessage("問題が発生しました。再度試してください。", false);
             btn.disabled = false;
             btn.textContent = SIGNUP_BTN_TEXT;
           })

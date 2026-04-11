@@ -1,4 +1,10 @@
-## v0.0.7 - 2026-04-11
+## v0.0.9 - 2026-04-12
+
+- Major update
+  - changes the way MASTER_SHEET_ID is called - removed hard coding of the ID
+  - improved security
+
+## v0.0.8 - 2026-04-11
 
 - Minor update
   - changed the "Spot is full" message to Japanese

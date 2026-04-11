@@ -1,4 +1,5 @@
-const MASTER_SHEET_ID = "xxxxxxxxx";
+const MASTER_SHEET_ID =
+  PropertiesService.getScriptProperties().getProperty("MASTER_SHEET_ID");
 
 const ROLES = {
   general: "一般保護者",
@@ -10,7 +11,7 @@ const ROLES = {
  * @fileoverview Signup App - Google Apps Script backend.
  * Serves the web app and handles all interactions with Google Sheets.
  * @author endotaatodne
- * @version 0.0.8
+ * @version 0.0.9
  */
 
 /**
@@ -180,14 +181,25 @@ function submitSignup(eventId, name, cls, role, alias) {
 
     // Validate and sanitise alias
     if (!alias || !/^[a-zA-Z0-9\-]{1,50}$/.test(alias)) {
-      return { success: false, message: "Invalid request." };
+      return { success: false, message: "不正なリクエストです。" };
     }
+
+    // Validate eventId as strict positive integer
+    const parsedEventId = parseInt(eventId, 10);
+    if (
+      isNaN(parsedEventId) ||
+      parsedEventId <= 0 ||
+      String(parsedEventId) !== String(eventId)
+    ) {
+      return { success: false, message: "不正なリクエストです。" };
+    }
+    eventId = parsedEventId;
 
     // Derive sheetId server-side — never trust client-supplied sheet identifiers
     const config = getEventConfig();
     const sheetId = config[alias.toLowerCase()];
     if (!sheetId) {
-      return { success: false, message: "Invalid request." };
+      return { success: false, message: "不正なリクエストです。" };
     }
 
     // Input validation — name
@@ -235,12 +247,12 @@ function submitSignup(eventId, name, cls, role, alias) {
       };
     }
 
-    // Rate limiting — max 3 submissions per name per 60 seconds
-    if (!checkRateLimit(name)) {
+    // Rate limiting — composite key prevents bypass by name variation,
+    // global event cap prevents flood attacks
+    if (!checkRateLimit(eventId, name, cls)) {
       return {
         success: false,
-        message:
-          "1分間内の回数制限を超過しました。少し待ってから再度試してください。",
+        message: "使用回数を超過しました。少し待ってからお試しください。",
       };
     }
 
@@ -250,8 +262,10 @@ function submitSignup(eventId, name, cls, role, alias) {
       return { success: false, message: "ロールを選択してください" };
     }
 
-    name = name.trim();
-    cls = cls.trim();
+    // Normalise whitespace in stored values — collapse regular and
+    // full-width spaces (common in Japanese input) before writing to Sheet
+    name = name.replace(/[\s\u3000]+/g, " ").trim();
+    cls = cls.replace(/[\s\u3000]+/g, " ").trim();
 
     const eventsSheet =
       SpreadsheetApp.openById(sheetId).getSheetByName("Events");
@@ -296,9 +310,19 @@ function submitSignup(eventId, name, cls, role, alias) {
       };
     }
 
-    // Duplicate check per slot regardless of role
+    // Normalise name for comparison — case insensitive, collapse regular
+    // and full-width spaces (common in Japanese input)
+    const normalisedInput = name
+      .toLowerCase()
+      .replace(/[\s\u3000]+/g, " ")
+      .trim();
     const duplicate = existing.find(
-      (r) => r[2].toString().toLowerCase() === name.toLowerCase(),
+      (r) =>
+        r[2]
+          .toString()
+          .toLowerCase()
+          .replace(/[\s\u3000]+/g, " ")
+          .trim() === normalisedInput,
     );
     if (duplicate) {
       return {
@@ -308,7 +332,7 @@ function submitSignup(eventId, name, cls, role, alias) {
       };
     }
 
-    const signupId = new Date().getTime();
+    const signupId = Utilities.getUuid();
     signupsSheet.appendRow([
       signupId,
       eventId,
@@ -332,20 +356,42 @@ function submitSignup(eventId, name, cls, role, alias) {
 }
 
 /**
- * Rate limiter — allows max 3 submissions per name per 60 seconds.
- * Uses CacheService to track submission counts.
+ * Rate limiter — uses a composite key of eventId, name prefix and class prefix
+ * to prevent bypass by varying name alone. Also enforces a global per-event
+ * cap of 20 submissions per minute to block flood attacks.
+ * @param {number} eventId - The event being signed up for
  * @param {string} name - The participant's name
+ * @param {string} cls - The participant's class
  * @returns {boolean} true if allowed, false if rate limited
  */
-function checkRateLimit(name) {
+function checkRateLimit(eventId, name, cls) {
   const cache = CacheService.getScriptCache();
-  const key =
-    "ratelimit_" + name.toLowerCase().replace(/\s/g, "_").substring(0, 50);
+
+  // Composite key — harder to bypass than name alone
+  const namePart = name
+    .toLowerCase()
+    .replace(/[\s\u3000]+/g, "")
+    .substring(0, 3);
+  const clsPart = cls
+    .toLowerCase()
+    .replace(/[\s\u3000]+/g, "")
+    .substring(0, 3);
+  const key = "rl_" + eventId + "_" + namePart + "_" + clsPart;
+
   const hits = cache.get(key);
   if (hits && parseInt(hits) >= 3) {
     return false;
   }
   cache.put(key, hits ? String(parseInt(hits) + 1) : "1", 60);
+
+  // Global per-event rate limit — max 20 submissions per event per minute
+  const eventKey = "rl_event_" + eventId;
+  const eventHits = cache.get(eventKey);
+  if (eventHits && parseInt(eventHits) >= 20) {
+    return false;
+  }
+  cache.put(eventKey, eventHits ? String(parseInt(eventHits) + 1) : "1", 60);
+
   return true;
 }
 
@@ -385,5 +431,26 @@ function sanitiseForScript(str) {
     .replace(/>/g, "\\u003e")
     .replace(/"/g, "\\u0022")
     .replace(/'/g, "\\u0027")
-    .replace(/\//g, "\\u002f");
+    .replace(/\//g, "\\u002f")
+    .replace(/`/g, "\\u0060");
+}
+
+function getEventConfig() {
+  if (!MASTER_SHEET_ID) {
+    console.error("MASTER_SHEET_ID not set in Script Properties");
+    return {};
+  }
+  const sheet =
+    SpreadsheetApp.openById(MASTER_SHEET_ID).getSheetByName("Config");
+  if (!sheet) return {};
+  const rows = sheet.getDataRange().getValues();
+  const config = {};
+  rows.slice(1).forEach(function (row) {
+    const alias = row[0].toString().trim().toLowerCase();
+    const sheetId = row[1].toString().trim();
+    if (alias && sheetId && /^[a-zA-Z0-9_\-]{20,60}$/.test(sheetId)) {
+      config[alias] = sheetId;
+    }
+  });
+  return config;
 }
