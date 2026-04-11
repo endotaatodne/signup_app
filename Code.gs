@@ -11,7 +11,7 @@ const ROLES = {
  * @fileoverview Signup App - Google Apps Script backend.
  * Serves the web app and handles all interactions with Google Sheets.
  * @author endotaatodne
- * @version 0.0.8
+ * @version 0.0.9
  */
 
 /**
@@ -247,12 +247,12 @@ function submitSignup(eventId, name, cls, role, alias) {
       };
     }
 
-    // Rate limiting — max 3 submissions per name per 60 seconds
-    if (!checkRateLimit(name)) {
+    // Rate limiting — composite key prevents bypass by name variation,
+    // global event cap prevents flood attacks
+    if (!checkRateLimit(eventId, name, cls)) {
       return {
         success: false,
-        message:
-          "1分間内の回数制限を超過しました。少し待ってから再度試してください。",
+        message: "使用回数を超過しました。少し待ってからお試しください。",
       };
     }
 
@@ -356,20 +356,42 @@ function submitSignup(eventId, name, cls, role, alias) {
 }
 
 /**
- * Rate limiter — allows max 3 submissions per name per 60 seconds.
- * Uses CacheService to track submission counts.
+ * Rate limiter — uses a composite key of eventId, name prefix and class prefix
+ * to prevent bypass by varying name alone. Also enforces a global per-event
+ * cap of 20 submissions per minute to block flood attacks.
+ * @param {number} eventId - The event being signed up for
  * @param {string} name - The participant's name
+ * @param {string} cls - The participant's class
  * @returns {boolean} true if allowed, false if rate limited
  */
-function checkRateLimit(name) {
+function checkRateLimit(eventId, name, cls) {
   const cache = CacheService.getScriptCache();
-  const key =
-    "ratelimit_" + name.toLowerCase().replace(/\s/g, "_").substring(0, 50);
+
+  // Composite key — harder to bypass than name alone
+  const namePart = name
+    .toLowerCase()
+    .replace(/[\s\u3000]+/g, "")
+    .substring(0, 3);
+  const clsPart = cls
+    .toLowerCase()
+    .replace(/[\s\u3000]+/g, "")
+    .substring(0, 3);
+  const key = "rl_" + eventId + "_" + namePart + "_" + clsPart;
+
   const hits = cache.get(key);
   if (hits && parseInt(hits) >= 3) {
     return false;
   }
   cache.put(key, hits ? String(parseInt(hits) + 1) : "1", 60);
+
+  // Global per-event rate limit — max 20 submissions per event per minute
+  const eventKey = "rl_event_" + eventId;
+  const eventHits = cache.get(eventKey);
+  if (eventHits && parseInt(eventHits) >= 20) {
+    return false;
+  }
+  cache.put(eventKey, eventHits ? String(parseInt(eventHits) + 1) : "1", 60);
+
   return true;
 }
 
