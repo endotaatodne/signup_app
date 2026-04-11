@@ -798,7 +798,7 @@
         if (document.getElementById("honeypot").value !== "") return;
 
         if (!currentRole) {
-          showModalMessage("Please select a role.", false);
+          showModalMessage("ロールを選択してください。", false);
           return;
         }
 
@@ -858,7 +858,7 @@
             }
           })
           .withFailureHandler(function (error) {
-            showModalMessage("Something went wrong. Please try again.", false);
+            showModalMessage("問題が発生しました。再度試してください。", false);
             btn.disabled = false;
             btn.textContent = SIGNUP_BTN_TEXT;
           })

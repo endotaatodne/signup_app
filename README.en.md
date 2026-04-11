@@ -130,19 +130,33 @@ cd signup-app
 clasp create --title "Signup App"
 ```
 
-### Step 8 — Configure the Script
+### Step 8 — Set Script Properties
 
-Open `Code.gs` and update these two constants at the top:
+The Master Sheet ID is stored securely in Script Properties.
+
+1. Go to [script.google.com](https://script.google.com) → open your Signup App project
+2. Click **Project Settings** (gear icon) → **Script Properties**
+3. Click **Add script property** and add:
+
+| Property          | Value                       |
+| ----------------- | --------------------------- |
+| `MASTER_SHEET_ID` | `your_master_sheet_id_here` |
+
+4. Click **Save script properties**
+
+### Step 8b — Configure Role Names in Code.gs
+
+Open `Code.gs` and update the `ROLES` constant if you want to use different role names:
 
 ```javascript
-const MASTER_SHEET_ID = "YOUR_MASTER_SHEET_ID_HERE";
-
 const ROLES = {
   general: "General",
   classRep: "Class Rep",
   committee: "Committee",
 };
 ```
+
+The keys (`general`, `classRep`, `committee`) must stay the same — only change the values on the right.
 
 ### Step 9 — Push the Code
 
@@ -317,11 +331,17 @@ npm run deploy
 
 - All Google Sheets should be set to **Restricted** sharing — only you can edit
 - The web app runs as you (the deployer) — anonymous users cannot access your Sheets directly
+- `MASTER_SHEET_ID` is stored in Script Properties
 - Only Sheet IDs registered in the Config tab can be loaded — arbitrary Sheet IDs are rejected
+- The sheet identifier is derived server-side from the event alias — clients never supply a sheet ID directly
 - Input length and characters are validated both client-side and server-side
+- `eventId` is validated as a strict positive integer before use
 - A honeypot field deters basic bot submissions
+- Rate limiting prevents rapid repeated submissions
 - `LockService` prevents race conditions when multiple users sign up simultaneously
-- Role validation is enforced server-side — clients cannot submit invalid roles
+- Role validation is enforced server-side using canonical values — clients cannot submit invalid roles
+- All user-supplied data is sanitised before embedding in the page
+- Error messages shown to users are generic — internal details are logged privately
 
 ---
 
@@ -329,12 +349,14 @@ npm run deploy
 
 ```
 signup-app/
-├── Code.gs          # Backend — reads/writes Google Sheets, serves web app
+├── Code.gs          # Backend — reads/writes Google Sheets, serves web app (no secrets hardcoded)
 ├── index.html       # Frontend — grid view, modal signup form
 ├── appsscript.json  # Apps Script configuration
 ├── CHANGELOG.md     # Version history
 └── README.md        # This file
 ```
+
+Sensitive values (`MASTER_SHEET_ID`) are stored in Script Properties — not in source code — so the entire repo is safe to share publicly.
 
 ---
 

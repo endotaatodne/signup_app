@@ -181,14 +181,25 @@ function submitSignup(eventId, name, cls, role, alias) {
 
     // Validate and sanitise alias
     if (!alias || !/^[a-zA-Z0-9\-]{1,50}$/.test(alias)) {
-      return { success: false, message: "Invalid request." };
+      return { success: false, message: "不正なリクエストです。" };
     }
+
+    // Validate eventId as strict positive integer
+    const parsedEventId = parseInt(eventId, 10);
+    if (
+      isNaN(parsedEventId) ||
+      parsedEventId <= 0 ||
+      String(parsedEventId) !== String(eventId)
+    ) {
+      return { success: false, message: "不正なリクエストです。" };
+    }
+    eventId = parsedEventId;
 
     // Derive sheetId server-side — never trust client-supplied sheet identifiers
     const config = getEventConfig();
     const sheetId = config[alias.toLowerCase()];
     if (!sheetId) {
-      return { success: false, message: "Invalid request." };
+      return { success: false, message: "不正なリクエストです。" };
     }
 
     // Input validation — name
