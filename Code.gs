@@ -332,7 +332,7 @@ function submitSignup(eventId, name, cls, role, alias) {
       };
     }
 
-    const signupId = new Date().getTime();
+    const signupId = Utilities.getUuid();
     signupsSheet.appendRow([
       signupId,
       eventId,
