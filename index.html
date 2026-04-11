@@ -395,6 +395,7 @@
             .join(""),
         );
       }
+      var PAGE_LOAD_TIME = Date.now();
       var SIGNUP_BTN_TEXT = "登録する";
       var gridData = JSON.parse(b64decode("<?!= gridData ?>"));
       var alias = b64decode("<?!= alias ?>");
@@ -796,6 +797,14 @@
 
       function submitSignup() {
         if (document.getElementById("honeypot").value !== "") return;
+        // Reject submissions that arrive too quickly — likely automated
+        if (Date.now() - PAGE_LOAD_TIME < 3000) {
+          showModalMessage(
+            "Please take a moment to review before submitting.",
+            false,
+          );
+          return;
+        }
 
         if (!currentRole) {
           showModalMessage("ロールを選択してください。", false);
