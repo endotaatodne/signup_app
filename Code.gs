@@ -1,4 +1,5 @@
-const MASTER_SHEET_ID = "xxxxxxxxx";
+const MASTER_SHEET_ID =
+  PropertiesService.getScriptProperties().getProperty("MASTER_SHEET_ID");
 
 const ROLES = {
   general: "一般保護者",
@@ -386,4 +387,24 @@ function sanitiseForScript(str) {
     .replace(/"/g, "\\u0022")
     .replace(/'/g, "\\u0027")
     .replace(/\//g, "\\u002f");
+}
+
+function getEventConfig() {
+  if (!MASTER_SHEET_ID) {
+    console.error("MASTER_SHEET_ID not set in Script Properties");
+    return {};
+  }
+  const sheet =
+    SpreadsheetApp.openById(MASTER_SHEET_ID).getSheetByName("Config");
+  if (!sheet) return {};
+  const rows = sheet.getDataRange().getValues();
+  const config = {};
+  rows.slice(1).forEach(function (row) {
+    const alias = row[0].toString().trim().toLowerCase();
+    const sheetId = row[1].toString().trim();
+    if (alias && sheetId && /^[a-zA-Z0-9_\-]{20,60}$/.test(sheetId)) {
+      config[alias] = sheetId;
+    }
+  });
+  return config;
 }
