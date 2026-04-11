@@ -397,7 +397,8 @@ function sanitiseForScript(str) {
     .replace(/>/g, "\\u003e")
     .replace(/"/g, "\\u0022")
     .replace(/'/g, "\\u0027")
-    .replace(/\//g, "\\u002f");
+    .replace(/\//g, "\\u002f")
+    .replace(/`/g, "\\u0060");
 }
 
 function getEventConfig() {
