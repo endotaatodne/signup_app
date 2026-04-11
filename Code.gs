@@ -262,8 +262,10 @@ function submitSignup(eventId, name, cls, role, alias) {
       return { success: false, message: "ロールを選択してください" };
     }
 
-    name = name.trim();
-    cls = cls.trim();
+    // Normalise whitespace in stored values — collapse regular and
+    // full-width spaces (common in Japanese input) before writing to Sheet
+    name = name.replace(/[\s\u3000]+/g, " ").trim();
+    cls = cls.replace(/[\s\u3000]+/g, " ").trim();
 
     const eventsSheet =
       SpreadsheetApp.openById(sheetId).getSheetByName("Events");
@@ -308,9 +310,19 @@ function submitSignup(eventId, name, cls, role, alias) {
       };
     }
 
-    // Duplicate check per slot regardless of role
+    // Normalise name for comparison — case insensitive, collapse regular
+    // and full-width spaces (common in Japanese input)
+    const normalisedInput = name
+      .toLowerCase()
+      .replace(/[\s\u3000]+/g, " ")
+      .trim();
     const duplicate = existing.find(
-      (r) => r[2].toString().toLowerCase() === name.toLowerCase(),
+      (r) =>
+        r[2]
+          .toString()
+          .toLowerCase()
+          .replace(/[\s\u3000]+/g, " ")
+          .trim() === normalisedInput,
     );
     if (duplicate) {
       return {
