@@ -367,10 +367,19 @@
           <input
             type="text"
             id="honeypot"
-            name="website"
+            name="email_confirm"
             autocomplete="off"
             tabindex="-1"
-            style="display: none"
+            aria-hidden="true"
+            style="
+              opacity: 0;
+              position: absolute;
+              top: 0;
+              left: 0;
+              height: 0;
+              width: 0;
+              z-index: -1;
+            "
           />
           <button class="modal-submit" id="submitBtn">SIGNUP_BTN_TEXT</button>
           <div
