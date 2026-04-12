@@ -11,7 +11,7 @@ const ROLES = {
  * @fileoverview Signup App - Google Apps Script backend.
  * Serves the web app and handles all interactions with Google Sheets.
  * @author endotaatodne
- * @version 0.0.9
+ * @version 0.0.10
  */
 
 /**
@@ -396,28 +396,6 @@ function checkRateLimit(eventId, name, cls) {
 }
 
 /**
- * Reads allowed event aliases and Sheet IDs from the Config tab
- * of the master Sheet. Validates Sheet ID format before trusting.
- * @returns {Object} Map of alias to Sheet ID
- */
-function getEventConfig() {
-  const sheet =
-    SpreadsheetApp.openById(MASTER_SHEET_ID).getSheetByName("Config");
-  if (!sheet) return {};
-  const rows = sheet.getDataRange().getValues();
-  const config = {};
-  rows.slice(1).forEach(function (row) {
-    const alias = row[0].toString().trim().toLowerCase();
-    const sheetId = row[1].toString().trim();
-    // Validate Sheet ID format before trusting
-    if (alias && sheetId && /^[a-zA-Z0-9_\-]{20,60}$/.test(sheetId)) {
-      config[alias] = sheetId;
-    }
-  });
-  return config;
-}
-
-/**
  * Sanitises a string for safe embedding in a JSON/script context.
  * Escapes characters that could break out of a script block.
  * @param {string} str - The string to sanitise
@@ -453,4 +431,132 @@ function getEventConfig() {
     }
   });
   return config;
+}
+
+/**
+ * Cancels a signup for a given event, name and role.
+ * Matches on normalised name and canonical role.
+ * @param {number} eventId - The EventID from the Events sheet
+ * @param {string} name - The participant's name
+ * @param {string} role - The participant's role
+ * @param {string} alias - The event alias from the URL
+ * @returns {{success: boolean, message: string}}
+ */
+function cancelSignup(eventId, name, cls, role, alias) {
+  const lock = LockService.getScriptLock();
+  try {
+    // Acquire lock
+    try {
+      lock.waitLock(5000);
+    } catch (e) {
+      return {
+        success: false,
+        message: "システムがビジー状態です。もう少し待ってから試してください。",
+      };
+    }
+
+    // Validate alias
+    if (!alias || !/^[a-zA-Z0-9\-]{1,50}$/.test(alias)) {
+      return { success: false, message: "不正なリクエストです。" };
+    }
+
+    // Validate eventId
+    const parsedEventId = parseInt(eventId, 10);
+    if (
+      isNaN(parsedEventId) ||
+      parsedEventId <= 0 ||
+      String(parsedEventId) !== String(eventId)
+    ) {
+      return { success: false, message: "不正なリクエストです。" };
+    }
+
+    // Validate name
+    if (!name || typeof name !== "string" || name.trim().length === 0) {
+      return { success: false, message: "名前を入力してください。" };
+    }
+    if (name.trim().length > 10) {
+      return {
+        success: false,
+        message: "名前は１０文字以下で入力してください。",
+      };
+    }
+
+    // Validate role against canonical values
+    const roleKeyMap = {
+      [ROLES.general]: ROLES.general,
+      [ROLES.classRep]: ROLES.classRep,
+      [ROLES.committee]: ROLES.committee,
+    };
+    const canonicalRole = roleKeyMap[role];
+    if (!canonicalRole) {
+      return { success: false, message: "ロールが不正です。" };
+    }
+
+    // Derive sheetId server-side
+    const config = getEventConfig();
+    const sheetId = config[alias.toLowerCase()];
+    if (!sheetId) {
+      return { success: false, message: "不正なリクエストです。" };
+    }
+
+    const signupsSheet =
+      SpreadsheetApp.openById(sheetId).getSheetByName("Signups");
+    const signupRows = signupsSheet.getDataRange().getValues();
+
+    // Normalise name for comparison
+    const normalisedInput = name
+      .toLowerCase()
+      .replace(/[\s\u3000]+/g, " ")
+      .trim();
+
+    // Find matching row — name + role + eventId
+    let matchRowIndex = -1;
+    for (let i = 1; i < signupRows.length; i++) {
+      const rowEventId = signupRows[i][1];
+      const rowName = signupRows[i][2]
+        .toString()
+        .toLowerCase()
+        .replace(/[\s\u3000]+/g, " ")
+        .trim();
+      const rowRole = signupRows[i][4];
+      const normalisedCls = cls
+        .toLowerCase()
+        .replace(/[\s\u3000]+/g, " ")
+        .trim();
+      const rowCls = signupRows[i][3]
+        .toString()
+        .toLowerCase()
+        .replace(/[\s\u3000]+/g, " ")
+        .trim();
+      if (
+        rowEventId == parsedEventId &&
+        rowName === normalisedInput &&
+        rowCls === normalisedCls &&
+        rowRole === canonicalRole
+      ) {
+        matchRowIndex = i + 1; // Sheets rows are 1-indexed, plus header row
+        break;
+      }
+    }
+
+    if (matchRowIndex === -1) {
+      return {
+        success: false,
+        message: "お名前とクラスの登録が見つかりません。ご確認ください。",
+      };
+    }
+
+    // Delete the matching row
+    signupsSheet.deleteRow(matchRowIndex);
+
+    return { success: true, message: "キャンセルされました。" };
+  } catch (e) {
+    console.error("cancelSignup error: " + e.message);
+    return {
+      success: false,
+      message: "エラーが発生しました。再度試してください。",
+    };
+  } finally {
+    lock.releaseLock();
+  }
 }
