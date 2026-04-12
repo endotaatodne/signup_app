@@ -88,7 +88,7 @@
       }
       .slot-all-full {
         background: #f0f0f0;
-        cursor: default;
+        cursor: pointer;
       }
 
       .role-row {
@@ -697,7 +697,8 @@
               var available = hasAnyAvailable(event.slots);
               if (!available) {
                 slotDiv.className = "slot slot-all-full";
-                slotDiv.style.cursor = "pointer";
+                slotDiv.setAttribute("data-eventid", event.eventId);
+
                 slotDiv.addEventListener(
                   "click",
                   (function (eid) {
@@ -713,6 +714,7 @@
                 slotDiv.appendChild(fullText);
               } else {
                 slotDiv.className = "slot " + colorClass;
+                slotDiv.setAttribute("data-eventid", event.eventId);
                 slotDiv.addEventListener(
                   "click",
                   (function (eid) {
@@ -790,7 +792,9 @@
           tbody.appendChild(tr);
         });
 
-        table.innerHTML = "";
+        while (table.firstChild) {
+          table.removeChild(table.firstChild);
+        }
         table.appendChild(thead);
         table.appendChild(tbody);
       }
@@ -1399,6 +1403,15 @@
         .addEventListener("click", function (e) {
           e.stopPropagation();
           if (e.target === this) closeModal();
+        });
+      document
+        .querySelector(".grid-wrapper")
+        .addEventListener("click", function (e) {
+          var slot = e.target.closest("[data-eventid]");
+          if (slot) {
+            var eventId = slot.getAttribute("data-eventid");
+            openModal(eventId);
+          }
         });
       buildGrid();
     </script>
