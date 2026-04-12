@@ -548,6 +548,7 @@
     </div>
 
     <script>
+      var EXEC_URL = "";
       var modalOpenBlocked = false;
       var cancelTimeoutId = null;
       var cancellationPending = false;
@@ -1199,44 +1200,15 @@
         google.script.run
           .withSuccessHandler(function (result) {
             if (result.success) {
-              var event = gridData.events.find(function (e) {
-                return e.eventId == currentEventId;
-              });
-              if (event) {
-                var normName = name
-                  .toLowerCase()
-                  .replace(/[\s\u3000]+/g, " ")
-                  .trim();
-                var normCls = cls
-                  .toLowerCase()
-                  .replace(/[\s\u3000]+/g, " ")
-                  .trim();
-                event.signups = event.signups.filter(function (s) {
-                  return !(
-                    s.role === role &&
-                    s.name
-                      .toLowerCase()
-                      .replace(/[\s\u3000]+/g, " ")
-                      .trim() === normName &&
-                    s.cls
-                      .toLowerCase()
-                      .replace(/[\s\u3000]+/g, " ")
-                      .trim() === normCls
-                  );
-                });
-                var roleKey = ROLE_KEYS.find(function (r) {
-                  return r.label === role;
-                });
-                if (roleKey) event.slots[roleKey.key].filled--;
-              }
               showCancelMessage(result.message, true);
-              // Defer buildGrid and closeModal to next event loop tick
-              // This prevents the async click event from Apps Script framework
-              // triggering slot click handlers on the newly rebuilt table
               setTimeout(function () {
-                buildGrid();
-                closeModal();
-              }, 0);
+                if (EXEC_URL) {
+                  window.top.location.href = EXEC_URL;
+                } else {
+                  // Fallback
+                  window.top.location.reload();
+                }
+              }, 1500);
             } else {
               showCancelMessage(result.message, false);
               btn.disabled = false;
@@ -1398,12 +1370,14 @@
           if (e.key === "Enter") submitSignup();
         });
       document.getElementById("pageTitle").textContent = PAGE_TITLE;
+
       document
         .getElementById("modalOverlay")
         .addEventListener("click", function (e) {
           e.stopPropagation();
           if (e.target === this) closeModal();
         });
+
       document
         .querySelector(".grid-wrapper")
         .addEventListener("click", function (e) {
@@ -1413,6 +1387,13 @@
             openModal(eventId);
           }
         });
+
+      google.script.run
+        .withSuccessHandler(function (url) {
+          EXEC_URL = url + "?event=" + alias;
+        })
+        .getDeployedUrl();
+
       buildGrid();
     </script>
     <div
