@@ -459,127 +459,517 @@
       /* Mobile agenda */
       .mobile-agenda {
         display: none;
+        padding-bottom: 24px;
       }
+
       .mobile-time-group {
-        margin-bottom: 18px;
+        margin-bottom: 24px;
       }
+
       .mobile-time-heading {
-        font-size: 14px;
+        font-size: 18px;
         font-weight: 700;
-        margin-bottom: 8px;
-        color: #444;
+        margin: 0 0 12px;
+        color: #2b2b2b;
+        line-height: 1.35;
       }
+
       .mobile-slot-card {
         width: 100%;
         display: block;
         text-align: left;
-        border: 1px solid #dde3e8;
-        border-radius: 14px;
-        background: #fff;
-        padding: 14px 14px 12px;
-        margin-bottom: 10px;
+        border: 1px solid #d9dee3;
+        border-radius: 16px;
+        background: #ffffff;
+        padding: 18px 18px 16px;
+        margin-bottom: 12px;
         cursor: pointer;
-        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+        transition:
+          transform 0.08s ease,
+          box-shadow 0.12s ease;
       }
+
       .mobile-slot-card:active {
-        transform: scale(0.995);
+        transform: scale(0.992);
       }
+
       .mobile-slot-header {
         display: flex;
         align-items: flex-start;
         justify-content: space-between;
-        gap: 10px;
+        gap: 12px;
       }
+
       .mobile-slot-title {
-        font-size: 15px;
+        font-size: 19px;
         font-weight: 700;
         color: #222;
-        margin-bottom: 4px;
+        line-height: 1.3;
+        margin-bottom: 6px;
       }
+
       .mobile-slot-meta {
-        font-size: 12px;
-        color: #777;
-        line-height: 1.5;
-      }
-      .mobile-slot-desc {
-        font-size: 12px;
-        color: #666;
-        margin-top: 6px;
+        font-size: 15px;
+        color: #6b7280;
         line-height: 1.45;
       }
+
+      .mobile-slot-desc {
+        font-size: 14px;
+        color: #666;
+        margin-top: 8px;
+        line-height: 1.5;
+      }
+
       .mobile-slot-badge {
-        font-size: 11px;
+        flex-shrink: 0;
+        font-size: 14px;
         font-weight: 700;
         border-radius: 999px;
-        padding: 5px 9px;
+        padding: 8px 14px;
         white-space: nowrap;
-        background: #e8f5e9;
-        color: #2e7d32;
+        background: #16a34a;
+        color: #ffffff;
+        box-shadow: 0 2px 6px rgba(234, 182, 60, 0.2);
       }
+
       .mobile-slot-badge.is-full {
-        background: #f0f0f0;
-        color: #888;
+        background: #d64545;
+        color: #ffffff;
+        box-shadow: 0 2px 6px rgba(214, 69, 69, 0.2);
       }
+
       .mobile-slot-roles {
         display: flex;
         flex-wrap: wrap;
-        gap: 6px;
-        margin-top: 10px;
+        gap: 8px;
+        margin-top: 14px;
       }
+
       .mobile-role-pill {
-        font-size: 11px;
+        font-size: 12px;
         font-weight: 600;
         border-radius: 999px;
-        padding: 4px 8px;
+        padding: 6px 10px;
         background: #f7f7f7;
         color: #555;
+        border: 1px solid #e3e6ea;
       }
+
       .mobile-role-pill.role-general {
-        background: #e8f5e9;
+        background: #eef8ef;
         color: #2e7d32;
+        border-color: #cfe7d2;
       }
+
       .mobile-role-pill.role-classrep {
         background: #fff8e1;
-        color: #f57f17;
+        color: #b26a00;
+        border-color: #f2deb0;
       }
+
       .mobile-role-pill.role-committee {
-        background: #e3f2fd;
+        background: #e8f1fd;
         color: #1565c0;
+        border-color: #cfe0f6;
       }
 
       body.compact-layout {
-        padding: 12px;
-      }
-
-      body.compact-layout .modal-overlay.active {
-        display: flex;
-        align-items: flex-end;
-        justify-content: stretch;
-        padding: 0;
-      }
-
-      body.compact-layout .modal {
-        width: 100%;
-        max-width: none;
-        margin: 0;
-        border-radius: 20px 20px 0 0;
-        padding: 16px;
-        max-height: 88dvh;
-        overflow-y: auto;
-      }
-
-      body.compact-layout .role-btn {
-        padding: 12px;
-      }
-
-      body.compact-layout .modal input {
+        padding: 14px;
         font-size: 16px;
       }
 
+      body.compact-layout h1 {
+        font-size: 28px;
+        line-height: 1.25;
+        margin-bottom: 18px;
+      }
+
+      body.compact-layout #desktopGridWrapper {
+        display: none !important;
+      }
+
+      body.compact-layout .mobile-agenda {
+        display: block !important;
+      }
+
+      /* Centered larger popup on mobile */
+      body.compact-layout .modal-overlay.active {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 12px;
+      }
+
+      body.compact-layout .modal {
+        width: min(97vw, 620px);
+        max-width: 560px;
+        max-height: min(92dvh, 820px);
+        overflow-y: auto;
+        border-radius: 18px;
+        padding: 22px;
+        margin: 0;
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
+      }
+
+      /* Header text */
+      body.compact-layout .modal-title {
+        font-size: 30px;
+        font-weight: 700;
+        line-height: 1.2;
+        margin-bottom: 4px;
+        text-align: center;
+      }
+
+      body.compact-layout .modal-subtitle {
+        font-size: 18px;
+        line-height: 1.45;
+        text-align: center;
+        color: #6b7280;
+        margin-bottom: 14px;
+      }
+
+      /* Tabs */
+      body.compact-layout .modal-tabs {
+        margin-top: 12px;
+        margin-bottom: 16px;
+      }
+
+      body.compact-layout .modal-tab,
+      body.compact-layout .tab-btn {
+        font-size: 17px;
+        font-weight: 700;
+        padding: 14px 16px;
+        min-height: 52px;
+      }
+
+      /* Role button area */
+      body.compact-layout .role-buttons {
+        gap: 10px;
+        margin-bottom: 16px;
+      }
+
+      body.compact-layout .role-btn {
+        min-height: 56px;
+        padding: 14px 14px;
+        border-radius: 12px;
+      }
+
+      body.compact-layout .role-btn-label {
+        font-size: 18px;
+        font-weight: 700;
+        line-height: 1.2;
+      }
+
+      body.compact-layout .role-btn-count {
+        font-size: 14px;
+        margin-top: 4px;
+      }
+
+      /* Names list */
       body.compact-layout .names-section {
         max-height: 26vh;
         overflow-y: auto;
+        margin-bottom: 14px;
       }
+
+      body.compact-layout .names-group-title {
+        font-size: 15px;
+        font-weight: 700;
+      }
+
+      body.compact-layout .participant-name {
+        font-size: 15px;
+        line-height: 1.45;
+      }
+
+      /* Form fields */
+      body.compact-layout label {
+        font-size: 16px;
+        font-weight: 600;
+      }
+
+      body.compact-layout input,
+      body.compact-layout select,
+      body.compact-layout textarea {
+        font-size: 17px;
+        padding: 15px 16px;
+        min-height: 52px;
+        border-radius: 12px;
+      }
+
+      /* Main action buttons */
+      body.compact-layout .modal-submit,
+      body.compact-layout #cancelSubmitBtn,
+      body.compact-layout #confirmYes,
+      body.compact-layout #confirmNo,
+      body.compact-layout .close-btn {
+        font-size: 18px;
+        font-weight: 700;
+        padding: 15px 18px;
+        min-height: 54px;
+        border-radius: 12px;
+      }
+
+      /* Make the primary action feel more prominent */
+      body.compact-layout .modal-submit,
+      body.compact-layout #cancelSubmitBtn,
+      body.compact-layout #confirmYes {
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+      }
+
+      /* Slightly tighter spacing on very small phones */
+      @media (max-width: 380px) {
+        body.compact-layout .modal {
+          width: 97vw;
+          padding: 18px;
+        }
+
+        body.compact-layout .modal-title {
+          font-size: 26px;
+        }
+
+        body.compact-layout .modal-subtitle {
+          font-size: 16px;
+        }
+
+        body.compact-layout .role-btn-label {
+          font-size: 16px;
+        }
+      }
+      /* ===== Mobile override: put this at the VERY END of the <style> block ===== */
+
+      body.compact-layout .modal-overlay.active {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        padding: 10px !important;
+      }
+
+      body.compact-layout .modal {
+        width: 96vw !important;
+        max-width: 96vw !important;
+        min-width: 0 !important;
+        max-height: 92vh !important;
+        padding: 24px !important;
+        border-radius: 18px !important;
+        overflow-y: auto !important;
+        margin: 0 !important;
+      }
+
+      body.compact-layout .modal-title {
+        font-size: 24px !important;
+        line-height: 1.25 !important;
+      }
+
+      body.compact-layout .modal-subtitle {
+        font-size: 16px !important;
+        line-height: 1.45 !important;
+      }
+
+      /* Make the time much bigger and more distinct */
+      body.compact-layout .mobile-time-group {
+        margin-bottom: 26px !important;
+      }
+
+      body.compact-layout .mobile-time-heading {
+        font-size: 22px !important;
+        font-weight: 800 !important;
+        line-height: 1.25 !important;
+        color: #1f2937 !important;
+        margin: 0 0 14px !important;
+        padding: 10px 14px !important;
+        background: #f3f4f6 !important;
+        border-left: 6px solid #3b82f6 !important;
+        border-radius: 10px !important;
+        letter-spacing: 0.01em !important;
+      }
+
+      /* Make cards a bit roomier too */
+      body.compact-layout .mobile-slot-card {
+        padding: 18px 18px 16px !important;
+        border-radius: 16px !important;
+      }
+
+body.compact-layout .mobile-slot-title {
+  font-size: 22px !important;
+  font-weight: 700 !important;
+  line-height: 1.25 !important;
+}
+
+body.compact-layout .mobile-slot-meta {
+  font-size: 16px !important;
+  line-height: 1.45 !important;
+}
+
+body.compact-layout .mobile-slot-badge {
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  padding: 10px 16px !important;
+}
+      /* ===== Mobile visual override ===== */
+
+      body.compact-layout .mobile-time-group {
+        margin-bottom: 28px !important;
+      }
+
+      body.compact-layout .mobile-time-heading {
+        font-size: 23px !important;
+        font-weight: 800 !important;
+        line-height: 1.25 !important;
+        color: #1f2937 !important;
+        margin: 0 0 14px !important;
+        padding: 6px 2px 4px !important;
+        background: transparent !important;
+        border-left: none !important;
+        border-radius: 0 !important;
+        letter-spacing: 0.01em !important;
+      }
+
+      /* Make each slot card chunkier like the mockup */
+body.compact-layout .mobile-slot-card {
+  width: 100% !important;
+  min-height: 108px !important;
+  padding: 22px 18px !important;
+  margin-bottom: 12px !important;
+  border-radius: 16px !important;
+}
+
+      body.compact-layout .mobile-slot-header {
+        gap: 14px !important;
+      }
+
+      body.compact-layout .mobile-slot-title {
+        font-size: 21px !important;
+        font-weight: 700 !important;
+        line-height: 1.3 !important;
+        margin-bottom: 6px !important;
+      }
+
+      body.compact-layout .mobile-slot-meta {
+        font-size: 15px !important;
+        line-height: 1.45 !important;
+      }
+
+      body.compact-layout .mobile-slot-desc {
+        font-size: 14px !important;
+        line-height: 1.5 !important;
+        margin-top: 8px !important;
+      }
+
+      body.compact-layout .mobile-slot-badge {
+        font-size: 15px !important;
+        font-weight: 700 !important;
+        padding: 9px 15px !important;
+        border-radius: 999px !important;
+      }
+
+      /* Bigger popup */
+      body.compact-layout .modal-overlay.active {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        padding: 10px !important;
+      }
+
+      body.compact-layout .modal {
+        width: 97vw !important;
+        max-width: 97vw !important;
+        max-height: 92vh !important;
+        padding: 26px 22px !important;
+        border-radius: 18px !important;
+        overflow-y: auto !important;
+        margin: 0 !important;
+      }
+
+      /* Bigger popup text */
+      body.compact-layout .modal-title {
+        font-size: 26px !important;
+        font-weight: 700 !important;
+        line-height: 1.25 !important;
+        text-align: center !important;
+        margin-bottom: 6px !important;
+      }
+
+      body.compact-layout .modal-subtitle {
+        font-size: 17px !important;
+        line-height: 1.45 !important;
+        text-align: center !important;
+        margin-bottom: 16px !important;
+      }
+
+      body.compact-layout .modal-tab,
+      body.compact-layout .tab-btn {
+        font-size: 18px !important;
+        font-weight: 700 !important;
+        min-height: 52px !important;
+        padding: 14px 16px !important;
+      }
+
+      /* Centre the role selection buttons like 一般保護者 etc */
+      body.compact-layout .role-buttons {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        justify-content: center !important;
+        align-items: center !important;
+        gap: 10px !important;
+        margin: 16px 0 18px !important;
+      }
+
+      body.compact-layout .role-btn {
+        min-width: 120px !important;
+        min-height: 56px !important;
+        padding: 12px 16px !important;
+        border-radius: 12px !important;
+        text-align: center !important;
+      }
+
+      body.compact-layout .role-btn-label {
+        font-size: 18px !important;
+        font-weight: 700 !important;
+        line-height: 1.2 !important;
+      }
+
+      body.compact-layout .role-btn-count {
+        font-size: 14px !important;
+        margin-top: 4px !important;
+      }
+
+      /* Bigger labels and participant text */
+      body.compact-layout label,
+      body.compact-layout .names-group-title {
+        font-size: 16px !important;
+        font-weight: 700 !important;
+      }
+
+      body.compact-layout .participant-name {
+        font-size: 15px !important;
+        line-height: 1.45 !important;
+      }
+
+      /* Bigger fields and action buttons */
+      body.compact-layout input,
+      body.compact-layout select,
+      body.compact-layout textarea {
+        font-size: 17px !important;
+        min-height: 52px !important;
+        padding: 14px 16px !important;
+        border-radius: 12px !important;
+      }
+
+      body.compact-layout .modal-submit,
+      body.compact-layout #cancelSubmitBtn,
+      body.compact-layout #confirmYes,
+      body.compact-layout #confirmNo,
+      body.compact-layout .close-btn {
+        font-size: 18px !important;
+        font-weight: 700 !important;
+        min-height: 54px !important;
+        padding: 14px 18px !important;
+        border-radius: 12px !important;
+      }
+      
     </style>
   </head>
   <body>
