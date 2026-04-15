@@ -57,6 +57,8 @@ The admin manages events directly in Google Sheets. Users visit the public web a
 - [VS Code](https://code.visualstudio.com) or any text editor
 - Git (optional, for version control)
 
+Recommended: Use a dedicated Google account for this app rather than your personal account. The app runs as the account owner, so all Sheets access and script execution happens under that account. A dedicated account keeps your personal data separate, makes it easier to share admin access with a colleague, and avoids any impact on your personal Google services if the app's quota is exceeded.
+
 ---
 
 ## Setup Guide
