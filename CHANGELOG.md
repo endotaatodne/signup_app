@@ -1,3 +1,9 @@
+## v0.1.0 - 2026-04-18
+
+- Major update
+  - added option to cancel
+  - updated some wording
+
 ## v0.0.9 - 2026-04-12
 
 - Major update

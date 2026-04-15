@@ -43,6 +43,9 @@
         font-weight: 600;
         text-align: center;
         border: 1px solid #e0e0e0;
+        position: sticky;
+        top: 0;
+        z-index: 2;
       }
       th.time-header {
         text-align: left;
@@ -61,6 +64,9 @@
         background: #fafafa;
         min-width: 80px;
         word-break: break-word;
+        position: sticky;
+        left: 0;
+        z-index: 1;
       }
       td.desc-cell {
         font-size: 11px;
@@ -88,7 +94,7 @@
       }
       .slot-all-full {
         background: #f0f0f0;
-        cursor: default;
+        cursor: pointer;
       }
 
       .role-row {
@@ -205,9 +211,6 @@
       .role-btn-full {
         opacity: 0.45;
         cursor: not-allowed;
-      }
-      .role-btn-hidden {
-        display: none;
       }
       .role-btn-general {
         background: #e8f5e9;
@@ -332,6 +335,126 @@
         border-radius: 20px;
         color: #444;
       }
+      /* Hint text */
+      .slot-hint {
+        font-size: 10px;
+        color: #aaa;
+        margin-top: 4px;
+        font-style: italic;
+      }
+
+      /* Cancel tab */
+      .modal-tabs {
+        display: flex;
+        border-bottom: 2px solid #e0e0e0;
+        margin-bottom: 14px;
+      }
+      .modal-tab {
+        flex: 1;
+        padding: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        text-align: center;
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -2px;
+        color: #aaa;
+        background: none;
+        border-top: none;
+        border-left: none;
+        border-right: none;
+      }
+      .modal-tab.active-signup {
+        color: #2e7d32;
+        border-bottom-color: #2e7d32;
+      }
+      .modal-tab.active-cancel {
+        color: #c62828;
+        border-bottom-color: #c62828;
+      }
+
+      .cancel-form {
+        display: none;
+      }
+      .cancel-form.visible {
+        display: block;
+      }
+      .cancel-select {
+        width: 100%;
+        padding: 10px 12px;
+        font-size: 14px;
+        border: 1px solid #ddd;
+        border-radius: 7px;
+        margin-bottom: 10px;
+        background: white;
+        color: #333;
+        outline: none;
+      }
+      .cancel-submit {
+        width: 100%;
+        padding: 11px;
+        font-size: 14px;
+        font-weight: 600;
+        background: #c62828;
+        color: white;
+        border: none;
+        border-radius: 7px;
+        cursor: pointer;
+        margin-top: 4px;
+      }
+      .cancel-submit:disabled {
+        background: #aaa;
+        cursor: not-allowed;
+      }
+
+      /* Confirmation prompt */
+      .confirm-box {
+        background: #fdecea;
+        border-radius: 8px;
+        padding: 12px;
+        margin-bottom: 10px;
+        font-size: 13px;
+        color: #c62828;
+        line-height: 1.5;
+      }
+      .confirm-buttons {
+        display: flex;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      .confirm-yes {
+        flex: 1;
+        padding: 9px;
+        font-size: 13px;
+        font-weight: 600;
+        background: #c62828;
+        color: white;
+        border: none;
+        border-radius: 7px;
+        cursor: pointer;
+      }
+      .confirm-no {
+        flex: 1;
+        padding: 9px;
+        font-size: 13px;
+        font-weight: 600;
+        background: #f0f0f0;
+        color: #333;
+        border: none;
+        border-radius: 7px;
+        cursor: pointer;
+      }
+      .confirm-yes:disabled {
+        background: #aaa;
+        cursor: not-allowed;
+        opacity: 0.6;
+      }
+      .confirm-no:disabled {
+        background: #ccc;
+        color: #999;
+        cursor: not-allowed;
+        opacity: 0.6;
+      }
     </style>
   </head>
   <body>
@@ -347,6 +470,13 @@
 
         <div class="names-section" id="namesSection" style="display: none">
           <div id="namesGroups"></div>
+        </div>
+
+        <div class="modal-tabs" id="modalTabs" style="display: none">
+          <button class="modal-tab active-signup" id="tabSignup">
+            登録する
+          </button>
+          <button class="modal-tab" id="tabCancel">キャンセルする</button>
         </div>
 
         <div class="role-buttons" id="roleButtons"></div>
@@ -381,7 +511,7 @@
               z-index: -1;
             "
           />
-          <button class="modal-submit" id="submitBtn">SIGNUP_BTN_TEXT</button>
+          <button class="modal-submit" id="submitBtn"></button>
           <div
             class="modal-message"
             id="modalMessage"
@@ -389,7 +519,46 @@
           ></div>
         </div>
 
-        <button class="modal-cancel" id="cancelBtn">キャンセル</button>
+        <div class="cancel-form" id="cancelForm">
+          <select class="cancel-select" id="cancelRole">
+            <option value="">ポジションを選んでください</option>
+          </select>
+          <input
+            type="text"
+            id="cancelName"
+            placeholder="保護者名"
+            maxlength="10"
+          />
+          <input
+            type="text"
+            id="cancelClass"
+            placeholder="クラス"
+            maxlength="10"
+          />
+          <div class="confirm-box" id="confirmBox" style="display: none">
+            <div id="confirmText"></div>
+            <div class="confirm-buttons">
+              <button class="confirm-yes" id="confirmYes">
+                はい、キャンセルします。
+              </button>
+              <button class="confirm-no" id="confirmNo">いいえ</button>
+            </div>
+          </div>
+          <button
+            class="cancel-submit"
+            id="cancelSubmitBtn"
+            style="display: block"
+          >
+            登録を探す
+          </button>
+          <div
+            class="modal-message"
+            id="cancelMessage"
+            style="display: none"
+          ></div>
+        </div>
+
+        <button class="modal-cancel" id="closeBtn">閉じる</button>
       </div>
     </div>
 
@@ -404,6 +573,8 @@
             .join(""),
         );
       }
+
+      var EXEC_URL = "";
       var PAGE_LOAD_TIME = Date.now();
       var SIGNUP_BTN_TEXT = "登録する";
       var gridData = JSON.parse(b64decode("<?!= gridData ?>"));
@@ -412,6 +583,7 @@
       var PAGE_TITLE = b64decode("<?!= title ?>");
       var currentEventId = null;
       var currentRole = null;
+      var currentTab = "signup";
 
       var ROLE_KEYS = [
         {
@@ -437,10 +609,6 @@
         },
       ];
 
-      function getSlotColorClass(slots) {
-        return "slot-mixed";
-      }
-
       function hasAnyAvailable(slots) {
         return ROLE_KEYS.some(function (r) {
           return slots[r.key].max > 0 && slots[r.key].filled < slots[r.key].max;
@@ -448,10 +616,19 @@
       }
 
       function buildGrid() {
+        if (!gridData || !gridData.events) {
+          setTimeout(buildGrid, 200);
+          return;
+        }
+        var table = document.getElementById("grid");
+        if (!table) {
+          setTimeout(buildGrid, 200);
+          return;
+        }
+
         var times = gridData.times;
         var activities = gridData.activities;
         var events = gridData.events;
-        var table = document.getElementById("grid");
 
         // Build header
         var thead = document.createElement("thead");
@@ -460,6 +637,7 @@
         var timeHeader = document.createElement("th");
         timeHeader.className = "time-header";
         timeHeader.textContent = "Time";
+        timeHeader.style.zIndex = "3";
         headerRow.appendChild(timeHeader);
 
         var descHeader = document.createElement("th");
@@ -487,7 +665,6 @@
           }
           headerRow.appendChild(th);
         });
-
         thead.appendChild(headerRow);
 
         // Build body
@@ -524,48 +701,29 @@
               td.appendChild(emptyDiv);
             } else {
               var slotDiv = document.createElement("div");
-              var colorClass = getSlotColorClass(event.slots);
               var available = hasAnyAvailable(event.slots);
+
               if (!available) {
                 slotDiv.className = "slot slot-all-full";
-                slotDiv.style.cursor = "pointer";
-                slotDiv.addEventListener(
-                  "click",
-                  (function (eid) {
-                    return function () {
-                      openModal(eid);
-                    };
-                  })(event.eventId),
-                );
+                slotDiv.setAttribute("data-eventid", event.eventId);
                 var fullText = document.createElement("div");
                 fullText.style.cssText =
                   "font-size:11px;color:#999;margin-bottom:4px;";
                 fullText.textContent = "Full";
                 slotDiv.appendChild(fullText);
               } else {
-                slotDiv.className = "slot " + colorClass;
-                slotDiv.addEventListener(
-                  "click",
-                  (function (eid) {
-                    return function () {
-                      openModal(eid);
-                    };
-                  })(event.eventId),
-                );
-
+                slotDiv.className = "slot slot-mixed";
+                slotDiv.setAttribute("data-eventid", event.eventId);
                 ROLE_KEYS.forEach(function (r, idx) {
                   var s = event.slots[r.key];
                   if (s.max === 0) return;
-
                   if (idx > 0) {
                     var divider = document.createElement("hr");
                     divider.className = "role-divider";
                     slotDiv.appendChild(divider);
                   }
-
                   var roleRow = document.createElement("div");
                   roleRow.className = "role-row";
-
                   var roleLabel = document.createElement("span");
                   roleLabel.className = "role-label " + r.countClass;
                   roleLabel.textContent = r.label;
@@ -583,13 +741,11 @@
               if (event.signups.length > 0) {
                 var namesDiv = document.createElement("div");
                 namesDiv.className = "slot-names";
-
                 ROLE_KEYS.forEach(function (r) {
                   var roleSignups = event.signups.filter(function (s) {
                     return s.role === r.label;
                   });
                   if (roleSignups.length === 0) return;
-
                   var roleSpan = document.createElement("span");
                   roleSpan.className = r.countClass;
                   roleSpan.style.cssText = "font-size:10px;font-weight:500;";
@@ -603,20 +759,24 @@
                   // Add a line break between role groups if more than one role has signups
                   namesDiv.appendChild(document.createElement("br"));
                 });
-
                 slotDiv.appendChild(namesDiv);
+                // Show hint text only when there are existing signups
+                var hintDiv = document.createElement("div");
+                hintDiv.className = "slot-hint";
+                hintDiv.textContent = "登録、またはキャンセルする";
+                slotDiv.appendChild(hintDiv);
               }
 
               td.appendChild(slotDiv);
             }
-
             tr.appendChild(td);
           });
-
           tbody.appendChild(tr);
         });
 
-        table.innerHTML = "";
+        while (table.firstChild) {
+          table.removeChild(table.firstChild);
+        }
         table.appendChild(thead);
         table.appendChild(tbody);
       }
@@ -636,8 +796,12 @@
       }
 
       function openModal(eventId) {
-        document.body.scrollTop = 0;
-        document.documentElement.scrollTop = 0;
+        if (!gridData || !gridData.events) {
+          setTimeout(function () {
+            openModal(eventId);
+          }, 100);
+          return;
+        }
         var event = gridData.events.find(function (e) {
           return e.eventId == eventId;
         });
@@ -660,7 +824,6 @@
         var namesSection = document.getElementById("namesSection");
         var namesGroups = document.getElementById("namesGroups");
         namesGroups.innerHTML = "";
-
         var hasAnySignups = false;
         ROLE_KEYS.forEach(function (r) {
           var roleSignups = event.signups.filter(function (s) {
@@ -668,15 +831,12 @@
           });
           if (roleSignups.length === 0) return;
           hasAnySignups = true;
-
           var group = document.createElement("div");
           group.className = "names-role-group";
-
           var label = document.createElement("div");
           label.className = "names-role-label " + r.labelClass;
           label.textContent = r.label;
           group.appendChild(label);
-
           var chips = document.createElement("div");
           chips.className = "names-chips";
           roleSignups.forEach(function (s) {
@@ -696,21 +856,16 @@
         });
         namesSection.style.display = hasAnySignups ? "block" : "none";
 
-        // Role buttons
         var roleButtons = document.getElementById("roleButtons");
         roleButtons.innerHTML = "";
-
         ROLE_KEYS.forEach(function (r) {
           var s = event.slots[r.key];
           if (s.max === 0) return;
-
           var btn = document.createElement("button");
           btn.className = "role-btn " + r.btnClass;
           btn.setAttribute("data-role", r.label);
-
           var remaining = s.max - s.filled;
           var isFull = remaining <= 0;
-
           if (isFull) {
             btn.classList.add("role-btn-full");
             btn.disabled = true;
@@ -719,23 +874,19 @@
               selectRole(r.label, btn);
             });
           }
-
           var labelDiv = document.createElement("div");
           labelDiv.className = "role-btn-label";
           labelDiv.textContent = r.label;
-
           var countDiv = document.createElement("div");
           countDiv.className = "role-btn-count";
           countDiv.textContent = isFull
             ? "Full"
             : remaining + " spot" + (remaining > 1 ? "s" : "") + " left";
-
           btn.appendChild(labelDiv);
           btn.appendChild(countDiv);
           roleButtons.appendChild(btn);
         });
 
-        // Add this block immediately here ↓
         var allFull = ROLE_KEYS.every(function (r) {
           var s = event.slots[r.key];
           return s.max === 0 || s.filled >= s.max;
@@ -747,26 +898,41 @@
           fullMsg.textContent =
             "この枠はおかげさまで定員に達しました。ありがとうございます。";
           roleButtons.appendChild(fullMsg);
-          document.getElementById("modalForm").className = "modal-form";
         }
 
-        // Hide form until role selected
-        var modalForm = document.getElementById("modalForm");
-        modalForm.className = "modal-form";
+        document.getElementById("modalForm").className = "modal-form";
         document.getElementById("inputName").value = "";
         document.getElementById("inputClass").value = "";
         document.getElementById("modalMessage").style.display = "none";
-        document.getElementById("submitBtn").textContent = SIGNUP_BTN_TEXT;
         document.getElementById("submitBtn").disabled = false;
-        document.getElementById("modalOverlay").scrollTop = 0;
+        document.getElementById("submitBtn").textContent = SIGNUP_BTN_TEXT;
+
+        var modalTabs = document.getElementById("modalTabs");
+        modalTabs.style.display = event.signups.length > 0 ? "flex" : "none";
+
+        currentTab = "signup";
+        document.getElementById("tabSignup").className =
+          "modal-tab active-signup";
+        document.getElementById("tabCancel").className = "modal-tab";
+        document.getElementById("cancelForm").className = "cancel-form";
+        document.getElementById("cancelName").value = "";
+        document.getElementById("cancelClass").value = "";
+        document.getElementById("cancelMessage").style.display = "none";
+        document.getElementById("confirmBox").style.display = "none";
+        document.getElementById("confirmYes").disabled = false;
+        document.getElementById("confirmYes").textContent =
+          "はい、キャンセルします。";
+        document.getElementById("confirmNo").disabled = false;
+        document.getElementById("cancelSubmitBtn").style.display = "block";
+        document.getElementById("cancelSubmitBtn").disabled = false;
+        document.getElementById("cancelSubmitBtn").textContent = "登録を探す";
+
         document.getElementById("modalOverlay").classList.add("active");
-        document.getElementById("modalOverlay").classList.add("active");
+        document.getElementById("inputName").focus();
       }
 
       function selectRole(roleLabel, btn) {
         currentRole = roleLabel;
-
-        // Highlight selected button
         document.querySelectorAll(".role-btn").forEach(function (b) {
           b.classList.remove("selected");
         });
@@ -775,7 +941,6 @@
         // Show form with matching submit button colour
         var modalForm = document.getElementById("modalForm");
         modalForm.className = "modal-form visible";
-
         var submitBtn = document.getElementById("submitBtn");
         submitBtn.className = "modal-submit";
         var roleKey = ROLE_KEYS.find(function (r) {
@@ -787,36 +952,213 @@
           );
         }
         submitBtn.textContent = SIGNUP_BTN_TEXT;
-
         document.getElementById("modalMessage").style.display = "none";
         document.getElementById("inputName").focus();
       }
 
       function closeModal() {
-        var overlay = document.getElementById("modalOverlay");
-        overlay.classList.remove("active");
-        overlay.scrollTop = 0;
+        document.getElementById("modalOverlay").classList.remove("active");
+        document.getElementById("cancelForm").className = "cancel-form";
+        document.getElementById("confirmBox").style.display = "none";
+        document.getElementById("cancelMessage").style.display = "none";
+        document.getElementById("cancelName").value = "";
+        document.getElementById("cancelClass").value = "";
+        document.getElementById("confirmYes").disabled = false;
+        document.getElementById("confirmYes").textContent =
+          "はい、キャンセルします。";
+        document.getElementById("confirmNo").disabled = false;
         currentEventId = null;
         currentRole = null;
+        currentTab = "signup";
         document.body.scrollTop = 0;
         document.documentElement.scrollTop = 0;
         var top = document.querySelector("h1");
         if (top) top.scrollIntoView({ behavior: "smooth" });
       }
 
+      function switchTab(tab) {
+        currentTab = tab;
+        var roleButtons = document.getElementById("roleButtons");
+        var modalForm = document.getElementById("modalForm");
+        var cancelForm = document.getElementById("cancelForm");
+        var tabSignup = document.getElementById("tabSignup");
+        var tabCancel = document.getElementById("tabCancel");
+
+        document.getElementById("confirmBox").style.display = "none";
+        document.getElementById("cancelMessage").style.display = "none";
+        document.getElementById("cancelSubmitBtn").style.display = "block";
+        document.getElementById("cancelSubmitBtn").disabled = false;
+        document.getElementById("cancelSubmitBtn").textContent = "登録を探す";
+        document.getElementById("confirmYes").disabled = false;
+        document.getElementById("confirmYes").textContent =
+          "はい、キャンセルします。";
+        document.getElementById("confirmNo").disabled = false;
+
+        if (tab === "signup") {
+          tabSignup.className = "modal-tab active-signup";
+          tabCancel.className = "modal-tab";
+          roleButtons.style.display = "block";
+          modalForm.className = currentRole
+            ? "modal-form visible"
+            : "modal-form";
+          cancelForm.className = "cancel-form";
+        } else {
+          tabSignup.className = "modal-tab";
+          tabCancel.className = "modal-tab active-cancel";
+          roleButtons.style.display = "none";
+          modalForm.className = "modal-form";
+          cancelForm.className = "cancel-form visible";
+          var event = gridData.events.find(function (e) {
+            return e.eventId == currentEventId;
+          });
+          var cancelRole = document.getElementById("cancelRole");
+          cancelRole.innerHTML =
+            '<option value="">ポジションを選んでください</option>';
+          if (event) {
+            ROLE_KEYS.forEach(function (r) {
+              var roleSignups = event.signups.filter(function (s) {
+                return s.role === r.label;
+              });
+              if (roleSignups.length > 0) {
+                var opt = document.createElement("option");
+                opt.value = r.label;
+                opt.textContent = r.label;
+                cancelRole.appendChild(opt);
+              }
+            });
+          }
+        }
+      }
+
+      function findAndConfirmCancel() {
+        var name = document.getElementById("cancelName").value.trim();
+        var cls = document.getElementById("cancelClass").value.trim();
+        var role = document.getElementById("cancelRole").value;
+        var msg = document.getElementById("cancelMessage");
+        msg.style.display = "none";
+
+        if (!role) {
+          showCancelMessage("ポジションを選んでください", false);
+          return;
+        }
+        if (!name) {
+          showCancelMessage("名前を入力してください", false);
+          return;
+        }
+        if (name.length > 10) {
+          showCancelMessage("名前は１０文字内で入力してください", false);
+          return;
+        }
+        if (!cls) {
+          showCancelMessage("クラスを入力してください", false);
+          return;
+        }
+        if (cls.length > 10) {
+          showCancelMessage("クラスは１０文字内で入力してください。", false);
+          return;
+        }
+
+        var event = gridData.events.find(function (e) {
+          return e.eventId == currentEventId;
+        });
+        if (event) {
+          var normName = name
+            .toLowerCase()
+            .replace(/[\s\u3000]+/g, " ")
+            .trim();
+          var normCls = cls
+            .toLowerCase()
+            .replace(/[\s\u3000]+/g, " ")
+            .trim();
+          var match = event.signups.find(function (s) {
+            return (
+              s.role === role &&
+              s.name
+                .toLowerCase()
+                .replace(/[\s\u3000]+/g, " ")
+                .trim() === normName &&
+              s.cls
+                .toLowerCase()
+                .replace(/[\s\u3000]+/g, " ")
+                .trim() === normCls
+            );
+          });
+          if (!match) {
+            showCancelMessage(
+              "お名前とクラスの登録が見つかりません。入力内容をご確認ください。全角数字と半角数字にご注意ください。",
+              false,
+            );
+            return;
+          }
+        }
+
+        document.getElementById("confirmText").textContent =
+          "本当にキャンセルしますか？";
+        document.getElementById("confirmBox").style.display = "block";
+        document.getElementById("cancelSubmitBtn").style.display = "none";
+      }
+
+      function confirmCancel() {
+        var name = document.getElementById("cancelName").value.trim();
+        var cls = document.getElementById("cancelClass").value.trim();
+        var role = document.getElementById("cancelRole").value;
+        var btn = document.getElementById("confirmYes");
+
+        btn.disabled = true;
+        btn.textContent = "キャンセル中...";
+        document.getElementById("confirmNo").disabled = true;
+        document.getElementById("cancelSubmitBtn").disabled = true;
+
+        google.script.run
+          .withSuccessHandler(function (result) {
+            if (result.success) {
+              showCancelMessage(result.message, true);
+              setTimeout(function () {
+                if (EXEC_URL) {
+                  window.top.location.href = EXEC_URL;
+                } else {
+                  // Fallback
+                  window.top.location.reload();
+                }
+              }, 1500);
+            } else {
+              showCancelMessage(result.message, false);
+              btn.disabled = false;
+              btn.textContent = "はい、キャンセルします。";
+              document.getElementById("confirmNo").disabled = false;
+              document.getElementById("cancelSubmitBtn").style.display =
+                "block";
+            }
+          })
+          .withFailureHandler(function (error) {
+            showCancelMessage(
+              "エラーが発生しました。再度試してください。",
+              false,
+            );
+            btn.disabled = false;
+            btn.textContent = "はい、キャンセルします。";
+            document.getElementById("confirmNo").disabled = false;
+            document.getElementById("cancelSubmitBtn").style.display = "block";
+          })
+          .cancelSignup(currentEventId, name, cls, role, alias);
+      }
+
+      function showCancelMessage(message, success) {
+        var msgDiv = document.getElementById("cancelMessage");
+        msgDiv.textContent = message;
+        msgDiv.className = "modal-message " + (success ? "success" : "error");
+        msgDiv.style.display = "block";
+      }
+
       function submitSignup() {
         if (document.getElementById("honeypot").value !== "") return;
         // Reject submissions that arrive too quickly — likely automated
         if (Date.now() - PAGE_LOAD_TIME < 3000) {
-          showModalMessage(
-            "Please take a moment to review before submitting.",
-            false,
-          );
+          showModalMessage("少し待ってから送信してください。", false);
           return;
         }
-
         if (!currentRole) {
-          showModalMessage("ロールを選択してください。", false);
+          showModalMessage("ポジションを選択してください。", false);
           return;
         }
 
@@ -850,14 +1192,13 @@
         }
 
         btn.disabled = true;
-        btn.textContent = "Submitting...";
+        btn.textContent = "送信中...";
         document.getElementById("modalMessage").style.display = "none";
 
         google.script.run
           .withSuccessHandler(function (result) {
             showModalMessage(result.message, result.success);
             if (result.success) {
-              // Update local data
               var event = gridData.events.find(function (e) {
                 return e.eventId == currentEventId;
               });
@@ -895,9 +1236,35 @@
         .addEventListener("click", function (e) {
           if (e.target === this) closeModal();
         });
+      document.getElementById("closeBtn").addEventListener("click", closeModal);
       document
-        .getElementById("cancelBtn")
-        .addEventListener("click", closeModal);
+        .getElementById("tabSignup")
+        .addEventListener("click", function () {
+          switchTab("signup");
+        });
+      document
+        .getElementById("tabCancel")
+        .addEventListener("click", function () {
+          switchTab("cancel");
+        });
+      document
+        .getElementById("cancelSubmitBtn")
+        .addEventListener("click", function (e) {
+          e.stopPropagation();
+          findAndConfirmCancel();
+        });
+      document
+        .getElementById("confirmYes")
+        .addEventListener("click", function (e) {
+          e.stopPropagation();
+          confirmCancel();
+        });
+      document
+        .getElementById("confirmNo")
+        .addEventListener("click", function () {
+          document.getElementById("confirmBox").style.display = "none";
+          document.getElementById("cancelSubmitBtn").style.display = "block";
+        });
       document
         .getElementById("submitBtn")
         .addEventListener("click", submitSignup);
@@ -911,9 +1278,30 @@
         .addEventListener("keydown", function (e) {
           if (e.key === "Enter") submitSignup();
         });
+
+      document
+        .querySelector(".grid-wrapper")
+        .addEventListener("click", function (e) {
+          var slot = e.target.closest("[data-eventid]");
+          if (slot) {
+            openModal(slot.getAttribute("data-eventid"));
+          }
+        });
+
       document.getElementById("pageTitle").textContent = PAGE_TITLE;
+
+      google.script.run
+        .withSuccessHandler(function (url) {
+          EXEC_URL = url + "?event=" + alias;
+        })
+        .getDeployedUrl();
+
       buildGrid();
     </script>
+
+    @media (max-width: 768px) and (orientation: portrait) { /* show the message
+    */ }
+
     <div
       style="margin-top: 2rem; font-size: 12px; color: #888; text-align: center"
     >
@@ -921,9 +1309,8 @@
         href="https://github.com/endotaatodne/signup_app"
         target="_blank"
         style="color: #888"
+        >このアプリについて</a
       >
-        このアプリについて
-      </a>
     </div>
   </body>
 </html>

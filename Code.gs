@@ -1,3 +1,10 @@
+/**
+ * @fileoverview Signup App - Google Apps Script backend.
+ * Serves the web app and handles all interactions with Google Sheets.
+ * @author endotaatodne
+ * @version 0.1.0
+ */
+
 const MASTER_SHEET_ID =
   PropertiesService.getScriptProperties().getProperty("MASTER_SHEET_ID");
 
@@ -6,13 +13,6 @@ const ROLES = {
   classRep: "学年委員",
   committee: "運営委員・役員",
 };
-
-/**
- * @fileoverview Signup App - Google Apps Script backend.
- * Serves the web app and handles all interactions with Google Sheets.
- * @author endotaatodne
- * @version 0.0.9
- */
 
 /**
  * Entry point for the web app. Called automatically by Google Apps Script
@@ -175,11 +175,11 @@ function submitSignup(eventId, name, cls, role, alias) {
     } catch (e) {
       return {
         success: false,
-        message: "The system is busy. Please try again in a moment.",
+        message: "システムがビジー状態です。もう少し待ってから試してください。",
       };
     }
 
-    // Validate and sanitise alias
+    // Validate alias
     if (!alias || !/^[a-zA-Z0-9\-]{1,50}$/.test(alias)) {
       return { success: false, message: "不正なリクエストです。" };
     }
@@ -195,14 +195,14 @@ function submitSignup(eventId, name, cls, role, alias) {
     }
     eventId = parsedEventId;
 
-    // Derive sheetId server-side — never trust client-supplied sheet identifiers
+    // Derive sheetId server-side
     const config = getEventConfig();
     const sheetId = config[alias.toLowerCase()];
     if (!sheetId) {
       return { success: false, message: "不正なリクエストです。" };
     }
 
-    // Input validation — name
+    // Validate name
     if (!name || typeof name !== "string" || name.trim().length === 0) {
       return { success: false, message: "名前を入力してください。" };
     }
@@ -216,7 +216,7 @@ function submitSignup(eventId, name, cls, role, alias) {
       return { success: false, message: "名前に不正な文字が含まれています。" };
     }
 
-    // Input validation — class
+    // Validate class
     if (!cls || typeof cls !== "string" || cls.trim().length === 0) {
       return { success: false, message: "クラスを入力してください。" };
     }
@@ -241,10 +241,7 @@ function submitSignup(eventId, name, cls, role, alias) {
     };
     const canonicalRole = roleKeyMap[role];
     if (!canonicalRole) {
-      return {
-        success: false,
-        message: "ロールを選択してください",
-      };
+      return { success: false, message: "ポジションを選択してください。" };
     }
 
     // Rate limiting — composite key prevents bypass by name variation,
@@ -256,14 +253,7 @@ function submitSignup(eventId, name, cls, role, alias) {
       };
     }
 
-    // Validate role
-    const validRoles = Object.values(ROLES);
-    if (!validRoles.includes(role)) {
-      return { success: false, message: "ロールを選択してください" };
-    }
-
-    // Normalise whitespace in stored values — collapse regular and
-    // full-width spaces (common in Japanese input) before writing to Sheet
+    // Normalise whitespace before storing
     name = name.replace(/[\s\u3000]+/g, " ").trim();
     cls = cls.replace(/[\s\u3000]+/g, " ").trim();
 
@@ -274,7 +264,8 @@ function submitSignup(eventId, name, cls, role, alias) {
 
     const eventRows = eventsSheet.getDataRange().getValues();
     const eventRow = eventRows.find((r) => r[0] == eventId);
-    if (!eventRow) return { success: false, message: "Event not found." };
+    if (!eventRow)
+      return { success: false, message: "イベントが見つかりません。" };
 
     // Check event date has not passed
     const eventDate = new Date(eventRow[3]);
@@ -292,10 +283,7 @@ function submitSignup(eventId, name, cls, role, alias) {
     };
     const maxSlots = roleMaxMap[canonicalRole];
     if (maxSlots === 0) {
-      return {
-        success: false,
-        message: "このボランティア枠は存在しません。",
-      };
+      return { success: false, message: "このボランティア枠は存在しません。" };
     }
 
     const signupRows = signupsSheet.getDataRange().getValues();
@@ -349,16 +337,155 @@ function submitSignup(eventId, name, cls, role, alias) {
     };
   } catch (e) {
     console.error("submitSignup error: " + e.message);
-    return { success: false, message: "An error occurred. Please try again." };
+    return {
+      success: false,
+      message: "エラーが発生しました。再度試してください。",
+    };
   } finally {
     lock.releaseLock();
   }
 }
 
 /**
- * Rate limiter — uses a composite key of eventId, name prefix and class prefix
- * to prevent bypass by varying name alone. Also enforces a global per-event
- * cap of 20 submissions per minute to block flood attacks.
+ * Cancels a signup for a given event, matching on name, class and role.
+ * @param {number} eventId - The EventID from the Events sheet
+ * @param {string} name - The participant's name
+ * @param {string} cls - The participant's class
+ * @param {string} role - The participant's role
+ * @param {string} alias - The event alias from the URL
+ * @returns {{success: boolean, message: string}}
+ */
+function cancelSignup(eventId, name, cls, role, alias) {
+  const lock = LockService.getScriptLock();
+  try {
+    // Acquire lock
+    try {
+      lock.waitLock(5000);
+    } catch (e) {
+      return {
+        success: false,
+        message: "システムがビジー状態です。もう少し待ってから試してください。",
+      };
+    }
+
+    // Validate alias
+    if (!alias || !/^[a-zA-Z0-9\-]{1,50}$/.test(alias)) {
+      return { success: false, message: "不正なリクエストです。" };
+    }
+
+    // Validate eventId
+    const parsedEventId = parseInt(eventId, 10);
+    if (
+      isNaN(parsedEventId) ||
+      parsedEventId <= 0 ||
+      String(parsedEventId) !== String(eventId)
+    ) {
+      return { success: false, message: "不正なリクエストです。" };
+    }
+
+    // Validate name
+    if (!name || typeof name !== "string" || name.trim().length === 0) {
+      return { success: false, message: "名前を入力してください。" };
+    }
+    if (name.trim().length > 10) {
+      return {
+        success: false,
+        message: "名前は１０文字以下で入力してください。",
+      };
+    }
+
+    // Validate class
+    if (!cls || typeof cls !== "string" || cls.trim().length === 0) {
+      return { success: false, message: "クラスを入力してください。" };
+    }
+
+    // Validate role against canonical values
+    const roleKeyMap = {
+      [ROLES.general]: ROLES.general,
+      [ROLES.classRep]: ROLES.classRep,
+      [ROLES.committee]: ROLES.committee,
+    };
+    const canonicalRole = roleKeyMap[role];
+    if (!canonicalRole) {
+      return { success: false, message: "ポジションが不正です。" };
+    }
+
+    // Derive sheetId server-side
+    const config = getEventConfig();
+    const sheetId = config[alias.toLowerCase()];
+    if (!sheetId) {
+      return { success: false, message: "不正なリクエストです。" };
+    }
+
+    const signupsSheet =
+      SpreadsheetApp.openById(sheetId).getSheetByName("Signups");
+    const signupRows = signupsSheet.getDataRange().getValues();
+
+    // Normalise name for comparison
+    const normalisedInput = name
+      .toLowerCase()
+      .replace(/[\s\u3000]+/g, " ")
+      .trim();
+    const normalisedCls = cls
+      .toLowerCase()
+      .replace(/[\s\u3000]+/g, " ")
+      .trim();
+
+    // Find matching row — name + role + eventId
+    let matchRowIndex = -1;
+    for (let i = 1; i < signupRows.length; i++) {
+      const rowEventId = signupRows[i][1];
+      const rowName = signupRows[i][2]
+        .toString()
+        .toLowerCase()
+        .replace(/[\s\u3000]+/g, " ")
+        .trim();
+      const rowCls = signupRows[i][3]
+        .toString()
+        .toLowerCase()
+        .replace(/[\s\u3000]+/g, " ")
+        .trim();
+      const rowRole = signupRows[i][4];
+      if (
+        rowEventId == parsedEventId &&
+        rowName === normalisedInput &&
+        rowCls === normalisedCls &&
+        rowRole === canonicalRole
+      ) {
+        matchRowIndex = i + 1;
+        break;
+      }
+    }
+
+    if (matchRowIndex === -1) {
+      return {
+        success: false,
+        message:
+          "お名前とクラスの登録が見つかりません。入力内容をご確認ください。全角数字と半角数字にご注意ください。",
+      };
+    }
+
+    // Delete the matching row
+    signupsSheet.deleteRow(matchRowIndex);
+
+    return {
+      success: true,
+      message: "キャンセルされました。ページをリフレッシュしてください。",
+    };
+  } catch (e) {
+    console.error("cancelSignup error: " + e.message);
+    return {
+      success: false,
+      message: "エラーが発生しました。再度試してください。",
+    };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * Rate limiter — composite key prevents bypass by name variation.
+ * Global event cap prevents flood attacks.
  * @param {number} eventId - The event being signed up for
  * @param {string} name - The participant's name
  * @param {string} cls - The participant's class
@@ -366,8 +493,6 @@ function submitSignup(eventId, name, cls, role, alias) {
  */
 function checkRateLimit(eventId, name, cls) {
   const cache = CacheService.getScriptCache();
-
-  // Composite key — harder to bypass than name alone
   const namePart = name
     .toLowerCase()
     .replace(/[\s\u3000]+/g, "")
@@ -379,62 +504,22 @@ function checkRateLimit(eventId, name, cls) {
   const key = "rl_" + eventId + "_" + namePart + "_" + clsPart;
 
   const hits = cache.get(key);
-  if (hits && parseInt(hits) >= 3) {
-    return false;
-  }
+  if (hits && parseInt(hits) >= 3) return false;
   cache.put(key, hits ? String(parseInt(hits) + 1) : "1", 60);
 
-  // Global per-event rate limit — max 20 submissions per event per minute
   const eventKey = "rl_event_" + eventId;
   const eventHits = cache.get(eventKey);
-  if (eventHits && parseInt(eventHits) >= 20) {
-    return false;
-  }
+  if (eventHits && parseInt(eventHits) >= 20) return false;
   cache.put(eventKey, eventHits ? String(parseInt(eventHits) + 1) : "1", 60);
 
   return true;
 }
 
 /**
- * Reads allowed event aliases and Sheet IDs from the Config tab
- * of the master Sheet. Validates Sheet ID format before trusting.
+ * Reads allowed event aliases and Sheet IDs from the Config tab.
+ * Validates Sheet ID format before trusting.
  * @returns {Object} Map of alias to Sheet ID
  */
-function getEventConfig() {
-  const sheet =
-    SpreadsheetApp.openById(MASTER_SHEET_ID).getSheetByName("Config");
-  if (!sheet) return {};
-  const rows = sheet.getDataRange().getValues();
-  const config = {};
-  rows.slice(1).forEach(function (row) {
-    const alias = row[0].toString().trim().toLowerCase();
-    const sheetId = row[1].toString().trim();
-    // Validate Sheet ID format before trusting
-    if (alias && sheetId && /^[a-zA-Z0-9_\-]{20,60}$/.test(sheetId)) {
-      config[alias] = sheetId;
-    }
-  });
-  return config;
-}
-
-/**
- * Sanitises a string for safe embedding in a JSON/script context.
- * Escapes characters that could break out of a script block.
- * @param {string} str - The string to sanitise
- * @returns {string} Sanitised string
- */
-function sanitiseForScript(str) {
-  if (!str) return "";
-  return String(str)
-    .replace(/&/g, "\\u0026")
-    .replace(/</g, "\\u003c")
-    .replace(/>/g, "\\u003e")
-    .replace(/"/g, "\\u0022")
-    .replace(/'/g, "\\u0027")
-    .replace(/\//g, "\\u002f")
-    .replace(/`/g, "\\u0060");
-}
-
 function getEventConfig() {
   if (!MASTER_SHEET_ID) {
     console.error("MASTER_SHEET_ID not set in Script Properties");
@@ -453,4 +538,29 @@ function getEventConfig() {
     }
   });
   return config;
+}
+
+/**
+ * Sanitises a string for safe embedding in a JSON/script context.
+ * @param {string} str - The string to sanitise
+ * @returns {string} Sanitised string
+ */
+function sanitiseForScript(str) {
+  if (!str) return "";
+  return String(str)
+    .replace(/&/g, "\\u0026")
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/"/g, "\\u0022")
+    .replace(/'/g, "\\u0027")
+    .replace(/\//g, "\\u002f")
+    .replace(/`/g, "\\u0060");
+}
+
+/**
+ * Returns the deployed web app URL for client-side navigation after cancellation.
+ * @returns {string} The deployed web app URL
+ */
+function getDeployedUrl() {
+  return ScriptApp.getService().getUrl();
 }
