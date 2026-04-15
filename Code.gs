@@ -1,3 +1,10 @@
+/**
+ * @fileoverview Signup App - Google Apps Script backend.
+ * Serves the web app and handles all interactions with Google Sheets.
+ * @author endotaatodne
+ * @version 0.1.0
+ */
+
 const MASTER_SHEET_ID =
   PropertiesService.getScriptProperties().getProperty("MASTER_SHEET_ID");
 
@@ -234,7 +241,7 @@ function submitSignup(eventId, name, cls, role, alias) {
     };
     const canonicalRole = roleKeyMap[role];
     if (!canonicalRole) {
-      return { success: false, message: "ロールを選択してください。" };
+      return { success: false, message: "ポジションを選択してください。" };
     }
 
     // Rate limiting — composite key prevents bypass by name variation,
@@ -400,7 +407,7 @@ function cancelSignup(eventId, name, cls, role, alias) {
     };
     const canonicalRole = roleKeyMap[role];
     if (!canonicalRole) {
-      return { success: false, message: "ロールが不正です。" };
+      return { success: false, message: "ポジションが不正です。" };
     }
 
     // Derive sheetId server-side
@@ -453,14 +460,18 @@ function cancelSignup(eventId, name, cls, role, alias) {
     if (matchRowIndex === -1) {
       return {
         success: false,
-        message: "お名前とクラスの登録が見つかりません。ご確認ください。",
+        message:
+          "お名前とクラスの登録が見つかりません。入力内容をご確認ください。全角数字と半角数字にご注意ください。",
       };
     }
 
     // Delete the matching row
     signupsSheet.deleteRow(matchRowIndex);
 
-    return { success: true, message: "キャンセルされました。" };
+    return {
+      success: true,
+      message: "キャンセルされました。ページをリフレッシュしてください。",
+    };
   } catch (e) {
     console.error("cancelSignup error: " + e.message);
     return {

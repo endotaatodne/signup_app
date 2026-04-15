@@ -444,6 +444,17 @@
         border-radius: 7px;
         cursor: pointer;
       }
+      .confirm-yes:disabled {
+        background: #aaa;
+        cursor: not-allowed;
+        opacity: 0.6;
+      }
+      .confirm-no:disabled {
+        background: #ccc;
+        color: #999;
+        cursor: not-allowed;
+        opacity: 0.6;
+      }
     </style>
   </head>
   <body>
@@ -510,7 +521,7 @@
 
         <div class="cancel-form" id="cancelForm">
           <select class="cancel-select" id="cancelRole">
-            <option value="">ロールを選んでください</option>
+            <option value="">ポジションを選んでください</option>
           </select>
           <input
             type="text"
@@ -528,7 +539,7 @@
             <div id="confirmText"></div>
             <div class="confirm-buttons">
               <button class="confirm-yes" id="confirmYes">
-                はい、キャンセルしてください。
+                はい、キャンセルします。
               </button>
               <button class="confirm-no" id="confirmNo">いいえ</button>
             </div>
@@ -910,7 +921,7 @@
         document.getElementById("confirmBox").style.display = "none";
         document.getElementById("confirmYes").disabled = false;
         document.getElementById("confirmYes").textContent =
-          "はい、キャンセルしてください。";
+          "はい、キャンセルします。";
         document.getElementById("confirmNo").disabled = false;
         document.getElementById("cancelSubmitBtn").style.display = "block";
         document.getElementById("cancelSubmitBtn").disabled = false;
@@ -954,7 +965,7 @@
         document.getElementById("cancelClass").value = "";
         document.getElementById("confirmYes").disabled = false;
         document.getElementById("confirmYes").textContent =
-          "はい、キャンセルしてください。";
+          "はい、キャンセルします。";
         document.getElementById("confirmNo").disabled = false;
         currentEventId = null;
         currentRole = null;
@@ -980,7 +991,7 @@
         document.getElementById("cancelSubmitBtn").textContent = "登録を探す";
         document.getElementById("confirmYes").disabled = false;
         document.getElementById("confirmYes").textContent =
-          "はい、キャンセルしてください。";
+          "はい、キャンセルします。";
         document.getElementById("confirmNo").disabled = false;
 
         if (tab === "signup") {
@@ -1002,7 +1013,7 @@
           });
           var cancelRole = document.getElementById("cancelRole");
           cancelRole.innerHTML =
-            '<option value="">ロールを選んでください</option>';
+            '<option value="">ポジションを選んでください</option>';
           if (event) {
             ROLE_KEYS.forEach(function (r) {
               var roleSignups = event.signups.filter(function (s) {
@@ -1027,7 +1038,7 @@
         msg.style.display = "none";
 
         if (!role) {
-          showCancelMessage("ロールを選んでください", false);
+          showCancelMessage("ポジションを選んでください", false);
           return;
         }
         if (!name) {
@@ -1074,7 +1085,7 @@
           });
           if (!match) {
             showCancelMessage(
-              "お名前とクラスの登録が見つかりません。ご確認ください。",
+              "お名前とクラスの登録が見つかりません。入力内容をご確認ください。全角数字と半角数字にご注意ください。",
               false,
             );
             return;
@@ -1096,6 +1107,7 @@
         btn.disabled = true;
         btn.textContent = "キャンセル中...";
         document.getElementById("confirmNo").disabled = true;
+        document.getElementById("cancelSubmitBtn").disabled = true;
 
         google.script.run
           .withSuccessHandler(function (result) {
@@ -1112,7 +1124,7 @@
             } else {
               showCancelMessage(result.message, false);
               btn.disabled = false;
-              btn.textContent = "はい、キャンセルしてください。";
+              btn.textContent = "はい、キャンセルします。";
               document.getElementById("confirmNo").disabled = false;
               document.getElementById("cancelSubmitBtn").style.display =
                 "block";
@@ -1124,7 +1136,7 @@
               false,
             );
             btn.disabled = false;
-            btn.textContent = "はい、キャンセルしてください。";
+            btn.textContent = "はい、キャンセルします。";
             document.getElementById("confirmNo").disabled = false;
             document.getElementById("cancelSubmitBtn").style.display = "block";
           })
@@ -1146,7 +1158,7 @@
           return;
         }
         if (!currentRole) {
-          showModalMessage("ロールを選択してください。", false);
+          showModalMessage("ポジションを選択してください。", false);
           return;
         }
 
@@ -1198,7 +1210,7 @@
                 if (roleKey) event.slots[roleKey.key].filled++;
               }
               buildGrid();
-              closeModal();
+              setTimeout(closeModal, 1500);
             } else {
               btn.disabled = false;
               btn.textContent = SIGNUP_BTN_TEXT;
@@ -1286,6 +1298,10 @@
 
       buildGrid();
     </script>
+
+@media (max-width: 768px) and (orientation: portrait) {
+  /* show the message */
+}
 
     <div
       style="margin-top: 2rem; font-size: 12px; color: #888; text-align: center"
