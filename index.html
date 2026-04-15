@@ -455,13 +455,139 @@
         cursor: not-allowed;
         opacity: 0.6;
       }
+
+      /* Mobile agenda */
+      .mobile-agenda {
+        display: none;
+      }
+      .mobile-time-group {
+        margin-bottom: 18px;
+      }
+      .mobile-time-heading {
+        font-size: 14px;
+        font-weight: 700;
+        margin-bottom: 8px;
+        color: #444;
+      }
+      .mobile-slot-card {
+        width: 100%;
+        display: block;
+        text-align: left;
+        border: 1px solid #dde3e8;
+        border-radius: 14px;
+        background: #fff;
+        padding: 14px 14px 12px;
+        margin-bottom: 10px;
+        cursor: pointer;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+      }
+      .mobile-slot-card:active {
+        transform: scale(0.995);
+      }
+      .mobile-slot-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .mobile-slot-title {
+        font-size: 15px;
+        font-weight: 700;
+        color: #222;
+        margin-bottom: 4px;
+      }
+      .mobile-slot-meta {
+        font-size: 12px;
+        color: #777;
+        line-height: 1.5;
+      }
+      .mobile-slot-desc {
+        font-size: 12px;
+        color: #666;
+        margin-top: 6px;
+        line-height: 1.45;
+      }
+      .mobile-slot-badge {
+        font-size: 11px;
+        font-weight: 700;
+        border-radius: 999px;
+        padding: 5px 9px;
+        white-space: nowrap;
+        background: #e8f5e9;
+        color: #2e7d32;
+      }
+      .mobile-slot-badge.is-full {
+        background: #f0f0f0;
+        color: #888;
+      }
+      .mobile-slot-roles {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 10px;
+      }
+      .mobile-role-pill {
+        font-size: 11px;
+        font-weight: 600;
+        border-radius: 999px;
+        padding: 4px 8px;
+        background: #f7f7f7;
+        color: #555;
+      }
+      .mobile-role-pill.role-general {
+        background: #e8f5e9;
+        color: #2e7d32;
+      }
+      .mobile-role-pill.role-classrep {
+        background: #fff8e1;
+        color: #f57f17;
+      }
+      .mobile-role-pill.role-committee {
+        background: #e3f2fd;
+        color: #1565c0;
+      }
+
+      body.compact-layout {
+        padding: 12px;
+      }
+
+      body.compact-layout .modal-overlay.active {
+        display: flex;
+        align-items: flex-end;
+        justify-content: stretch;
+        padding: 0;
+      }
+
+      body.compact-layout .modal {
+        width: 100%;
+        max-width: none;
+        margin: 0;
+        border-radius: 20px 20px 0 0;
+        padding: 16px;
+        max-height: 88dvh;
+        overflow-y: auto;
+      }
+
+      body.compact-layout .role-btn {
+        padding: 12px;
+      }
+
+      body.compact-layout .modal input {
+        font-size: 16px;
+      }
+
+      body.compact-layout .names-section {
+        max-height: 26vh;
+        overflow-y: auto;
+      }
     </style>
   </head>
   <body>
     <h1 id="pageTitle"></h1>
-    <div class="grid-wrapper">
+    <div class="grid-wrapper" id="desktopGridWrapper">
       <table id="grid"></table>
     </div>
+    <div id="mobileAgenda" class="mobile-agenda" style="display: none"></div>
 
     <div class="modal-overlay" id="modalOverlay">
       <div class="modal">
@@ -608,6 +734,46 @@
           labelClass: "names-role-label-committee",
         },
       ];
+
+      function getEffectiveWidth() {
+        var widths = [];
+
+        if (window.visualViewport && window.visualViewport.width) {
+          widths.push(window.visualViewport.width);
+        }
+
+        if (window.screen && window.screen.width) {
+          widths.push(window.screen.width);
+        }
+
+        if (document.documentElement && document.documentElement.clientWidth) {
+          widths.push(document.documentElement.clientWidth);
+        }
+
+        if (window.innerWidth) {
+          widths.push(window.innerWidth);
+        }
+
+        widths = widths.filter(function (w) {
+          return typeof w === "number" && w > 0;
+        });
+
+        if (!widths.length) return window.innerWidth || 9999;
+
+        return Math.min.apply(null, widths);
+      }
+
+      function isCompactLayout() {
+        return getEffectiveWidth() <= 900;
+      }
+
+      function getDesktopGridWrapper() {
+        return document.getElementById("desktopGridWrapper");
+      }
+
+      function getMobileAgenda() {
+        return document.getElementById("mobileAgenda");
+      }
 
       function hasAnyAvailable(slots) {
         return ROLE_KEYS.some(function (r) {
@@ -781,6 +947,125 @@
         table.appendChild(tbody);
       }
 
+      function buildMobileAgenda() {
+        if (!gridData || !gridData.events) {
+          setTimeout(buildMobileAgenda, 200);
+          return;
+        }
+        var container = getMobileAgenda();
+        if (!container) {
+          setTimeout(buildMobileAgenda, 200);
+          return;
+        }
+
+        var times = gridData.times;
+        var events = gridData.events;
+
+        while (container.firstChild) {
+          container.removeChild(container.firstChild);
+        }
+
+        times.forEach(function (time) {
+          var section = document.createElement("section");
+          section.className = "mobile-time-group";
+
+          var matchedEvent = events.find(function (e) {
+            return e.startTime === time;
+          });
+
+          var heading = document.createElement("h2");
+          heading.className = "mobile-time-heading";
+          heading.textContent = formatTimeRange(
+            time,
+            matchedEvent ? matchedEvent.endTime : "",
+          );
+          section.appendChild(heading);
+
+          var matchingEvents = events.filter(function (e) {
+            return e.startTime === time;
+          });
+
+          matchingEvents.forEach(function (event) {
+            var card = document.createElement("button");
+            card.className = "mobile-slot-card";
+            card.type = "button";
+            card.setAttribute("data-eventid", event.eventId);
+
+            var header = document.createElement("div");
+            header.className = "mobile-slot-header";
+
+            var titleWrap = document.createElement("div");
+
+            var title = document.createElement("div");
+            title.className = "mobile-slot-title";
+            title.textContent = event.activity;
+            titleWrap.appendChild(title);
+
+            var meta = document.createElement("div");
+            meta.className = "mobile-slot-meta";
+            meta.textContent = event.location || "";
+            titleWrap.appendChild(meta);
+
+            if (event.description && event.description.trim() !== "") {
+              var desc = document.createElement("div");
+              desc.className = "mobile-slot-desc";
+              desc.textContent = event.description;
+              titleWrap.appendChild(desc);
+            }
+
+            var badge = document.createElement("div");
+            badge.className = "mobile-slot-badge";
+            var available = hasAnyAvailable(event.slots);
+            badge.textContent = available ? "Open" : "Full";
+            if (!available) {
+              badge.classList.add("is-full");
+            }
+
+            header.appendChild(titleWrap);
+            header.appendChild(badge);
+            card.appendChild(header);
+
+            var roles = document.createElement("div");
+            roles.className = "mobile-slot-roles";
+            ROLE_KEYS.forEach(function (r) {
+              var s = event.slots[r.key];
+              if (s.max === 0) return;
+              var pill = document.createElement("div");
+              pill.className =
+                "mobile-role-pill role-" +
+                r.key.replace("classRep", "classrep");
+              var remaining = s.max - s.filled;
+              pill.textContent =
+                r.label + " " + (remaining <= 0 ? "Full" : remaining + " left");
+              roles.appendChild(pill);
+            });
+            card.appendChild(roles);
+
+            section.appendChild(card);
+          });
+
+          container.appendChild(section);
+        });
+      }
+
+      function renderResponsiveView() {
+        var desktop = getDesktopGridWrapper();
+        var mobile = getMobileAgenda();
+        var compact = isCompactLayout();
+
+        document.body.classList.toggle("compact-layout", compact);
+        document.body.classList.toggle("desktop-layout", !compact);
+
+        if (compact) {
+          if (desktop) desktop.style.display = "none";
+          if (mobile) mobile.style.display = "block";
+          buildMobileAgenda();
+        } else {
+          if (mobile) mobile.style.display = "none";
+          if (desktop) desktop.style.display = "block";
+          buildGrid();
+        }
+      }
       function formatTime(time) {
         if (!time) return "";
         var parts = time.split(":");
@@ -928,7 +1213,10 @@
         document.getElementById("cancelSubmitBtn").textContent = "登録を探す";
 
         document.getElementById("modalOverlay").classList.add("active");
-        document.getElementById("inputName").focus();
+        document.body.style.overflow = "hidden";
+        if (!isCompactLayout()) {
+          document.getElementById("inputName").focus();
+        }
       }
 
       function selectRole(roleLabel, btn) {
@@ -953,7 +1241,9 @@
         }
         submitBtn.textContent = SIGNUP_BTN_TEXT;
         document.getElementById("modalMessage").style.display = "none";
-        document.getElementById("inputName").focus();
+        if (!isCompactLayout()) {
+          document.getElementById("inputName").focus();
+        }
       }
 
       function closeModal() {
@@ -970,10 +1260,13 @@
         currentEventId = null;
         currentRole = null;
         currentTab = "signup";
-        document.body.scrollTop = 0;
-        document.documentElement.scrollTop = 0;
-        var top = document.querySelector("h1");
-        if (top) top.scrollIntoView({ behavior: "smooth" });
+        document.body.style.overflow = "";
+        if (!isCompactLayout()) {
+          document.body.scrollTop = 0;
+          document.documentElement.scrollTop = 0;
+          var top = document.querySelector("h1");
+          if (top) top.scrollIntoView({ behavior: "smooth" });
+        }
       }
 
       function switchTab(tab) {
@@ -1209,7 +1502,7 @@
                 });
                 if (roleKey) event.slots[roleKey.key].filled++;
               }
-              buildGrid();
+              renderResponsiveView();
               setTimeout(closeModal, 1500);
             } else {
               btn.disabled = false;
@@ -1287,6 +1580,14 @@
             openModal(slot.getAttribute("data-eventid"));
           }
         });
+      document
+        .getElementById("mobileAgenda")
+        .addEventListener("click", function (e) {
+          var slot = e.target.closest("[data-eventid]");
+          if (slot) {
+            openModal(slot.getAttribute("data-eventid"));
+          }
+        });
 
       document.getElementById("pageTitle").textContent = PAGE_TITLE;
 
@@ -1296,11 +1597,9 @@
         })
         .getDeployedUrl();
 
-      buildGrid();
+      renderResponsiveView();
+      window.addEventListener("resize", renderResponsiveView);
     </script>
-
-    @media (max-width: 768px) and (orientation: portrait) { /* show the message
-    */ }
 
     <div
       style="margin-top: 2rem; font-size: 12px; color: #888; text-align: center"
