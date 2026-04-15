@@ -14,14 +14,19 @@ A free, open source volunteer signup app built on Google Apps Script and Google 
 - Role-based slot limits — each role has its own quota
 - Roles with zero quota are hidden automatically
 - Colour coded roles — green (General), amber (Class Rep), blue (Committee)
+- Names displayed in role colour in each grid cell
 - Users sign up with name and class — no Google account required
+- Users can cancel their own signup via the modal
 - Names grouped by role in the signup modal
+- Notes shown in the modal when clicking a slot
 - Slot limits enforced server-side with race condition protection
 - Duplicate name prevention per slot
+- Subtitle shown per activity column (e.g. responsible person)
 - Notes/description column per time slot
+- Hint text shown on slots with existing signups
 - Page title driven dynamically by the Google Sheet name
 - Multiple events supported via URL parameter — no redeployment needed
-- Works on mobile — signup via clean modal popup
+- Works on mobile — signup and cancellation via clean modal popup
 - Fully Unicode compatible — supports any language
 - Data stored in Google Sheets — easy to view and manage
 - Free to run — no hosting costs beyond a Google account
@@ -40,7 +45,7 @@ Google Apps Script (backend + web server)
 Public Web App (no login required for users)
 ```
 
-The admin manages events directly in Google Sheets. Users visit the public web app URL with an event alias parameter, see available slots, and sign up by entering their name and class. All data is written back to the event's Google Sheet in real time.
+The admin manages events directly in Google Sheets. Users visit the public web app URL with an event alias parameter, see available slots, and sign up by entering their name and class. Users can also cancel their own signup from the same modal. All data is written back to the event's Google Sheet in real time.
 
 ---
 
@@ -224,6 +229,19 @@ All signups are in the **Signups tab** of each event Sheet with:
 - Role (General / Class Rep / Committee)
 - Timestamp
 
+### Cancelling a Signup (Admin)
+
+Delete the relevant row directly from the **Signups tab**. The slot opens up automatically on the next page load.
+
+### Cancelling a Signup (User)
+
+Users can cancel their own signup from the app:
+
+1. Click the slot they signed up for
+2. Switch to the **Cancel** tab in the modal
+3. Select their role, enter their name and class
+4. Click **Find my signup** → confirm cancellation
+
 ---
 
 ## Events Tab Column Reference
@@ -336,11 +354,12 @@ npm run deploy
 - The sheet identifier is derived server-side from the event alias — clients never supply a sheet ID directly
 - Input length and characters are validated both client-side and server-side
 - `eventId` is validated as a strict positive integer before use
-- A honeypot field deters basic bot submissions
+- A honeypot field and timing check deter basic bot submissions
 - Rate limiting prevents rapid repeated submissions
 - `LockService` prevents race conditions when multiple users sign up simultaneously
 - Role validation is enforced server-side using canonical values — clients cannot submit invalid roles
 - All user-supplied data is sanitised before embedding in the page
+- Cancellation requires matching name, class and role — reduces risk of accidental cancellation
 - Error messages shown to users are generic — internal details are logged privately
 
 ---
@@ -350,7 +369,7 @@ npm run deploy
 ```
 signup-app/
 ├── Code.gs          # Backend — reads/writes Google Sheets, serves web app (no secrets hardcoded)
-├── index.html       # Frontend — grid view, modal signup form
+├── index.html       # Frontend — grid view, modal signup and cancellation form
 ├── appsscript.json  # Apps Script configuration
 ├── CHANGELOG.md     # Version history
 └── README.md        # This file
