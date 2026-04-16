@@ -662,7 +662,7 @@
 
       /* Location / subtitle */
       body.compact-layout .mobile-slot-meta {
-        font-size: 25px;
+        font-size: 15px;
         line-height: 1.35;
         color: #6b7280;
       }
@@ -1308,6 +1308,13 @@
             meta.textContent = event.location || "";
             titleWrap.appendChild(meta);
 
+            if (event.subtitle && event.subtitle.trim() !== "") {
+              var subtitle = document.createElement("div");
+              subtitle.className = "mobile-slot-meta";
+              subtitle.textContent = event.subtitle;
+              titleWrap.appendChild(subtitle);
+            }
+
             if (event.description && event.description.trim() !== "") {
               var desc = document.createElement("div");
               desc.className = "mobile-slot-desc";
@@ -1360,6 +1367,16 @@
             });
             card.appendChild(summary);
 
+            if (event.signups && event.signups.length > 0) {
+              var namesList = document.createElement("div");
+              namesList.className = "mobile-slot-desc";
+              namesList.textContent = event.signups
+                .map(function (s) {
+                  return s.name;
+                })
+                .join(", ");
+              card.appendChild(namesList);
+            }
             section.appendChild(card);
           });
 
