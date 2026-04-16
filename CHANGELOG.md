@@ -1,4 +1,11 @@
-## v0.1.0 - 2026-04-18
+## v0.1.1 - 2026-04-1x
+
+- Patch
+  - puts colour to the slots left depending on the role
+  - puts colour to the voluteer's name depending on the role
+  - adjust various font/button sizes
+
+## v0.1.0 - 2026-04-15
 
 - Major update
   - added option to cancel
