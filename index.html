@@ -101,7 +101,12 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 3px;
+        gap: 10px;
+        margin-bottom: 5px;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: #ffffff;
+        border: 1px solid rgba(0, 0, 0, 0.06);
       }
       .role-row:last-child {
         margin-bottom: 0;
@@ -109,15 +114,17 @@
       .role-label {
         font-size: 10px;
         color: #444;
+        font-weight: 600;
       }
       .role-count {
         font-size: 10px;
         font-weight: 600;
+        white-space: nowrap;
       }
       .role-divider {
         border: none;
         border-top: 1px solid rgba(0, 0, 0, 0.08);
-        margin: 3px 0;
+        margin: 4px 0;
       }
       .slot-names {
         font-size: 10px;
@@ -151,6 +158,24 @@
       }
       .slot-mixed {
         background: #f9f9f9;
+      }
+      .role-row-general {
+        background: #f3fbf4;
+      }
+      .role-row-classrep {
+        background: #fffaf0;
+      }
+      .role-row-committee {
+        background: #eef6ff;
+      }
+      .name-role-general {
+        color: #2e7d32;
+      }
+      .name-role-classrep {
+        color: #c77800;
+      }
+      .name-role-committee {
+        color: #1565c0;
       }
       /* Modal */
       .modal-overlay {
@@ -334,6 +359,33 @@
         background: #f0f0f0;
         border-radius: 20px;
         color: #444;
+      }
+      .name-chip.name-role-general {
+        background: #edf7ee;
+        color: #2e7d32;
+      }
+      .name-chip.name-role-classrep {
+        background: #fff6df;
+        color: #c77800;
+      }
+      .name-chip.name-role-committee {
+        background: #eaf3ff;
+        color: #1565c0;
+      }
+      .name-chip-class {
+        color: #888;
+        font-size: 10px;
+      }
+      .mobile-slot-names {
+        margin-top: 8px;
+        font-size: 11px;
+        line-height: 1.5;
+      }
+      .mobile-slot-name {
+        font-weight: 600;
+      }
+      .mobile-slot-separator {
+        color: #999;
       }
       /* Hint text */
       .slot-hint {
@@ -585,6 +637,18 @@
       .mobile-slot-summary-item {
         font-size: 13px;
         font-weight: 600;
+      }
+      .mobile-slot-summary-item.role-general {
+        color: #2e7d32;
+      }
+      .mobile-slot-summary-item.role-classrep {
+        color: #b26a00;
+      }
+      .mobile-slot-summary-item.role-committee {
+        color: #1565c0;
+      }
+      .mobile-slot-summary-item.is-full {
+        color: #aaa;
       }
 
       /* ===== Compact / mobile layout (≤900px) ===== */
@@ -1020,6 +1084,8 @@
           btnClass: "role-btn-general",
           countClass: "count-general",
           labelClass: "names-role-label-general",
+          roleRowClass: "role-row-general",
+          nameClass: "name-role-general",
         },
         {
           key: "classRep",
@@ -1027,6 +1093,8 @@
           btnClass: "role-btn-classrep",
           countClass: "count-classrep",
           labelClass: "names-role-label-classrep",
+          roleRowClass: "role-row-classrep",
+          nameClass: "name-role-classrep",
         },
         {
           key: "committee",
@@ -1034,8 +1102,16 @@
           btnClass: "role-btn-committee",
           countClass: "count-committee",
           labelClass: "names-role-label-committee",
+          roleRowClass: "role-row-committee",
+          nameClass: "name-role-committee",
         },
       ];
+
+      function getRoleMetaByLabel(roleLabel) {
+        return ROLE_KEYS.find(function (r) {
+          return r.label === roleLabel;
+        });
+      }
 
       function getEffectiveWidth() {
         var widths = [];
@@ -1191,7 +1267,7 @@
                     slotDiv.appendChild(divider);
                   }
                   var roleRow = document.createElement("div");
-                  roleRow.className = "role-row";
+                  roleRow.className = "role-row " + r.roleRowClass;
                   var roleLabel = document.createElement("span");
                   roleLabel.className = "role-label " + r.countClass;
                   roleLabel.textContent = r.label;
@@ -1215,7 +1291,7 @@
                   });
                   if (roleSignups.length === 0) return;
                   var roleSpan = document.createElement("span");
-                  roleSpan.className = r.countClass;
+                  roleSpan.className = r.countClass + " " + r.nameClass;
                   roleSpan.style.cssText = "font-size:10px;font-weight:500;";
                   roleSpan.textContent = roleSignups
                     .map(function (s) {
@@ -1359,8 +1435,10 @@
               if (s.max === 0) return;
               var remaining = s.max - s.filled;
               var item = document.createElement("span");
-              item.className = "mobile-slot-summary-item";
-              item.style.color = remaining <= 0 ? "#aaa" : "";
+              item.className =
+                "mobile-slot-summary-item role-" +
+                r.key.replace("classRep", "classrep");
+              if (remaining <= 0) item.classList.add("is-full");
               item.textContent =
                 r.label + " " + (remaining <= 0 ? "Full" : remaining + " left");
               summary.appendChild(item);
@@ -1369,12 +1447,21 @@
 
             if (event.signups && event.signups.length > 0) {
               var namesList = document.createElement("div");
-              namesList.className = "mobile-slot-desc";
-              namesList.textContent = event.signups
-                .map(function (s) {
-                  return s.name;
-                })
-                .join(", ");
+              namesList.className = "mobile-slot-names";
+              event.signups.forEach(function (s, idx) {
+                var roleMeta = getRoleMetaByLabel(s.role);
+                var nameSpan = document.createElement("span");
+                nameSpan.className =
+                  "mobile-slot-name " + (roleMeta ? roleMeta.nameClass : "");
+                nameSpan.textContent = s.name;
+                namesList.appendChild(nameSpan);
+                if (idx < event.signups.length - 1) {
+                  var separator = document.createElement("span");
+                  separator.className = "mobile-slot-separator";
+                  separator.textContent = ", ";
+                  namesList.appendChild(separator);
+                }
+              });
               card.appendChild(namesList);
             }
             section.appendChild(card);
@@ -1462,11 +1549,11 @@
           chips.className = "names-chips";
           roleSignups.forEach(function (s) {
             var chip = document.createElement("div");
-            chip.className = "name-chip";
+            chip.className = "name-chip " + r.nameClass;
             chip.textContent = s.name;
             if (s.cls) {
               var clsSpan = document.createElement("span");
-              clsSpan.style.cssText = "color:#888;font-size:10px;";
+              clsSpan.className = "name-chip-class";
               clsSpan.textContent = " — " + s.cls;
               chip.appendChild(clsSpan);
             }
