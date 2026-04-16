@@ -17,7 +17,7 @@
         color: #333;
       }
       h1 {
-        font-size: 1.4em;
+        font-size: 2em;
         margin-bottom: 1.2rem;
         color: #222;
       }
@@ -201,7 +201,7 @@
         max-width: 380px;
       }
       .modal-title {
-        font-size: 15px;
+        font-size: 13px;
         font-weight: 600;
         margin-bottom: 4px;
       }
@@ -281,7 +281,7 @@
       .modal-submit {
         width: 100%;
         padding: 11px;
-        font-size: 14px;
+        font-size: 16px;
         font-weight: 600;
         color: white;
         border: none;
@@ -404,7 +404,7 @@
       .modal-tab {
         flex: 1;
         padding: 8px;
-        font-size: 13px;
+        font-size: 15px;
         font-weight: 600;
         text-align: center;
         cursor: pointer;
@@ -445,7 +445,7 @@
       .cancel-submit {
         width: 100%;
         padding: 11px;
-        font-size: 14px;
+        font-size: 16px;
         font-weight: 600;
         background: #c62828;
         color: white;
@@ -468,6 +468,10 @@
         font-size: 13px;
         color: #c62828;
         line-height: 1.5;
+      }
+      #confirmText {
+        font-size: 20px;
+        font-weight: 700;
       }
       .confirm-buttons {
         display: flex;
@@ -659,7 +663,7 @@
       }
 
       body.compact-layout h1 {
-        font-size: 26px;
+        font-size: 32px;
         line-height: 1.25;
         margin-bottom: 16px;
       }
@@ -816,7 +820,7 @@
 
       body.compact-layout .modal-tab,
       body.compact-layout .tab-btn {
-        font-size: 17px;
+        font-size: 25px;
         font-weight: 700;
         min-height: 50px;
         padding: 12px 16px;
@@ -844,7 +848,7 @@
       }
 
       body.compact-layout .role-btn-label {
-        font-size: 20px;
+        font-size: 30px;
         font-weight: 700;
         line-height: 1.2;
       }
@@ -898,10 +902,11 @@
         font-weight: 600;
       }
 
+        /* name text insertion size */
       body.compact-layout input,
       body.compact-layout select,
       body.compact-layout textarea {
-        font-size: 18px;
+        font-size: 30px;
         min-height: 54px;
         padding: 14px 16px;
         border-radius: 12px;
@@ -914,7 +919,7 @@
       body.compact-layout #confirmYes,
       body.compact-layout #confirmNo,
       body.compact-layout .close-btn {
-        font-size: 18px;
+        font-size: 30px;
         font-weight: 700;
         min-height: 56px;
         padding: 15px 18px;
@@ -1013,7 +1018,7 @@
 
         <div class="cancel-form" id="cancelForm">
           <select class="cancel-select" id="cancelRole">
-            <option value="">ポジションを選んでください</option>
+            <option value="">登録したポジションを選んでください</option>
           </select>
           <input
             type="text"
@@ -1602,7 +1607,7 @@
         if (allFull) {
           var fullMsg = document.createElement("div");
           fullMsg.style.cssText =
-            "font-size:13px;color:#999;text-align:center;padding:8px 0;";
+            "font-size:25px;color:#999;text-align:center;padding:8px 0;";
           fullMsg.textContent =
             "この枠はおかげさまで定員に達しました。ありがとうございます。";
           roleButtons.appendChild(fullMsg);
@@ -1729,7 +1734,7 @@
           });
           var cancelRole = document.getElementById("cancelRole");
           cancelRole.innerHTML =
-            '<option value="">ポジションを選んでください</option>';
+            '<option value="">登録したポジションを選んでください</option>';
           if (event) {
             ROLE_KEYS.forEach(function (r) {
               var roleSignups = event.signups.filter(function (s) {
@@ -1754,7 +1759,7 @@
         msg.style.display = "none";
 
         if (!role) {
-          showCancelMessage("ポジションを選んでください", false);
+          showCancelMessage("登録したポジションを選んでください", false);
           return;
         }
         if (!name) {
@@ -1874,7 +1879,7 @@
           return;
         }
         if (!currentRole) {
-          showModalMessage("ポジションを選択してください。", false);
+          showModalMessage("登録したポジションを選択してください。", false);
           return;
         }
 
