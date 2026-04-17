@@ -2,16 +2,16 @@
 
 - Patch
   - remove redundant code
-    - Removed the unused currentTab variable from and its write-only assignments.
-    - Extracted shared backend helpers for role lookup and string normalization: getCanonicalRole normaliseWhitespace, normaliseComparable, normaliseCompact.
+    - Removed the unused currentTab variable from Code.gs and its write-only assignments.
+    - Extracted shared backend helpers for role lookup and string normalization: getCanonicalRole, normaliseWhitespace, normaliseComparable, normaliseCompact.
     - Reused a single SpreadsheetApp.openById(sheetId) per function in the affected backend paths.
     - Consolidated the duplicated frontend message rendering into showMessage(...)
 
-  - some efficiency gains:
+  - Some efficiency gains:
   1. Frontend lookup precomputation
      Replace repeated find/filter scans with maps built once from gridData.
-  2. Resize rerender throttling  
-     Debounce renderResponsiveView() or rerender only when crossing the compact/desktop
+  2. Resize rerender throttling
+     Debounce renderResponsiveView() or rerender only when crossing the compact/desktop threshold.
   3. Reuse the opened spreadsheet in doGet/getGridData  
      Avoid opening the same spreadsheet twice in one request.
   4. Single-pass slot counting in getGridData  
@@ -21,32 +21,32 @@
 
 - Patch
   - puts colour to the slots left depending on the role
-  - puts colour to the voluteer's name depending on the role
+  - puts colour to the volunteer's name depending on the role
   - adjust various font/button sizes
 
 ## v0.1.0 - 2026-04-15
 
 - Major update
-  - added option to cancel
-  - updated some wording
+  - Added option to cancel
+  - Updated some wording
 
 ## v0.0.9 - 2026-04-12
 
 - Major update
-  - changes the way MASTER_SHEET_ID is called - removed hard coding of the ID
-  - improved security
+  - Changes the way MASTER_SHEET_ID is called - removed hard coding of the ID
+  - Improved security
 
 ## v0.0.8 - 2026-04-11
 
 - Minor update
-  - changed the "Spot is full" message to Japanese
-  - changed the colour of names being displayed after registered
+  - Changed the "Spot is full" message to Japanese
+  - Changed the colour of names being displayed after registered
 
 ## v0.0.7 - 2026-04-10
 
 - Minor update
-  - changed the column name in the original Google Sheet for clarity
-  - adds SubTitle column in the pop-up
+  - Changed the column name in the original Google Sheet for clarity
+  - Added SubTitle column in the pop-up
 
 ## v0.0.6 - 2026-04-10
 
@@ -55,10 +55,10 @@
 ## v0.0.5 - 2026-04-10
 
 - Adds further security patches
-  - limit the number of entries in a minute
-  - checks the date in submitSignup()
-  - added timeout
-  - further sanitisation on alias
+  - Limit the number of entries in a minute
+  - Checks the date in submitSignup()
+  - Added timeout
+  - Further sanitisation on alias
 
 ## v0.0.4 - 2026-04-10
 
@@ -71,11 +71,11 @@
 ## v0.0.2 - 2026-04-09
 
 - Major update
-  - allow different volunteer slots depending on the person's role
-  - control the position of the pop up
-  - improved security
-  - adds description column to be displayed next to the time
-  - dynamic title update based on Google Sheet file name
+  - Allow different volunteer slots depending on the person's role
+  - Control the position of the pop-up
+  - Improved security
+  - Adds description column to be displayed next to the time
+  - Dynamic title update based on Google Sheet file name
 
 ## v0.0.1 - 2026-04-06
 
