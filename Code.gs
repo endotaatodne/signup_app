@@ -2,7 +2,7 @@
  * @fileoverview Signup App - Google Apps Script backend.
  * Serves the web app and handles all interactions with Google Sheets.
  * @author endotaatodne
- * @version 0.1.1
+ * @version 0.1.2
  */
 
 const MASTER_SHEET_ID =
@@ -543,7 +543,9 @@ function getCanonicalRole(role) {
 }
 
 function normaliseWhitespace(value) {
-  return String(value).replace(/[\s\u3000]+/g, " ").trim();
+  return String(value)
+    .replace(/[\s\u3000]+/g, " ")
+    .trim();
 }
 
 function normaliseComparable(value) {
@@ -551,7 +553,9 @@ function normaliseComparable(value) {
 }
 
 function normaliseCompact(value) {
-  return String(value).toLowerCase().replace(/[\s\u3000]+/g, "");
+  return String(value)
+    .toLowerCase()
+    .replace(/[\s\u3000]+/g, "");
 }
 
 /**

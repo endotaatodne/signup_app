@@ -16,6 +16,8 @@
      Avoid opening the same spreadsheet twice in one request.
   4. Single-pass slot counting in getGridData  
      Count role fills once instead of filtering the same signup array three times per event.
+  - Font size adjustments
+  - comments added throughout
 
 ## v0.1.1 - 2026-04-16
 
