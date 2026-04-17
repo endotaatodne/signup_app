@@ -50,7 +50,7 @@ function doGet(e) {
 
     const spreadsheet = SpreadsheetApp.openById(sheetId);
     const title = spreadsheet.getName();
-    const gridData = JSON.stringify(getGridData(sheetId));
+    const gridData = JSON.stringify(getGridData(spreadsheet));
 
     // Base64 encode all template data to prevent script injection
     const encodedGridData = Utilities.base64Encode(
@@ -82,31 +82,42 @@ function doGet(e) {
 /**
  * Retrieves all events and signup data from Google Sheets and structures
  * it for the grid view.
- * @param {string} sheetId - The Google Sheet ID
+ * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} spreadsheet - The event spreadsheet
  * @returns {{events: Object[], times: string[], activities: string[]}}
  */
-function getGridData(sheetId) {
-  const eventsSheet = SpreadsheetApp.openById(sheetId).getSheetByName("Events");
-  const signupsSheet =
-    SpreadsheetApp.openById(sheetId).getSheetByName("Signups");
+function getGridData(spreadsheet) {
+  const eventsSheet = spreadsheet.getSheetByName("Events");
+  const signupsSheet = spreadsheet.getSheetByName("Signups");
 
   const eventRows = eventsSheet.getDataRange().getValues();
   const signupRows = signupsSheet.getDataRange().getValues();
 
   // Build signups lookup: eventId -> [{name, cls, role}]
   const signupsMap = {};
+  const signupCountsMap = {};
   signupRows.slice(1).forEach((row) => {
     const eventId = row[1];
     const name = sanitiseForScript(row[2]);
     const cls = sanitiseForScript(String(row[3]));
     const role = sanitiseForScript(row[4]);
     if (!signupsMap[eventId]) signupsMap[eventId] = [];
+    if (!signupCountsMap[eventId]) {
+      signupCountsMap[eventId] = {
+        [ROLES.general]: 0,
+        [ROLES.classRep]: 0,
+        [ROLES.committee]: 0,
+      };
+    }
     signupsMap[eventId].push({ name, cls, role });
+    if (signupCountsMap[eventId][role] !== undefined) {
+      signupCountsMap[eventId][role]++;
+    }
   });
 
   const events = eventRows.slice(1).map((row) => {
     const eventId = row[0];
     const allSignups = signupsMap[eventId] || [];
+    const signupCounts = signupCountsMap[eventId] || {};
     const generalMax = Number(row[8]) || 0;
     const classRepMax = Number(row[9]) || 0;
     const committeeMax = Number(row[10]) || 0;
@@ -135,15 +146,15 @@ function getGridData(sheetId) {
       slots: {
         general: {
           max: generalMax,
-          filled: allSignups.filter((s) => s.role === ROLES.general).length,
+          filled: signupCounts[ROLES.general] || 0,
         },
         classRep: {
           max: classRepMax,
-          filled: allSignups.filter((s) => s.role === ROLES.classRep).length,
+          filled: signupCounts[ROLES.classRep] || 0,
         },
         committee: {
           max: committeeMax,
-          filled: allSignups.filter((s) => s.role === ROLES.committee).length,
+          filled: signupCounts[ROLES.committee] || 0,
         },
       },
       signups: allSignups,
@@ -234,12 +245,7 @@ function submitSignup(eventId, name, cls, role, alias) {
     }
 
     // Validate role against canonical values
-    const roleKeyMap = {
-      [ROLES.general]: ROLES.general,
-      [ROLES.classRep]: ROLES.classRep,
-      [ROLES.committee]: ROLES.committee,
-    };
-    const canonicalRole = roleKeyMap[role];
+    const canonicalRole = getCanonicalRole(role);
     if (!canonicalRole) {
       return { success: false, message: "ポジションを選択してください。" };
     }
@@ -254,13 +260,12 @@ function submitSignup(eventId, name, cls, role, alias) {
     }
 
     // Normalise whitespace before storing
-    name = name.replace(/[\s\u3000]+/g, " ").trim();
-    cls = cls.replace(/[\s\u3000]+/g, " ").trim();
+    name = normaliseWhitespace(name);
+    cls = normaliseWhitespace(cls);
 
-    const eventsSheet =
-      SpreadsheetApp.openById(sheetId).getSheetByName("Events");
-    const signupsSheet =
-      SpreadsheetApp.openById(sheetId).getSheetByName("Signups");
+    const spreadsheet = SpreadsheetApp.openById(sheetId);
+    const eventsSheet = spreadsheet.getSheetByName("Events");
+    const signupsSheet = spreadsheet.getSheetByName("Signups");
 
     const eventRows = eventsSheet.getDataRange().getValues();
     const eventRow = eventRows.find((r) => r[0] == eventId);
@@ -300,17 +305,9 @@ function submitSignup(eventId, name, cls, role, alias) {
 
     // Normalise name for comparison — case insensitive, collapse regular
     // and full-width spaces (common in Japanese input)
-    const normalisedInput = name
-      .toLowerCase()
-      .replace(/[\s\u3000]+/g, " ")
-      .trim();
+    const normalisedInput = normaliseComparable(name);
     const duplicate = existing.find(
-      (r) =>
-        r[2]
-          .toString()
-          .toLowerCase()
-          .replace(/[\s\u3000]+/g, " ")
-          .trim() === normalisedInput,
+      (r) => normaliseComparable(r[2]) === normalisedInput,
     );
     if (duplicate) {
       return {
@@ -400,12 +397,7 @@ function cancelSignup(eventId, name, cls, role, alias) {
     }
 
     // Validate role against canonical values
-    const roleKeyMap = {
-      [ROLES.general]: ROLES.general,
-      [ROLES.classRep]: ROLES.classRep,
-      [ROLES.committee]: ROLES.committee,
-    };
-    const canonicalRole = roleKeyMap[role];
+    const canonicalRole = getCanonicalRole(role);
     if (!canonicalRole) {
       return { success: false, message: "ポジションが不正です。" };
     }
@@ -417,34 +409,20 @@ function cancelSignup(eventId, name, cls, role, alias) {
       return { success: false, message: "不正なリクエストです。" };
     }
 
-    const signupsSheet =
-      SpreadsheetApp.openById(sheetId).getSheetByName("Signups");
+    const spreadsheet = SpreadsheetApp.openById(sheetId);
+    const signupsSheet = spreadsheet.getSheetByName("Signups");
     const signupRows = signupsSheet.getDataRange().getValues();
 
     // Normalise name for comparison
-    const normalisedInput = name
-      .toLowerCase()
-      .replace(/[\s\u3000]+/g, " ")
-      .trim();
-    const normalisedCls = cls
-      .toLowerCase()
-      .replace(/[\s\u3000]+/g, " ")
-      .trim();
+    const normalisedInput = normaliseComparable(name);
+    const normalisedCls = normaliseComparable(cls);
 
     // Find matching row — name + role + eventId
     let matchRowIndex = -1;
     for (let i = 1; i < signupRows.length; i++) {
       const rowEventId = signupRows[i][1];
-      const rowName = signupRows[i][2]
-        .toString()
-        .toLowerCase()
-        .replace(/[\s\u3000]+/g, " ")
-        .trim();
-      const rowCls = signupRows[i][3]
-        .toString()
-        .toLowerCase()
-        .replace(/[\s\u3000]+/g, " ")
-        .trim();
+      const rowName = normaliseComparable(signupRows[i][2]);
+      const rowCls = normaliseComparable(signupRows[i][3]);
       const rowRole = signupRows[i][4];
       if (
         rowEventId == parsedEventId &&
@@ -493,14 +471,8 @@ function cancelSignup(eventId, name, cls, role, alias) {
  */
 function checkRateLimit(eventId, name, cls) {
   const cache = CacheService.getScriptCache();
-  const namePart = name
-    .toLowerCase()
-    .replace(/[\s\u3000]+/g, "")
-    .substring(0, 3);
-  const clsPart = cls
-    .toLowerCase()
-    .replace(/[\s\u3000]+/g, "")
-    .substring(0, 3);
+  const namePart = normaliseCompact(name).substring(0, 3);
+  const clsPart = normaliseCompact(cls).substring(0, 3);
   const key = "rl_" + eventId + "_" + namePart + "_" + clsPart;
 
   const hits = cache.get(key);
@@ -555,6 +527,27 @@ function sanitiseForScript(str) {
     .replace(/'/g, "\\u0027")
     .replace(/\//g, "\\u002f")
     .replace(/`/g, "\\u0060");
+}
+
+function getCanonicalRole(role) {
+  const roleKeyMap = {
+    [ROLES.general]: ROLES.general,
+    [ROLES.classRep]: ROLES.classRep,
+    [ROLES.committee]: ROLES.committee,
+  };
+  return roleKeyMap[role];
+}
+
+function normaliseWhitespace(value) {
+  return String(value).replace(/[\s\u3000]+/g, " ").trim();
+}
+
+function normaliseComparable(value) {
+  return normaliseWhitespace(value).toLowerCase();
+}
+
+function normaliseCompact(value) {
+  return String(value).toLowerCase().replace(/[\s\u3000]+/g, "");
 }
 
 /**

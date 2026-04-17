@@ -327,6 +327,12 @@
         color: #d32f2f;
         font-weight: 500;
       }
+      .modal-helper {
+        font-size: 19px;
+        color: #666;
+        margin: 10px 0 8px;
+        line-height: 1.5;
+      }
 
       .names-section {
         margin-bottom: 14px;
@@ -1084,7 +1090,8 @@
       var PAGE_TITLE = b64decode("<?!= title ?>");
       var currentEventId = null;
       var currentRole = null;
-      var currentTab = "signup";
+      var resizeTimer = null;
+      var lastCompactLayout = null;
 
       var ROLE_KEYS = [
         {
@@ -1116,10 +1123,67 @@
         },
       ];
 
-      function getRoleMetaByLabel(roleLabel) {
-        return ROLE_KEYS.find(function (r) {
-          return r.label === roleLabel;
+      var ROLE_META_BY_LABEL = ROLE_KEYS.reduce(function (acc, roleMeta) {
+        acc[roleMeta.label] = roleMeta;
+        return acc;
+      }, {});
+      var gridIndexes = null;
+
+      function getEventLookupKey(activity, startTime) {
+        return activity + "\u0000" + startTime;
+      }
+
+      function buildGridIndexes() {
+        var events = (gridData && gridData.events) || [];
+        var indexes = {
+          eventById: {},
+          firstEventByActivity: {},
+          firstEventByTime: {},
+          eventsByTime: {},
+          eventByActivityAndTime: {},
+        };
+
+        events.forEach(function (event) {
+          indexes.eventById[String(event.eventId)] = event;
+
+          if (!indexes.firstEventByActivity[event.activity]) {
+            indexes.firstEventByActivity[event.activity] = event;
+          }
+
+          if (!indexes.firstEventByTime[event.startTime]) {
+            indexes.firstEventByTime[event.startTime] = event;
+          }
+
+          if (!indexes.eventsByTime[event.startTime]) {
+            indexes.eventsByTime[event.startTime] = [];
+          }
+          indexes.eventsByTime[event.startTime].push(event);
+          indexes.eventByActivityAndTime[
+            getEventLookupKey(event.activity, event.startTime)
+          ] = event;
+
+          event.signupsByRole = ROLE_KEYS.reduce(function (roleMap, roleMeta) {
+            roleMap[roleMeta.label] = [];
+            return roleMap;
+          }, {});
+
+          (event.signups || []).forEach(function (signup) {
+            if (!event.signupsByRole[signup.role]) {
+              event.signupsByRole[signup.role] = [];
+            }
+            event.signupsByRole[signup.role].push(signup);
+          });
         });
+
+        gridIndexes = indexes;
+      }
+
+      function getEventById(eventId) {
+        return gridIndexes && gridIndexes.eventById[String(eventId)];
+      }
+
+      function getRoleMetaByLabel(roleLabel) {
+        return ROLE_META_BY_LABEL[roleLabel] || null;
       }
 
       function getEffectiveWidth() {
@@ -1202,9 +1266,7 @@
 
         activities.forEach(function (a) {
           var th = document.createElement("th");
-          var event = events.find(function (e) {
-            return e.activity === a;
-          });
+          var event = gridIndexes.firstEventByActivity[a];
           var actDiv = document.createElement("div");
           actDiv.style.cssText = "font-size:13px;font-weight:600;";
           actDiv.textContent = a;
@@ -1225,9 +1287,7 @@
 
         times.forEach(function (time) {
           var tr = document.createElement("tr");
-          var matchedEvent = events.find(function (e) {
-            return e.startTime === time;
-          });
+          var matchedEvent = gridIndexes.firstEventByTime[time];
 
           var timeTd = document.createElement("td");
           timeTd.className = "time-cell";
@@ -1244,9 +1304,10 @@
 
           activities.forEach(function (activity) {
             var td = document.createElement("td");
-            var event = events.find(function (e) {
-              return e.activity === activity && e.startTime === time;
-            });
+            var event =
+              gridIndexes.eventByActivityAndTime[
+                getEventLookupKey(activity, time)
+              ];
 
             if (!event) {
               var emptyDiv = document.createElement("div");
@@ -1295,9 +1356,7 @@
                 var namesDiv = document.createElement("div");
                 namesDiv.className = "slot-names";
                 ROLE_KEYS.forEach(function (r) {
-                  var roleSignups = event.signups.filter(function (s) {
-                    return s.role === r.label;
-                  });
+                  var roleSignups = event.signupsByRole[r.label] || [];
                   if (roleSignups.length === 0) return;
                   var roleSpan = document.createElement("span");
                   roleSpan.className = r.countClass + " " + r.nameClass;
@@ -1356,9 +1415,7 @@
           var section = document.createElement("section");
           section.className = "mobile-time-group";
 
-          var matchedEvent = events.find(function (e) {
-            return e.startTime === time;
-          });
+          var matchedEvent = gridIndexes.firstEventByTime[time];
 
           var heading = document.createElement("h2");
           heading.className = "mobile-time-heading";
@@ -1368,9 +1425,7 @@
           );
           section.appendChild(heading);
 
-          var matchingEvents = events.filter(function (e) {
-            return e.startTime === time;
-          });
+          var matchingEvents = gridIndexes.eventsByTime[time] || [];
 
           matchingEvents.forEach(function (event) {
             var card = document.createElement("button");
@@ -1484,9 +1539,16 @@
         var desktop = getDesktopGridWrapper();
         var mobile = getMobileAgenda();
         var compact = isCompactLayout();
+        var layoutChanged = compact !== lastCompactLayout;
 
         document.body.classList.toggle("compact-layout", compact);
         document.body.classList.toggle("desktop-layout", !compact);
+
+        if (!layoutChanged) {
+          return;
+        }
+
+        lastCompactLayout = compact;
 
         if (compact) {
           if (desktop) desktop.style.display = "none";
@@ -1519,9 +1581,7 @@
           }, 100);
           return;
         }
-        var event = gridData.events.find(function (e) {
-          return e.eventId == eventId;
-        });
+        var event = getEventById(eventId);
         if (!event) return;
 
         currentEventId = eventId;
@@ -1543,9 +1603,7 @@
         namesGroups.innerHTML = "";
         var hasAnySignups = false;
         ROLE_KEYS.forEach(function (r) {
-          var roleSignups = event.signups.filter(function (s) {
-            return s.role === r.label;
-          });
+          var roleSignups = event.signupsByRole[r.label] || [];
           if (roleSignups.length === 0) return;
           hasAnySignups = true;
           var group = document.createElement("div");
@@ -1627,7 +1685,6 @@
         var modalTabs = document.getElementById("modalTabs");
         modalTabs.style.display = event.signups.length > 0 ? "flex" : "none";
 
-        currentTab = "signup";
         document.getElementById("tabSignup").className =
           "modal-tab active-signup";
         document.getElementById("tabCancel").className = "modal-tab";
@@ -1691,7 +1748,6 @@
         document.getElementById("confirmNo").disabled = false;
         currentEventId = null;
         currentRole = null;
-        currentTab = "signup";
         document.body.style.overflow = "";
         if (!isCompactLayout()) {
           document.body.scrollTop = 0;
@@ -1702,7 +1758,6 @@
       }
 
       function switchTab(tab) {
-        currentTab = tab;
         var roleButtons = document.getElementById("roleButtons");
         var modalForm = document.getElementById("modalForm");
         var cancelForm = document.getElementById("cancelForm");
@@ -1722,6 +1777,7 @@
         if (tab === "signup") {
           tabSignup.className = "modal-tab active-signup";
           tabCancel.className = "modal-tab";
+          document.getElementById("signupHelper").style.display = "block";
           roleButtons.style.display = "block";
           modalForm.className = currentRole
             ? "modal-form visible"
@@ -1730,20 +1786,17 @@
         } else {
           tabSignup.className = "modal-tab";
           tabCancel.className = "modal-tab active-cancel";
+          document.getElementById("signupHelper").style.display = "none";
           roleButtons.style.display = "none";
           modalForm.className = "modal-form";
           cancelForm.className = "cancel-form visible";
-          var event = gridData.events.find(function (e) {
-            return e.eventId == currentEventId;
-          });
+          var event = getEventById(currentEventId);
           var cancelRole = document.getElementById("cancelRole");
           cancelRole.innerHTML =
             '<option value="">登録したポジションを選んでください</option>';
           if (event) {
             ROLE_KEYS.forEach(function (r) {
-              var roleSignups = event.signups.filter(function (s) {
-                return s.role === r.label;
-              });
+              var roleSignups = event.signupsByRole[r.label] || [];
               if (roleSignups.length > 0) {
                 var opt = document.createElement("option");
                 opt.value = r.label;
@@ -1783,9 +1836,7 @@
           return;
         }
 
-        var event = gridData.events.find(function (e) {
-          return e.eventId == currentEventId;
-        });
+        var event = getEventById(currentEventId);
         if (event) {
           var normName = name
             .toLowerCase()
@@ -1868,11 +1919,15 @@
           .cancelSignup(currentEventId, name, cls, role, alias);
       }
 
-      function showCancelMessage(message, success) {
-        var msgDiv = document.getElementById("cancelMessage");
+      function showMessage(targetId, message, success) {
+        var msgDiv = document.getElementById(targetId);
         msgDiv.textContent = message;
         msgDiv.className = "modal-message " + (success ? "success" : "error");
         msgDiv.style.display = "block";
+      }
+
+      function showCancelMessage(message, success) {
+        showMessage("cancelMessage", message, success);
       }
 
       function submitSignup() {
@@ -1924,17 +1979,24 @@
           .withSuccessHandler(function (result) {
             showModalMessage(result.message, result.success);
             if (result.success) {
-              var event = gridData.events.find(function (e) {
-                return e.eventId == currentEventId;
-              });
+              var event = getEventById(currentEventId);
               if (event) {
-                event.signups.push({ name: name, cls: cls, role: currentRole });
+                var signup = { name: name, cls: cls, role: currentRole };
+                event.signups.push(signup);
+                if (!event.signupsByRole[currentRole]) {
+                  event.signupsByRole[currentRole] = [];
+                }
+                event.signupsByRole[currentRole].push(signup);
                 var roleKey = ROLE_KEYS.find(function (r) {
                   return r.label === currentRole;
                 });
                 if (roleKey) event.slots[roleKey.key].filled++;
               }
-              renderResponsiveView();
+              if (isCompactLayout()) {
+                buildMobileAgenda();
+              } else {
+                buildGrid();
+              }
               setTimeout(closeModal, 1500);
             } else {
               btn.disabled = false;
@@ -1950,10 +2012,7 @@
       }
 
       function showModalMessage(message, success) {
-        var msgDiv = document.getElementById("modalMessage");
-        msgDiv.textContent = message;
-        msgDiv.className = "modal-message " + (success ? "success" : "error");
-        msgDiv.style.display = "block";
+        showMessage("modalMessage", message, success);
       }
 
       document
@@ -2029,8 +2088,14 @@
         })
         .getDeployedUrl();
 
+      buildGridIndexes();
       renderResponsiveView();
-      window.addEventListener("resize", renderResponsiveView);
+      window.addEventListener("resize", function () {
+        window.clearTimeout(resizeTimer);
+        resizeTimer = window.setTimeout(function () {
+          renderResponsiveView();
+        }, 120);
+      });
     </script>
 
     <div
