@@ -1,4 +1,23 @@
-## v0.1.1 - 2026-04-1x
+## v0.1.2 - 2026-04-17
+
+- Patch
+  - remove redundant code
+    - Removed the unused currentTab variable from and its write-only assignments.
+    - Extracted shared backend helpers for role lookup and string normalization: getCanonicalRole normaliseWhitespace, normaliseComparable, normaliseCompact.
+    - Reused a single SpreadsheetApp.openById(sheetId) per function in the affected backend paths.
+    - Consolidated the duplicated frontend message rendering into showMessage(...)
+
+  - some efficiency gains:
+  1. Frontend lookup precomputation
+     Replace repeated find/filter scans with maps built once from gridData.
+  2. Resize rerender throttling  
+     Debounce renderResponsiveView() or rerender only when crossing the compact/desktop
+  3. Reuse the opened spreadsheet in doGet/getGridData  
+     Avoid opening the same spreadsheet twice in one request.
+  4. Single-pass slot counting in getGridData  
+     Count role fills once instead of filtering the same signup array three times per event.
+
+## v0.1.1 - 2026-04-16
 
 - Patch
   - puts colour to the slots left depending on the role
