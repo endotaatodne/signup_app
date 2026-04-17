@@ -2,7 +2,7 @@
 
 [日本語はこちら](README.ja.md)
 
-A free, open source volunteer signup app built on Google Apps Script and Google Sheets. This app was developed to assist a voluteer sign up management for Japanese school events.
+A free, open source volunteer signup app built on Google Apps Script and Google Sheets. This app was developed to assist volunteer signup management for Japanese school events.
 
 ---
 
@@ -374,7 +374,7 @@ signup-app/
 ├── index.html       # Frontend — grid view, modal signup and cancellation form
 ├── appsscript.json  # Apps Script configuration
 ├── CHANGELOG.md     # Version history
-└── README.md        # This file
+└── README.en.md     # This file
 ```
 
 Sensitive values (`MASTER_SHEET_ID`) are stored in Script Properties — not in source code — so the entire repo is safe to share publicly.
