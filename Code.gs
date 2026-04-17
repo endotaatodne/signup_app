@@ -91,14 +91,18 @@ function getGridData(spreadsheet) {
 
   const eventRows = eventsSheet.getDataRange().getValues();
   const signupRows = signupsSheet.getDataRange().getValues();
+  const signupDisplayRows = signupsSheet.getDataRange().getDisplayValues();
 
   // Build signups lookup: eventId -> [{name, cls, role}]
   const signupsMap = {};
   const signupCountsMap = {};
-  signupRows.slice(1).forEach((row) => {
+  signupRows.slice(1).forEach((row, index) => {
+    const displayRow = signupDisplayRows[index + 1] || [];
     const eventId = row[1];
     const name = sanitiseForScript(row[2]);
-    const cls = sanitiseForScript(String(row[3]));
+    // Use the displayed sheet text for class so values like "1-1" are not
+    // serialised as Date strings when Sheets auto-detects them internally.
+    const cls = sanitiseForScript(String(displayRow[3] || ""));
     const role = sanitiseForScript(row[4]);
     if (!signupsMap[eventId]) signupsMap[eventId] = [];
     if (!signupCountsMap[eventId]) {
