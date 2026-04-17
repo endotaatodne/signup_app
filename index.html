@@ -380,7 +380,16 @@
       }
       .name-chip-class {
         color: #888;
-        font-size: 50px;
+        /* TEXT_SIZE: [POP-UP] Desktop class text inside name chips */
+        font-size: 11px;
+      }
+      .modal-full-message {
+        /* TEXT_SIZE: [POP-UP] Desktop full-capacity message */
+        font-size: 17px;
+        color: #999;
+        text-align: center;
+        padding: 8px 0;
+        line-height: 1.5;
       }
       .mobile-slot-names {
         margin-top: 8px;
@@ -901,6 +910,11 @@
       /* TEXT_SIZE: [POP-UP] Mobile name chip class text  */
       body.compact-layout .name-chip-class {
         font-size: 20px;
+      }
+
+      /* TEXT_SIZE: [POP-UP] Mobile full-capacity message */
+      body.compact-layout .modal-full-message {
+        font-size: 28px;
       }
 
 
@@ -1689,8 +1703,7 @@
         });
         if (allFull) {
           var fullMsg = document.createElement("div");
-          fullMsg.style.cssText =
-            "font-size:48px;color:#999;text-align:center;padding:8px 0;";
+          fullMsg.className = "modal-full-message";
           fullMsg.textContent =
             "この枠はおかげさまで定員に達しました。ありがとうございます。";
           roleButtons.appendChild(fullMsg);
@@ -2125,6 +2138,7 @@
       <a
         href="https://github.com/endotaatodne/signup_app"
         target="_blank"
+        rel="noopener noreferrer"
         style="color: #888"
         >このアプリについて</a
       >
