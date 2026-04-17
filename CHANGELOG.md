@@ -1,3 +1,10 @@
+## v0.1.3 - 2026-04-18
+
+- Patch
+  - Fixes issues of text size shared for thank you message and class between desktop and mobile
+  - Minor fix to the link to external source
+  -
+
 ## v0.1.2 - 2026-04-17
 
 - Patch

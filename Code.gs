@@ -2,7 +2,7 @@
  * @fileoverview Signup App - Google Apps Script backend.
  * Serves the web app and handles all interactions with Google Sheets.
  * @author endotaatodne
- * @version 0.1.2
+ * @version 0.1.3
  */
 
 const MASTER_SHEET_ID =
