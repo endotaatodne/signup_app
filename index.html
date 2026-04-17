@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html>
   <head>
     <meta charset="UTF-8" />
@@ -380,7 +380,7 @@
       }
       .name-chip-class {
         color: #888;
-        font-size: 10px;
+        font-size: 50px;
       }
       .mobile-slot-names {
         margin-top: 8px;
@@ -661,7 +661,7 @@
         color: #aaa;
       }
 
-      /* ===== Compact / mobile layout (≤900px) ===== */
+      /* ===== Compact / mobile layout (<=900px) ===== */
 
       body.compact-layout {
         padding: 12px;
@@ -692,9 +692,7 @@
         margin-bottom: 20px;
       }
 
-      /*
-      size of time-slot display
-      */
+      /* TEXT_SIZE: [SIGN-UP CARD] Mobile time heading (e.g. "9:00 am - 10:00 am") */
       body.compact-layout .mobile-time-heading {
         font-size: 50px;
         font-weight: 2000;
@@ -726,6 +724,7 @@
       }
 
       /* Large, dominant title */
+      /* TEXT_SIZE: [SIGN-UP CARD] Mobile slot card title (e.g. "Sports Day") */
       body.compact-layout .mobile-slot-title {
         font-size: 30px;
         font-weight: 700;
@@ -735,20 +734,22 @@
       }
 
       /* Location / subtitle */
+      /* TEXT_SIZE: [SIGN-UP CARD] Mobile slot location/subtitle (e.g. "Gymnasium" or "Subtitle text") */
       body.compact-layout .mobile-slot-meta {
-        font-size: 15px;
+        font-size: 20px;
         line-height: 1.35;
         color: #6b7280;
       }
 
-      /* Optional description — hide to save vertical space 
+      /* Optional description - hide to save vertical space 
       body.compact-layout .mobile-slot-desc {
         display: none;
       }
  */
       /* Badge (Open / Full) */
+      /* TEXT_SIZE: [SIGN-UP CARD] Mobile slot badge (e.g. "Open" or "Full") */
       body.compact-layout .mobile-slot-badge {
-        font-size: 25px;
+        font-size: 15px;
         font-weight: 700;
         padding: 7px 13px;
         border-radius: 999px;
@@ -765,7 +766,18 @@
       }
 
       body.compact-layout .mobile-slot-summary-item {
-        font-size: 13px;
+        /* TEXT_SIZE: [SIGN-UP CARD] Mobile slot summary items (e.g. "General 3 left", "Committee Full") */
+        font-size: 20px;
+        font-weight: 600;
+      }
+      /* TEXT_SIZE: [SIGN-UP CARD] Mobile card volunteer names container (e.g. "Tanaka, Suzuki, ...") */
+      body.compact-layout .mobile-slot-names {
+        font-size: 30px;
+        line-height: 1.5;
+      }
+      /* TEXT_SIZE: [SIGN-UP CARD] Mobile card individual volunteer name (e.g. "Tanaka") */
+      body.compact-layout .mobile-slot-name {
+        font-size: 25px;
         font-weight: 600;
       }
 
@@ -800,8 +812,7 @@
         border-radius: 99px;
         margin: 0 auto 20px;
       }
-
-      /* size of the title of pop-up*/
+      /* TEXT_SIZE: [POP-UP] Mobile modal title (e.g. "Sports Day") */
       body.compact-layout .modal-title {
         font-size: 30px;
         font-weight: 700;
@@ -811,28 +822,26 @@
       }
 
       body.compact-layout .modal-subtitle {
+        /* TEXT_SIZE: [POP-UP] Mobile modal subtitle (e.g. "9:00 am - 10:00 am â€” Gymnasium") */
         font-size: 30px;
         line-height: 1.55;
         text-align: center;
         color: #6b7280;
         margin-bottom: 18px;
       }
-
-      /* Tabs */
       body.compact-layout .modal-tabs {
         margin-top: 4px;
         margin-bottom: 18px;
       }
-
-      body.compact-layout .modal-tab,
-      body.compact-layout .tab-btn {
+      /* TEXT_SIZE: [POP-UP] Mobile modal tabs (e.g. "登録する", "登録をキャンセルする") */
+      body.compact-layout .modal-tab {
         font-size: 25px;
         font-weight: 700;
         min-height: 50px;
         padding: 12px 16px;
       }
 
-      /* Role selection buttons — full-width stack */
+      /* Role selection buttons - full-width stack */
       body.compact-layout .role-buttons {
         display: flex;
         flex-direction: column;
@@ -849,17 +858,19 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
-        -webkit-appearance: none; /* ← add this */
-        appearance: none; /* ← and this */
+        -webkit-appearance: none;
+        appearance: none;
       }
 
       body.compact-layout .role-btn-label {
+        /* TEXT_SIZE: [POP-UP] Mobile role button label  */
         font-size: 30px;
         font-weight: 700;
         line-height: 1.2;
       }
 
       body.compact-layout .role-btn-count {
+        /* TEXT_SIZE: [POP-UP] Mobile role button count (e.g. "3 spots left", "Full") */
         font-size: 15px;
         font-weight: 500;
         margin-top: 0;
@@ -874,27 +885,26 @@
       }
 
       body.compact-layout .names-role-label {
+        /* TEXT_SIZE: [POP-UP] Mobile names role label  */
         font-size: 15px;
         font-weight: 700;
         margin-bottom: 6px;
       }
 
       body.compact-layout .name-chip {
-        font-size: 15px;
+        /* TEXT_SIZE: [POP-UP] Mobile name chips  */
+        font-size: 30px;
         padding: 6px 13px;
       }
 
-      body.compact-layout .names-group-title {
-        font-size: 16px;
-        font-weight: 700;
+      /* TEXT_SIZE: [POP-UP] Mobile name chip class text  */
+      body.compact-layout .name-chip-class {
+        font-size: 25px;
       }
 
-      body.compact-layout .participant-name {
-        font-size: 16px;
-        line-height: 1.45;
-      }
 
       /* Success / error message */
+      /* TEXT_SIZE: [POP-UP] Mobile success/error messages  */
       body.compact-layout .modal-message {
         font-size: 16px;
         padding: 12px 14px;
@@ -907,8 +917,7 @@
         font-size: 16px;
         font-weight: 600;
       }
-
-        /* name text insertion size */
+      /* TEXT_SIZE: [POP-UP] Mobile form inputs (name, class e.g. "åå‰", "ã‚¯ãƒ©ã‚¹" fields) */
       body.compact-layout input,
       body.compact-layout select,
       body.compact-layout textarea {
@@ -920,6 +929,7 @@
       }
 
       /* Action buttons */
+      /* TEXT_SIZE: [POP-UP] Mobile action buttons (submit, cancel, confirm) */
       body.compact-layout .modal-submit,
       body.compact-layout #cancelSubmitBtn,
       body.compact-layout #confirmYes,
@@ -939,13 +949,14 @@
       }
 
       /* Close / cancel link */
+      /* TEXT_SIZE: [POP-UP] Mobile close/cancel link */
       body.compact-layout .modal-cancel {
         font-size: 17px;
         padding: 10px;
         margin-top: 8px;
       }
 
-      /* Very small phones (≤380px) */
+      /* Very small phones (<=380px) */
       @media (max-width: 380px) {
         body.compact-layout .modal-title {
           font-size: 22px;
@@ -956,6 +967,15 @@
         body.compact-layout .mobile-slot-title {
           font-size: 18px;
         }
+      }
+
+      body {
+        background:
+          radial-gradient(circle at top, #f8fbff 0, #eef2f7 42%, #e7edf5 100%);
+      }
+
+      h1 {
+        text-align: center;
       }
     </style>
   </head>
