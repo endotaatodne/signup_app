@@ -1,9 +1,16 @@
+## v0.1.4 - 2026-04-18
+
+- Bug fix
+  - Fixed a bug which prevented value such as 1-1 entered to class not matching
+  - Updates the successful cancellation message so that the readability improves
+  - Standardised number/dash entry to class so that half-width and full-width characters will not be treated differently
+  - Adds unit tests.
+
 ## v0.1.3 - 2026-04-18
 
 - Patch
   - Fixes issues of text size shared for thank you message and class between desktop and mobile
   - Minor fix to the link to external source
-  -
 
 ## v0.1.2 - 2026-04-17
 
