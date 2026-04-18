@@ -135,15 +135,6 @@
       }
 
       /* Role colours */
-      .color-general {
-        background: #e8f5e9;
-      }
-      .color-classrep {
-        background: #fff8e1;
-      }
-      .color-committee {
-        background: #e3f2fd;
-      }
       .count-general {
         color: #2e7d32;
       }
@@ -152,9 +143,6 @@
       }
       .count-committee {
         color: #1565c0;
-      }
-      .count-full {
-        color: #bbb;
       }
       .slot-mixed {
         background: #f9f9f9;
@@ -1296,8 +1284,6 @@
 
         var times = gridData.times;
         var activities = gridData.activities;
-        var events = gridData.events;
-
         // Build header
         var thead = document.createElement("thead");
         var headerRow = document.createElement("tr");
@@ -1456,8 +1442,6 @@
         }
 
         var times = gridData.times;
-        var events = gridData.events;
-
         while (container.firstChild) {
           container.removeChild(container.firstChild);
         }

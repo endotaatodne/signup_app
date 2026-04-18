@@ -293,8 +293,7 @@ function submitSignup(eventId, name, cls, role, alias) {
       return { success: false, message: "このボランティア枠は存在しません。" };
     }
 
-    const signupRange = signupsSheet.getDataRange();
-    const signupRows = signupRange.getValues();
+    const signupRows = signupsSheet.getDataRange().getValues();
     const existing = signupRows.slice(1).filter((r) => r[1] == eventId);
 
     // Check slot capacity for this role
