@@ -1625,6 +1625,62 @@
         return formatTime(startTime) + " - " + formatTime(endTime);
       }
 
+      function normaliseWhitespace(value) {
+        return String(value)
+          .replace(/[\s\u3000]+/g, " ")
+          .trim();
+      }
+
+      function normaliseAsciiDigits(value) {
+        return String(value).replace(/[０-９]/g, function (char) {
+          return String.fromCharCode(char.charCodeAt(0) - 0xfee0);
+        });
+      }
+
+      function isClassTokenChar(char) {
+        return /^[0-9A-Za-z\uFF10-\uFF19\uFF21-\uFF3A\uFF41-\uFF5A]$/.test(char);
+      }
+
+      function normaliseClassSeparators(value) {
+        var source = String(value);
+        var result = "";
+
+        for (var i = 0; i < source.length; i += 1) {
+          var char = source.charAt(i);
+          if (/[\u2010-\u2015\u2212\uFF0D]/.test(char)) {
+            result += "-";
+            continue;
+          }
+
+          if (
+            char === "\u30FC" &&
+            isClassTokenChar(source.charAt(i - 1)) &&
+            isClassTokenChar(source.charAt(i + 1))
+          ) {
+            result += "-";
+            continue;
+          }
+
+          result += char;
+        }
+
+        return result;
+      }
+
+      function normaliseClassValue(value) {
+        return normaliseClassSeparators(
+          normaliseWhitespace(normaliseAsciiDigits(value)),
+        );
+      }
+
+      function normaliseComparable(value) {
+        return normaliseWhitespace(value).toLowerCase();
+      }
+
+      function normaliseClassComparable(value) {
+        return normaliseClassValue(value).toLowerCase();
+      }
+
       function openModal(eventId) {
         if (!gridData || !gridData.events) {
           setTimeout(function () {
@@ -1859,8 +1915,12 @@
       }
 
       function findAndConfirmCancel() {
-        var name = document.getElementById("cancelName").value.trim();
-        var cls = document.getElementById("cancelClass").value.trim();
+        var name = normaliseWhitespace(
+          document.getElementById("cancelName").value,
+        );
+        var cls = normaliseClassValue(
+          document.getElementById("cancelClass").value,
+        );
         var role = document.getElementById("cancelRole").value;
         var msg = document.getElementById("cancelMessage");
         msg.style.display = "none";
@@ -1888,30 +1948,18 @@
 
         var event = getEventById(currentEventId);
         if (event) {
-          var normName = name
-            .toLowerCase()
-            .replace(/[\s\u3000]+/g, " ")
-            .trim();
-          var normCls = cls
-            .toLowerCase()
-            .replace(/[\s\u3000]+/g, " ")
-            .trim();
+          var normName = normaliseComparable(name);
+          var normCls = normaliseClassComparable(cls);
           var match = event.signups.find(function (s) {
             return (
               s.role === role &&
-              s.name
-                .toLowerCase()
-                .replace(/[\s\u3000]+/g, " ")
-                .trim() === normName &&
-              s.cls
-                .toLowerCase()
-                .replace(/[\s\u3000]+/g, " ")
-                .trim() === normCls
+              normaliseComparable(s.name) === normName &&
+              normaliseClassComparable(s.cls) === normCls
             );
           });
           if (!match) {
             showCancelMessage(
-              "お名前とクラスの登録が見つかりません。入力内容をご確認ください。全角数字と半角数字にご注意ください。",
+              "お名前とクラスの登録が見つかりません。入力内容をご確認ください。",
               false,
             );
             return;
@@ -1925,8 +1973,12 @@
       }
 
       function confirmCancel() {
-        var name = document.getElementById("cancelName").value.trim();
-        var cls = document.getElementById("cancelClass").value.trim();
+        var name = normaliseWhitespace(
+          document.getElementById("cancelName").value,
+        );
+        var cls = normaliseClassValue(
+          document.getElementById("cancelClass").value,
+        );
         var role = document.getElementById("cancelRole").value;
         var btn = document.getElementById("confirmYes");
 
@@ -2013,8 +2065,8 @@
           return;
         }
 
-        var name = document.getElementById("inputName").value.trim();
-        var cls = document.getElementById("inputClass").value.trim();
+        var name = normaliseWhitespace(document.getElementById("inputName").value);
+        var cls = normaliseClassValue(document.getElementById("inputClass").value);
         var btn = document.getElementById("submitBtn");
 
         if (!name) {
@@ -2052,7 +2104,11 @@
             if (result.success) {
               var event = getEventById(currentEventId);
               if (event) {
-                var signup = { name: name, cls: cls, role: currentRole };
+                var signup = {
+                  name: result.name || name,
+                  cls: result.cls || cls,
+                  role: currentRole,
+                };
                 event.signups.push(signup);
                 if (!event.signupsByRole[currentRole]) {
                   event.signupsByRole[currentRole] = [];
