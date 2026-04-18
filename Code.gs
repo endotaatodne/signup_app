@@ -295,7 +295,8 @@ function submitSignup(eventId, name, cls, role, alias) {
       return { success: false, message: "このボランティア枠は存在しません。" };
     }
 
-    const signupRows = signupsSheet.getDataRange().getValues();
+    const signupRange = signupsSheet.getDataRange();
+    const signupRows = signupRange.getValues();
     const existing = signupRows.slice(1).filter((r) => r[1] == eventId);
 
     // Check slot capacity for this role
@@ -415,7 +416,9 @@ function cancelSignup(eventId, name, cls, role, alias) {
 
     const spreadsheet = SpreadsheetApp.openById(sheetId);
     const signupsSheet = spreadsheet.getSheetByName("Signups");
-    const signupRows = signupsSheet.getDataRange().getValues();
+    const signupRange = signupsSheet.getDataRange();
+    const signupRows = signupRange.getValues();
+    const signupDisplayRows = signupRange.getDisplayValues();
 
     // Normalise name for comparison
     const normalisedInput = normaliseComparable(name);
@@ -426,7 +429,9 @@ function cancelSignup(eventId, name, cls, role, alias) {
     for (let i = 1; i < signupRows.length; i++) {
       const rowEventId = signupRows[i][1];
       const rowName = normaliseComparable(signupRows[i][2]);
-      const rowCls = normaliseComparable(signupRows[i][3]);
+      // Compare against the displayed sheet text so values like "1-1" are
+      // matched consistently even if Sheets auto-detects the raw cell value.
+      const rowCls = normaliseComparable(signupDisplayRows[i][3]);
       const rowRole = signupRows[i][4];
       if (
         rowEventId == parsedEventId &&
