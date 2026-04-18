@@ -2,7 +2,7 @@
  * @fileoverview Signup App - Google Apps Script backend.
  * Serves the web app and handles all interactions with Google Sheets.
  * @author endotaatodne
- * @version 0.1.4
+ * @version 0.1.5
  */
 
 const MASTER_SHEET_ID =
@@ -270,6 +270,8 @@ function submitSignup(eventId, name, cls, role, alias) {
     const signupsSheet = spreadsheet.getSheetByName("Signups");
 
     const eventRows = eventsSheet.getDataRange().getValues();
+    // Use loose equality intentionally because Sheets can surface EventID cells
+    // as either numbers or strings depending on column formatting.
     const eventRow = eventRows.find((r) => r[0] == eventId);
     if (!eventRow)
       return { success: false, message: "イベントが見つかりません。" };
@@ -294,6 +296,8 @@ function submitSignup(eventId, name, cls, role, alias) {
     }
 
     const signupRows = signupsSheet.getDataRange().getValues();
+    // Use loose equality intentionally because stored EventID cells may be
+    // typed differently by Sheets while still representing the same ID.
     const existing = signupRows.slice(1).filter((r) => r[1] == eventId);
 
     // Check slot capacity for this role
@@ -435,6 +439,8 @@ function cancelSignup(eventId, name, cls, role, alias) {
       const rowCls = normaliseClassComparable(signupDisplayRows[i][3]);
       const rowRole = signupRows[i][4];
       if (
+        // Use loose equality intentionally because Sheets can return EventID
+        // cells as numbers or strings depending on how the sheet is formatted.
         rowEventId == parsedEventId &&
         rowName === normalisedInput &&
         rowCls === normalisedCls &&
@@ -448,7 +454,8 @@ function cancelSignup(eventId, name, cls, role, alias) {
     if (matchRowIndex === -1) {
       return {
         success: false,
-        message: "お名前とクラスの登録が見つかりません。入力内容をご確認ください。",
+        message:
+          "お名前とクラスの登録が見つかりません。入力内容をご確認ください。",
       };
     }
 
