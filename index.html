@@ -1691,7 +1691,9 @@
         // Names grouped by role
         var namesSection = document.getElementById("namesSection");
         var namesGroups = document.getElementById("namesGroups");
-        namesGroups.innerHTML = "";
+        while (namesGroups.firstChild) {
+          namesGroups.removeChild(namesGroups.firstChild);
+        }
         var hasAnySignups = false;
         ROLE_KEYS.forEach(function (r) {
           var roleSignups = event.signupsByRole[r.label] || [];
@@ -1723,7 +1725,9 @@
         namesSection.style.display = hasAnySignups ? "block" : "none";
 
         var roleButtons = document.getElementById("roleButtons");
-        roleButtons.innerHTML = "";
+        while (roleButtons.firstChild) {
+          roleButtons.removeChild(roleButtons.firstChild);
+        }
         ROLE_KEYS.forEach(function (r) {
           var s = event.slots[r.key];
           if (s.max === 0) return;
@@ -1882,8 +1886,13 @@
           cancelForm.className = "cancel-form visible";
           var event = getEventById(currentEventId);
           var cancelRole = document.getElementById("cancelRole");
-          cancelRole.innerHTML =
-            '<option value="">登録したポジションを選んでください</option>';
+          while (cancelRole.firstChild) {
+            cancelRole.removeChild(cancelRole.firstChild);
+          }
+          var defaultOption = document.createElement("option");
+          defaultOption.value = "";
+          defaultOption.textContent = "登録したポジションを選んでください";
+          cancelRole.appendChild(defaultOption);
           if (event) {
             ROLE_KEYS.forEach(function (r) {
               var roleSignups = event.signupsByRole[r.label] || [];
@@ -2038,8 +2047,11 @@
       }
 
       function submitSignup() {
+        // This is intentionally only a low-friction client-side filter. Real
+        // abuse protection is enforced server-side via rate limiting.
         if (document.getElementById("honeypot").value !== "") return;
-        // Reject submissions that arrive too quickly — likely automated
+        // This is also only a client-side friction check. The backend rate
+        // limiter remains the actual enforcement point.
         if (Date.now() - PAGE_LOAD_TIME < 3000) {
           showModalMessage("少し待ってから送信してください。", false);
           return;
@@ -2195,7 +2207,11 @@
 
       google.script.run
         .withSuccessHandler(function (url) {
-          EXEC_URL = url + "?event=" + alias;
+          EXEC_URL =
+            url +
+            (url.indexOf("?") === -1 ? "?" : "&") +
+            "event=" +
+            encodeURIComponent(alias);
         })
         .getDeployedUrl();
 

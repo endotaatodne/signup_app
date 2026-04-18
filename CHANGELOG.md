@@ -1,9 +1,16 @@
-## v0.1.4 - 2026-04-18
+## v0.1.5 - 2026-04-19
+
+- Patch
+  - Addresses minor security volnerability and added further comments.
+
+## v0.1.4 - 2026-04-19
 
 - Bug fix
   - Fixed a bug which prevented value such as 1-1 entered to class not matching
-  - Updates the successful cancellation message so that the readability improves
   - Standardised number/dash entry to class so that half-width and full-width characters will not be treated differently
+
+- Patch
+  - Updates the successful cancellation message so that the readability improves
   - Adds unit tests.
 
 ## v0.1.3 - 2026-04-18
