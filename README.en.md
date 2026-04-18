@@ -373,11 +373,48 @@ signup-app/
 ├── Code.gs          # Backend — reads/writes Google Sheets, serves web app (no secrets hardcoded)
 ├── index.html       # Frontend — grid view, modal signup and cancellation form
 ├── appsscript.json  # Apps Script configuration
+├── .claspignore     # Excludes local test/dev files from Apps Script deployments
+├── test/            # Unit tests for backend and frontend logic
+├── test-support/    # Test harnesses and Apps Script/browser mocks
+├── package.json     # Local test commands
 ├── CHANGELOG.md     # Version history
 └── README.en.md     # This file
 ```
 
 Sensitive values (`MASTER_SHEET_ID`) are stored in Script Properties — not in source code — so the entire repo is safe to share publicly.
+
+---
+
+## Unit Tests
+
+This project includes local unit tests for the Google Apps Script backend and the testable logic inside `index.html`.
+
+Run all tests from the repository root:
+
+```bash
+node --test --test-isolation=none test/*.test.js
+```
+
+If your shell allows `npm` scripts, you can also run:
+
+```bash
+npm test
+```
+
+Current test coverage includes:
+
+- `Code.gs` backend logic such as config loading, signup/cancellation flows, rate limiting, sanitisation, and normalization
+- Shared normalization behavior for names, classes, digits, and class separators
+- `index.html` client-side utility and state logic such as event indexing, layout decisions, message rendering, and client normalization
+
+Testing strategy:
+
+- Run the full test suite after every meaningful change to `Code.gs`, `index.html`, or shared validation/normalization logic
+- Update or add tests in the same change whenever expected behavior changes
+- Keep Apps Script-specific and browser-specific dependencies mocked in tests so production logic can be exercised without deploying
+- Treat unit tests as regression protection: if you fix a bug, add a test that would have failed before the fix
+
+Note: the current suite focuses on unit-level behavior. It does not replace full browser interaction testing.
 
 ---
 

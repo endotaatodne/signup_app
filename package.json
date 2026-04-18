@@ -1,7 +1,10 @@
 {
   "name": "signup-app",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "A free open source signup app built on Google Apps Script",
+  "scripts": {
+    "test": "node --test --test-isolation=none test/*.test.js"
+  },
   "author": "endotaatodne",
   "license": "MIT",
   "homepage": "https://github.com/endotaatodne/signup-app"

@@ -2,7 +2,7 @@
  * @fileoverview Signup App - Google Apps Script backend.
  * Serves the web app and handles all interactions with Google Sheets.
  * @author endotaatodne
- * @version 0.1.3
+ * @version 0.1.4
  */
 
 const MASTER_SHEET_ID =
@@ -221,6 +221,7 @@ function submitSignup(eventId, name, cls, role, alias) {
     if (!name || typeof name !== "string" || name.trim().length === 0) {
       return { success: false, message: "名前を入力してください。" };
     }
+    name = normaliseWhitespace(name);
     if (name.trim().length > 10) {
       return {
         success: false,
@@ -235,6 +236,7 @@ function submitSignup(eventId, name, cls, role, alias) {
     if (!cls || typeof cls !== "string" || cls.trim().length === 0) {
       return { success: false, message: "クラスを入力してください。" };
     }
+    cls = normaliseClassValue(cls);
     if (cls.trim().length > 10) {
       return {
         success: false,
@@ -262,10 +264,6 @@ function submitSignup(eventId, name, cls, role, alias) {
         message: "使用回数を超過しました。少し待ってからお試しください。",
       };
     }
-
-    // Normalise whitespace before storing
-    name = normaliseWhitespace(name);
-    cls = normaliseWhitespace(cls);
 
     const spreadsheet = SpreadsheetApp.openById(sheetId);
     const eventsSheet = spreadsheet.getSheetByName("Events");
@@ -334,6 +332,8 @@ function submitSignup(eventId, name, cls, role, alias) {
     return {
       success: true,
       message: "ありがとうございます！登録が完了しました！",
+      name: name,
+      cls: cls,
       role: canonicalRole,
     };
   } catch (e) {
@@ -388,6 +388,7 @@ function cancelSignup(eventId, name, cls, role, alias) {
     if (!name || typeof name !== "string" || name.trim().length === 0) {
       return { success: false, message: "名前を入力してください。" };
     }
+    name = normaliseWhitespace(name);
     if (name.trim().length > 10) {
       return {
         success: false,
@@ -399,6 +400,7 @@ function cancelSignup(eventId, name, cls, role, alias) {
     if (!cls || typeof cls !== "string" || cls.trim().length === 0) {
       return { success: false, message: "クラスを入力してください。" };
     }
+    cls = normaliseClassValue(cls);
 
     // Validate role against canonical values
     const canonicalRole = getCanonicalRole(role);
@@ -415,18 +417,22 @@ function cancelSignup(eventId, name, cls, role, alias) {
 
     const spreadsheet = SpreadsheetApp.openById(sheetId);
     const signupsSheet = spreadsheet.getSheetByName("Signups");
-    const signupRows = signupsSheet.getDataRange().getValues();
+    const signupRange = signupsSheet.getDataRange();
+    const signupRows = signupRange.getValues();
+    const signupDisplayRows = signupRange.getDisplayValues();
 
     // Normalise name for comparison
     const normalisedInput = normaliseComparable(name);
-    const normalisedCls = normaliseComparable(cls);
+    const normalisedCls = normaliseClassComparable(cls);
 
     // Find matching row — name + role + eventId
     let matchRowIndex = -1;
     for (let i = 1; i < signupRows.length; i++) {
       const rowEventId = signupRows[i][1];
       const rowName = normaliseComparable(signupRows[i][2]);
-      const rowCls = normaliseComparable(signupRows[i][3]);
+      // Compare against the displayed sheet text so values like "1-1" are
+      // matched consistently even if Sheets auto-detects the raw cell value.
+      const rowCls = normaliseClassComparable(signupDisplayRows[i][3]);
       const rowRole = signupRows[i][4];
       if (
         rowEventId == parsedEventId &&
@@ -442,8 +448,7 @@ function cancelSignup(eventId, name, cls, role, alias) {
     if (matchRowIndex === -1) {
       return {
         success: false,
-        message:
-          "お名前とクラスの登録が見つかりません。入力内容をご確認ください。全角数字と半角数字にご注意ください。",
+        message: "お名前とクラスの登録が見つかりません。入力内容をご確認ください。",
       };
     }
 
@@ -548,8 +553,54 @@ function normaliseWhitespace(value) {
     .trim();
 }
 
+function normaliseAsciiDigits(value) {
+  return String(value).replace(/[\uFF10-\uFF19]/g, function (char) {
+    return String.fromCharCode(char.charCodeAt(0) - 0xfee0);
+  });
+}
+
+function isClassTokenChar(char) {
+  return /^[0-9A-Za-z\uFF10-\uFF19\uFF21-\uFF3A\uFF41-\uFF5A]$/.test(char);
+}
+
+function normaliseClassSeparators(value) {
+  const source = String(value);
+  let result = "";
+
+  for (let i = 0; i < source.length; i += 1) {
+    const char = source.charAt(i);
+    if (/[\u2010-\u2015\u2212\uFF0D]/.test(char)) {
+      result += "-";
+      continue;
+    }
+
+    if (
+      char === "\u30FC" &&
+      isClassTokenChar(source.charAt(i - 1)) &&
+      isClassTokenChar(source.charAt(i + 1))
+    ) {
+      result += "-";
+      continue;
+    }
+
+    result += char;
+  }
+
+  return result;
+}
+
+function normaliseClassValue(value) {
+  return normaliseClassSeparators(
+    normaliseWhitespace(normaliseAsciiDigits(value)),
+  );
+}
+
 function normaliseComparable(value) {
   return normaliseWhitespace(value).toLowerCase();
+}
+
+function normaliseClassComparable(value) {
+  return normaliseClassValue(value).toLowerCase();
 }
 
 function normaliseCompact(value) {

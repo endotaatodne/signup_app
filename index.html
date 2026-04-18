@@ -135,15 +135,6 @@
       }
 
       /* Role colours */
-      .color-general {
-        background: #e8f5e9;
-      }
-      .color-classrep {
-        background: #fff8e1;
-      }
-      .color-committee {
-        background: #e3f2fd;
-      }
       .count-general {
         color: #2e7d32;
       }
@@ -152,9 +143,6 @@
       }
       .count-committee {
         color: #1565c0;
-      }
-      .count-full {
-        color: #bbb;
       }
       .slot-mixed {
         background: #f9f9f9;
@@ -317,6 +305,7 @@
         padding: 8px 10px;
         border-radius: 6px;
         margin-top: 8px;
+        line-height: 1.5;
       }
       .modal-message.success {
         background: #e8f5e9;
@@ -326,6 +315,21 @@
         background: #fdecea;
         color: #d32f2f;
         font-weight: 500;
+      }
+      .modal-message.action-needed {
+        background: #fff8e1;
+        color: #7a5200;
+        font-weight: 600;
+      }
+      .modal-message-main {
+        display: block;
+      }
+      .modal-message-emphasis {
+        display: block;
+        margin-top: 6px;
+        padding: 0;
+        color: #7a5200;
+        font-weight: 700;
       }
       .modal-helper {
         font-size: 19px;
@@ -1280,8 +1284,6 @@
 
         var times = gridData.times;
         var activities = gridData.activities;
-        var events = gridData.events;
-
         // Build header
         var thead = document.createElement("thead");
         var headerRow = document.createElement("tr");
@@ -1440,8 +1442,6 @@
         }
 
         var times = gridData.times;
-        var events = gridData.events;
-
         while (container.firstChild) {
           container.removeChild(container.firstChild);
         }
@@ -1607,6 +1607,62 @@
 
       function formatTimeRange(startTime, endTime) {
         return formatTime(startTime) + " - " + formatTime(endTime);
+      }
+
+      function normaliseWhitespace(value) {
+        return String(value)
+          .replace(/[\s\u3000]+/g, " ")
+          .trim();
+      }
+
+      function normaliseAsciiDigits(value) {
+        return String(value).replace(/[０-９]/g, function (char) {
+          return String.fromCharCode(char.charCodeAt(0) - 0xfee0);
+        });
+      }
+
+      function isClassTokenChar(char) {
+        return /^[0-9A-Za-z\uFF10-\uFF19\uFF21-\uFF3A\uFF41-\uFF5A]$/.test(char);
+      }
+
+      function normaliseClassSeparators(value) {
+        var source = String(value);
+        var result = "";
+
+        for (var i = 0; i < source.length; i += 1) {
+          var char = source.charAt(i);
+          if (/[\u2010-\u2015\u2212\uFF0D]/.test(char)) {
+            result += "-";
+            continue;
+          }
+
+          if (
+            char === "\u30FC" &&
+            isClassTokenChar(source.charAt(i - 1)) &&
+            isClassTokenChar(source.charAt(i + 1))
+          ) {
+            result += "-";
+            continue;
+          }
+
+          result += char;
+        }
+
+        return result;
+      }
+
+      function normaliseClassValue(value) {
+        return normaliseClassSeparators(
+          normaliseWhitespace(normaliseAsciiDigits(value)),
+        );
+      }
+
+      function normaliseComparable(value) {
+        return normaliseWhitespace(value).toLowerCase();
+      }
+
+      function normaliseClassComparable(value) {
+        return normaliseClassValue(value).toLowerCase();
       }
 
       function openModal(eventId) {
@@ -1843,8 +1899,12 @@
       }
 
       function findAndConfirmCancel() {
-        var name = document.getElementById("cancelName").value.trim();
-        var cls = document.getElementById("cancelClass").value.trim();
+        var name = normaliseWhitespace(
+          document.getElementById("cancelName").value,
+        );
+        var cls = normaliseClassValue(
+          document.getElementById("cancelClass").value,
+        );
         var role = document.getElementById("cancelRole").value;
         var msg = document.getElementById("cancelMessage");
         msg.style.display = "none";
@@ -1872,30 +1932,18 @@
 
         var event = getEventById(currentEventId);
         if (event) {
-          var normName = name
-            .toLowerCase()
-            .replace(/[\s\u3000]+/g, " ")
-            .trim();
-          var normCls = cls
-            .toLowerCase()
-            .replace(/[\s\u3000]+/g, " ")
-            .trim();
+          var normName = normaliseComparable(name);
+          var normCls = normaliseClassComparable(cls);
           var match = event.signups.find(function (s) {
             return (
               s.role === role &&
-              s.name
-                .toLowerCase()
-                .replace(/[\s\u3000]+/g, " ")
-                .trim() === normName &&
-              s.cls
-                .toLowerCase()
-                .replace(/[\s\u3000]+/g, " ")
-                .trim() === normCls
+              normaliseComparable(s.name) === normName &&
+              normaliseClassComparable(s.cls) === normCls
             );
           });
           if (!match) {
             showCancelMessage(
-              "お名前とクラスの登録が見つかりません。入力内容をご確認ください。全角数字と半角数字にご注意ください。",
+              "お名前とクラスの登録が見つかりません。入力内容をご確認ください。",
               false,
             );
             return;
@@ -1909,8 +1957,12 @@
       }
 
       function confirmCancel() {
-        var name = document.getElementById("cancelName").value.trim();
-        var cls = document.getElementById("cancelClass").value.trim();
+        var name = normaliseWhitespace(
+          document.getElementById("cancelName").value,
+        );
+        var cls = normaliseClassValue(
+          document.getElementById("cancelClass").value,
+        );
         var role = document.getElementById("cancelRole").value;
         var btn = document.getElementById("confirmYes");
 
@@ -1955,8 +2007,29 @@
 
       function showMessage(targetId, message, success) {
         var msgDiv = document.getElementById(targetId);
-        msgDiv.textContent = message;
+        var refreshPrompt = "ページをリフレッシュしてください。";
+        msgDiv.textContent = "";
         msgDiv.className = "modal-message " + (success ? "success" : "error");
+
+        if (success && message.indexOf(refreshPrompt) !== -1) {
+          msgDiv.className += " action-needed";
+
+          var mainText = message.replace(refreshPrompt, "").trim();
+          if (mainText) {
+            var mainSpan = document.createElement("span");
+            mainSpan.className = "modal-message-main";
+            mainSpan.textContent = mainText;
+            msgDiv.appendChild(mainSpan);
+          }
+
+          var emphasisSpan = document.createElement("span");
+          emphasisSpan.className = "modal-message-emphasis";
+          emphasisSpan.textContent = refreshPrompt;
+          msgDiv.appendChild(emphasisSpan);
+        } else {
+          msgDiv.textContent = message;
+        }
+
         msgDiv.style.display = "block";
       }
 
@@ -1976,8 +2049,8 @@
           return;
         }
 
-        var name = document.getElementById("inputName").value.trim();
-        var cls = document.getElementById("inputClass").value.trim();
+        var name = normaliseWhitespace(document.getElementById("inputName").value);
+        var cls = normaliseClassValue(document.getElementById("inputClass").value);
         var btn = document.getElementById("submitBtn");
 
         if (!name) {
@@ -2015,7 +2088,11 @@
             if (result.success) {
               var event = getEventById(currentEventId);
               if (event) {
-                var signup = { name: name, cls: cls, role: currentRole };
+                var signup = {
+                  name: result.name || name,
+                  cls: result.cls || cls,
+                  role: currentRole,
+                };
                 event.signups.push(signup);
                 if (!event.signupsByRole[currentRole]) {
                   event.signupsByRole[currentRole] = [];

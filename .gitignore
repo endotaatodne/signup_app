@@ -1,3 +1,23 @@
 .clasprc.json
 .clasp.json
 node_modules/
+package-lock.json
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+*.local
+secrets.*
+credentials.json
+
+# Logs and temp files
+*.log
+*.tmp
+*.temp
+
+# Editor and OS files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
