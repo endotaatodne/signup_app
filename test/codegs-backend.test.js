@@ -259,6 +259,104 @@ test("cancelSignup matches normalised class values and deletes the correct row",
   assert.equal(lock.released, true);
 });
 
+test("cancelSignup uses the same invalid-character validation as submitSignup", () => {
+  const { app } = loadBackend();
+
+  const submitResult = app.submitSignup(
+    "1",
+    "Alice<",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+  const cancelResult = app.cancelSignup(
+    "1",
+    "Alice<",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+
+  assert.equal(submitResult.success, false);
+  assert.equal(cancelResult.success, false);
+  assert.equal(cancelResult.message, submitResult.message);
+});
+
+test("cancelSignup rate limits repeated lookup attempts", () => {
+  const { app } = loadBackend({ cacheStore: new Map() });
+
+  const attempts = [];
+  for (let i = 0; i < 4; i += 1) {
+    attempts.push(
+      app.cancelSignup("1", "Alice", "1-1", app.ROLES.general, "spring-fete"),
+    );
+  }
+
+  assert.equal(attempts[0].success, false);
+  assert.equal(attempts[1].message, attempts[0].message);
+  assert.equal(attempts[2].message, attempts[0].message);
+  assert.notEqual(attempts[3].message, attempts[0].message);
+});
+
+test("doGet returns a safe error page when the signups sheet is missing", () => {
+  const { app, logs } = loadBackend({
+    extraSpreadsheets: {
+      [EVENT_SHEET_ID]: createSpreadsheet("Spring Fete", {
+        Events: createSheet(createEventRows()),
+      }),
+    },
+  });
+
+  const result = app.doGet({ parameter: { event: "Spring-Fete" } });
+
+  assert.equal(result.kind, "html");
+  assert.match(result.content, /Something went wrong/);
+  assert.ok(logs.some((entry) => /Signups/.test(entry.message)));
+});
+
+test("doGet returns a safe error page when the event headers are invalid", () => {
+  const eventRows = createEventRows();
+  eventRows[0][0] = "WrongEventId";
+  const { app, logs } = loadBackend({ eventRows });
+
+  const result = app.doGet({ parameter: { event: "Spring-Fete" } });
+
+  assert.equal(result.kind, "html");
+  assert.match(result.content, /Something went wrong/);
+  assert.ok(logs.some((entry) => /headers are invalid/.test(entry.message)));
+});
+
+test("submitSignup fails safely when existing signup rows are malformed", () => {
+  const signupRows = [
+    ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
+    ["s1", "", "Alice", "1-1", "not-a-role", new Date()],
+  ];
+  const { app, logs } = loadBackend({ signupRows });
+
+  const result = app.submitSignup(
+    "1",
+    "Alice",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+
+  assert.equal(result.success, false);
+  assert.ok(logs.some((entry) => /Signups/.test(entry.message)));
+});
+
+test("doGet returns a safe error page when an event row is malformed", () => {
+  const eventRows = createEventRows();
+  eventRows[1][8] = -1;
+  const { app, logs } = loadBackend({ eventRows });
+
+  const result = app.doGet({ parameter: { event: "Spring-Fete" } });
+
+  assert.equal(result.kind, "html");
+  assert.match(result.content, /Something went wrong/);
+  assert.ok(logs.some((entry) => /general slot limit/.test(entry.message)));
+});
+
 test("getDeployedUrl returns the configured script URL", () => {
   const { app } = loadBackend();
 
