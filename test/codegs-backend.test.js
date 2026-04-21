@@ -196,6 +196,30 @@ test("checkRateLimit limits repeated person submissions and global event floodin
   assert.equal(eventFloodApp.checkRateLimit(1, "Overflow", "9"), false);
 });
 
+test("checkRateLimit keeps signup and cancel buckets isolated", () => {
+  const cacheStore = new Map();
+  const { app } = loadBackend({ cacheStore });
+
+  assert.equal(app.checkRateLimit(1, "Alice", "1-1", "signup"), true);
+  assert.equal(app.checkRateLimit(1, "Alice", "1-1", "signup"), true);
+  assert.equal(app.checkRateLimit(1, "Alice", "1-1", "signup"), true);
+  assert.equal(app.checkRateLimit(1, "Alice", "1-1", "signup"), false);
+
+  assert.equal(app.checkRateLimit(1, "Alice", "1-1", "cancel"), true);
+  assert.equal(app.checkRateLimit(1, "Alice", "1-1", "cancel"), true);
+  assert.equal(app.checkRateLimit(1, "Alice", "1-1", "cancel"), true);
+  assert.equal(app.checkRateLimit(1, "Alice", "1-1", "cancel"), false);
+});
+
+test("checkRateLimit limits global event flooding for cancellation attempts", () => {
+  const { app } = loadBackend({ cacheStore: new Map() });
+
+  for (let i = 0; i < 20; i += 1) {
+    assert.equal(app.checkRateLimit(1, `User${i}`, `${i}`, "cancel"), true);
+  }
+  assert.equal(app.checkRateLimit(1, "Overflow", "9", "cancel"), false);
+});
+
 test("submitSignup appends a normalised signup row on success", () => {
   const { app, spreadsheets, lock } = loadBackend();
   const signupsSheet = spreadsheets[EVENT_SHEET_ID].getSheetByName("Signups");
@@ -257,6 +281,263 @@ test("cancelSignup matches normalised class values and deletes the correct row",
   assert.equal(result.success, true);
   assert.deepEqual(signupsSheet.__state.deletedRows, [2]);
   assert.equal(lock.released, true);
+});
+
+test("cancelSignup uses the same invalid-character validation as submitSignup", () => {
+  const { app } = loadBackend();
+
+  const submitResult = app.submitSignup(
+    "1",
+    "Alice<",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+  const cancelResult = app.cancelSignup(
+    "1",
+    "Alice<",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+
+  assert.equal(submitResult.success, false);
+  assert.equal(cancelResult.success, false);
+  assert.equal(cancelResult.message, submitResult.message);
+});
+
+test("cancelSignup matches submitSignup class-length validation", () => {
+  const { app } = loadBackend();
+
+  const submitResult = app.submitSignup(
+    "1",
+    "Alice",
+    "12345678901",
+    app.ROLES.general,
+    "spring-fete",
+  );
+  const cancelResult = app.cancelSignup(
+    "1",
+    "Alice",
+    "12345678901",
+    app.ROLES.general,
+    "spring-fete",
+  );
+
+  assert.equal(submitResult.success, false);
+  assert.equal(cancelResult.success, false);
+  assert.equal(cancelResult.message, submitResult.message);
+});
+
+test("cancelSignup rejects non-canonical role labels", () => {
+  const { app } = loadBackend();
+
+  const result = app.cancelSignup("1", "Alice", "1-1", "general", "spring-fete");
+
+  assert.equal(result.success, false);
+  assert.match(result.message, /ポジション/);
+});
+
+test("cancelSignup rate limits repeated lookup attempts", () => {
+  const { app } = loadBackend({ cacheStore: new Map() });
+
+  const attempts = [];
+  for (let i = 0; i < 4; i += 1) {
+    attempts.push(
+      app.cancelSignup("1", "Alice", "1-1", app.ROLES.general, "spring-fete"),
+    );
+  }
+
+  assert.equal(attempts[0].success, false);
+  assert.equal(attempts[1].message, attempts[0].message);
+  assert.equal(attempts[2].message, attempts[0].message);
+  assert.notEqual(attempts[3].message, attempts[0].message);
+});
+
+test("getGridData exposes only public signup fields and sanitised values", () => {
+  const { app, spreadsheets } = loadBackend();
+  const signupRows = [
+    ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
+    [
+      "signup-1",
+      1,
+      "<Alice>",
+      "1-1",
+      app.ROLES.general,
+      new Date("2026-04-01T00:00:00Z"),
+    ],
+  ];
+  const signupDisplayRows = [
+    ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
+    [
+      "signup-1",
+      "1",
+      "<Alice>",
+      "<1-1>",
+      app.ROLES.general,
+      "2026-04-01",
+    ],
+  ];
+  spreadsheets[EVENT_SHEET_ID].getSheetByName("Signups").__state.values = signupRows;
+  spreadsheets[EVENT_SHEET_ID].getSheetByName("Signups").__state.displayValues =
+    signupDisplayRows;
+
+  const event = app.getGridData(spreadsheets[EVENT_SHEET_ID]).events[0];
+  const signup = event.signups[0];
+
+  assert.deepEqual(Object.keys(signup).sort(), ["cls", "name", "role"]);
+  assert.equal(signup.name, "\\u003cAlice\\u003e");
+  assert.equal(signup.cls, "\\u003c1-1\\u003e");
+  assert.ok(!("signupId" in signup));
+  assert.ok(!("createdAt" in signup));
+});
+
+test("doGet payload does not include signup ids or timestamps", () => {
+  const { app, spreadsheets } = loadBackend();
+  const signupRows = [
+    ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
+    [
+      "signup-1",
+      1,
+      "Alice",
+      "1-1",
+      app.ROLES.general,
+      new Date("2026-04-01T00:00:00Z"),
+    ],
+  ];
+  const signupsSheet = spreadsheets[EVENT_SHEET_ID].getSheetByName("Signups");
+  signupsSheet.__state.values = signupRows;
+  signupsSheet.__state.displayValues = signupRows.map((row) =>
+    row.map((value) => String(value ?? "")),
+  );
+
+  const result = app.doGet({ parameter: { event: "Spring-Fete" } });
+  const decodedGridData = JSON.parse(
+    Buffer.from(result.gridData, "base64").toString("utf8"),
+  );
+  const signup = decodedGridData.events[0].signups[0];
+
+  assert.equal(result.kind, "template");
+  assert.deepEqual(Object.keys(signup).sort(), ["cls", "name", "role"]);
+  assert.ok(!("signupId" in signup));
+  assert.ok(!("createdAt" in signup));
+});
+
+test("doGet returns a safe error page when the signups sheet is missing", () => {
+  const { app, logs } = loadBackend({
+    extraSpreadsheets: {
+      [EVENT_SHEET_ID]: createSpreadsheet("Spring Fete", {
+        Events: createSheet(createEventRows()),
+      }),
+    },
+  });
+
+  const result = app.doGet({ parameter: { event: "Spring-Fete" } });
+
+  assert.equal(result.kind, "html");
+  assert.match(result.content, /Something went wrong/);
+  assert.ok(logs.some((entry) => /Signups/.test(entry.message)));
+});
+
+test("doGet returns a safe error page when the event headers are invalid", () => {
+  const eventRows = createEventRows();
+  eventRows[0][0] = "WrongEventId";
+  const { app, logs } = loadBackend({ eventRows });
+
+  const result = app.doGet({ parameter: { event: "Spring-Fete" } });
+
+  assert.equal(result.kind, "html");
+  assert.match(result.content, /Something went wrong/);
+  assert.ok(logs.some((entry) => /headers are invalid/.test(entry.message)));
+});
+
+test("submitSignup fails safely when existing signup rows are malformed", () => {
+  const signupRows = [
+    ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
+    ["s1", "", "Alice", "1-1", "not-a-role", new Date()],
+  ];
+  const { app, logs } = loadBackend({ signupRows });
+
+  const result = app.submitSignup(
+    "1",
+    "Alice",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+
+  assert.equal(result.success, false);
+  assert.ok(logs.some((entry) => /Signups/.test(entry.message)));
+});
+
+test("doGet returns a safe error page when an event row is malformed", () => {
+  const eventRows = createEventRows();
+  eventRows[1][8] = -1;
+  const { app, logs } = loadBackend({ eventRows });
+
+  const result = app.doGet({ parameter: { event: "Spring-Fete" } });
+
+  assert.equal(result.kind, "html");
+  assert.match(result.content, /Something went wrong/);
+  assert.ok(logs.some((entry) => /general slot limit/.test(entry.message)));
+});
+
+test("doGet returns a safe error page when the config headers are invalid", () => {
+  const configRows = [
+    ["WrongAlias", "SheetId"],
+    ["Spring-Fete", EVENT_SHEET_ID],
+  ];
+  const { app, logs } = loadBackend({ configRows });
+
+  const result = app.doGet({ parameter: { event: "Spring-Fete" } });
+
+  assert.equal(result.kind, "html");
+  assert.match(result.content, /Something went wrong/);
+  assert.ok(logs.some((entry) => /Config/.test(entry.message)));
+});
+
+test("submitSignup fails safely when the events sheet is missing", () => {
+  const { app, logs, lock } = loadBackend({
+    extraSpreadsheets: {
+      [EVENT_SHEET_ID]: createSpreadsheet("Spring Fete", {
+        Signups: createSheet([
+          ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
+        ]),
+      }),
+    },
+  });
+
+  const result = app.submitSignup(
+    "1",
+    "Alice",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+
+  assert.equal(result.success, false);
+  assert.equal(lock.released, true);
+  assert.ok(logs.some((entry) => /Events/.test(entry.message)));
+});
+
+test("cancelSignup fails safely when the signups headers are invalid", () => {
+  const signupRows = [
+    ["WrongSignupId", "EventID", "Name", "Class", "Role", "CreatedAt"],
+    ["s1", 1, "Alice", "1-1", "ä¸€èˆ¬ä¿è­·è€…", new Date()],
+  ];
+  const { app, logs, lock } = loadBackend({ signupRows });
+
+  const result = app.cancelSignup(
+    "1",
+    "Alice",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+
+  assert.equal(result.success, false);
+  assert.equal(lock.released, true);
+  assert.ok(logs.some((entry) => /headers are invalid/.test(entry.message)));
 });
 
 test("getDeployedUrl returns the configured script URL", () => {

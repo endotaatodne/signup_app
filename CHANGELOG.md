@@ -1,3 +1,9 @@
+## v0.1.6 - 2026-04-21
+
+- Patch
+  - Adds tests
+  - Minor improvement to UI
+
 ## v0.1.5 - 2026-04-19
 
 - Patch

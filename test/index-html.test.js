@@ -203,6 +203,7 @@ function loadClient(options = {}) {
       "normaliseClassComparable",
       "showMessage",
       "showCancelMessage",
+      "buildMobileAgenda",
       "renderResponsiveView",
     ],
     {
@@ -333,6 +334,40 @@ test("showCancelMessage forwards to the cancel message target", () => {
   assert.equal(cancelNode.textContent, "入力内容をご確認ください。");
   assert.equal(cancelNode.className, "modal-message error");
   assert.equal(cancelNode.style.display, "block");
+});
+
+test("buildMobileAgenda groups mobile signup names by role", () => {
+  const mobileNode = createElement("div");
+  mobileNode.style = {};
+  const { exports: client } = loadClient({
+    elements: {
+      mobileAgenda: mobileNode,
+    },
+  });
+
+  client.buildGridIndexes();
+  client.buildMobileAgenda();
+
+  const firstSection = mobileNode.children[0];
+  const firstCard = firstSection.children[1];
+  const summary = firstCard.children[1];
+  const namesList = firstCard.children[2];
+
+  assert.equal(firstCard.children.length, 3);
+  assert.equal(summary.className, "mobile-slot-summary");
+  assert.equal(namesList.className, "mobile-slot-names");
+  assert.equal(namesList.children.length, 2);
+  assert.equal(namesList.children[0].className, "mobile-slot-name-group");
+  assert.equal(
+    namesList.children[0].children[0].textContent,
+    client.ROLE_KEYS[0].label + ":",
+  );
+  assert.equal(namesList.children[0].children[1].textContent, "Alice");
+  assert.equal(
+    namesList.children[1].children[0].textContent,
+    client.ROLE_KEYS[1].label + ":",
+  );
+  assert.equal(namesList.children[1].children[1].textContent, "Bob");
 });
 
 test("renderResponsiveView toggles layout classes and target visibility", () => {
