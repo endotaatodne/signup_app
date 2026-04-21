@@ -420,11 +420,19 @@
         font-size: 11px;
         line-height: 1.5;
       }
-      .mobile-slot-name {
-        font-weight: 600;
+      .mobile-slot-name-group {
+        margin-top: 4px;
       }
-      .mobile-slot-separator {
-        color: #999;
+      .mobile-slot-name-group:first-child {
+        margin-top: 0;
+      }
+      .mobile-slot-role-label {
+        display: inline-block;
+        margin-right: 6px;
+        font-weight: 700;
+      }
+      .mobile-slot-name-list {
+        font-weight: 600;
       }
       /* Hint text */
       .slot-hint {
@@ -636,44 +644,9 @@
         box-shadow: 0 2px 6px rgba(214, 69, 69, 0.2);
       }
 
-      .mobile-slot-roles {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        margin-top: 14px;
-      }
-
-      .mobile-role-pill {
-        font-size: 12px;
-        font-weight: 600;
-        border-radius: 999px;
-        padding: 6px 10px;
-        background: #f7f7f7;
-        color: #555;
-        border: 1px solid #e3e6ea;
-      }
-
-      .mobile-role-pill.role-general {
-        background: #eef8ef;
-        color: #2e7d32;
-        border-color: #cfe7d2;
-      }
-
-      .mobile-role-pill.role-classrep {
-        background: #fff8e1;
-        color: #b26a00;
-        border-color: #f2deb0;
-      }
-
-      .mobile-role-pill.role-committee {
-        background: #e8f1fd;
-        color: #1565c0;
-        border-color: #cfe0f6;
-      }
-
       /* --- Role-count summary line shown only in compact mode --- */
       .mobile-slot-summary {
-        display: none;
+        display: flex;
         flex-wrap: wrap;
         gap: 6px 12px;
         margin-top: 10px;
@@ -790,15 +763,6 @@
         align-self: center;
       }
 
-      /* Hide the verbose role-pills row; show compact summary instead */
-      body.compact-layout .mobile-slot-roles {
-        display: none;
-      }
-
-      body.compact-layout .mobile-slot-summary {
-        display: flex;
-      }
-
       body.compact-layout .mobile-slot-summary-item {
         /* TEXT_SIZE: [SIGN-UP CARD] Mobile slot summary items (e.g. "General 3 left", "Committee Full") */
         font-size: 20px;
@@ -809,10 +773,11 @@
         font-size: 30px;
         line-height: 1.5;
       }
-      /* TEXT_SIZE: [SIGN-UP CARD] Mobile card individual volunteer name (e.g. "Tanaka") */
-      body.compact-layout .mobile-slot-name {
+      body.compact-layout .mobile-slot-role-label {
         font-size: 25px;
-        font-weight: 600;
+      }
+      body.compact-layout .mobile-slot-name-list {
+        font-size: 25px;
       }
 
       /* ---- Modal / popup ---- */
@@ -1531,23 +1496,6 @@
             header.appendChild(badge);
             card.appendChild(header);
 
-            var roles = document.createElement("div");
-            roles.className = "mobile-slot-roles";
-            ROLE_KEYS.forEach(function (r) {
-              var s = event.slots[r.key];
-              if (s.max === 0) return;
-              var pill = document.createElement("div");
-              pill.className =
-                "mobile-role-pill role-" +
-                r.key.replace("classRep", "classrep");
-              var remaining = s.max - s.filled;
-              pill.textContent =
-                r.label + " " + (remaining <= 0 ? "Full" : remaining + " left");
-              roles.appendChild(pill);
-            });
-            card.appendChild(roles);
-
-            // Compact one-line summary (shown in mobile layout instead of pills)
             var summary = document.createElement("div");
             summary.className = "mobile-slot-summary";
             ROLE_KEYS.forEach(function (r) {
@@ -1568,19 +1516,27 @@
             if (event.signups && event.signups.length > 0) {
               var namesList = document.createElement("div");
               namesList.className = "mobile-slot-names";
-              event.signups.forEach(function (s, idx) {
-                var roleMeta = getRoleMetaByLabel(s.role);
-                var nameSpan = document.createElement("span");
-                nameSpan.className =
-                  "mobile-slot-name " + (roleMeta ? roleMeta.nameClass : "");
-                nameSpan.textContent = s.name;
-                namesList.appendChild(nameSpan);
-                if (idx < event.signups.length - 1) {
-                  var separator = document.createElement("span");
-                  separator.className = "mobile-slot-separator";
-                  separator.textContent = ", ";
-                  namesList.appendChild(separator);
-                }
+              ROLE_KEYS.forEach(function (r) {
+                var roleSignups = event.signupsByRole[r.label] || [];
+                if (roleSignups.length === 0) return;
+                var group = document.createElement("div");
+                group.className = "mobile-slot-name-group";
+
+                var roleLabel = document.createElement("span");
+                roleLabel.className = "mobile-slot-role-label " + r.nameClass;
+                roleLabel.textContent = r.label + ":";
+                group.appendChild(roleLabel);
+
+                var namesSpan = document.createElement("span");
+                namesSpan.className = "mobile-slot-name-list " + r.nameClass;
+                namesSpan.textContent = roleSignups
+                  .map(function (signup) {
+                    return signup.name;
+                  })
+                  .join(", ");
+                group.appendChild(namesSpan);
+
+                namesList.appendChild(group);
               });
               card.appendChild(namesList);
             }
