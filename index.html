@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html>
   <head>
     <meta charset="UTF-8" />
@@ -132,6 +132,26 @@
         padding-top: 4px;
         border-top: 1px solid rgba(0, 0, 0, 0.08);
         line-height: 1.6;
+      }
+      .slot-name-group {
+        margin-top: 2px;
+      }
+      .slot-name-group:first-child {
+        margin-top: 0;
+      }
+      .slot-name-role-label {
+        display: inline-block;
+        margin-right: 6px;
+        font-size: 10px;
+        font-weight: 600;
+      }
+      .role-row.is-full {
+        background: #e7e7e7;
+        border-color: rgba(0, 0, 0, 0.08);
+      }
+      .role-row.is-full .role-label,
+      .role-row.is-full .role-count {
+        color: #6f6f6f;
       }
 
       /* Role colours */
@@ -1346,24 +1366,16 @@
                 getEventLookupKey(activity, time)
               ];
 
-            if (!event) {
-              var emptyDiv = document.createElement("div");
-              emptyDiv.className = "slot slot-empty";
-              td.appendChild(emptyDiv);
-            } else {
-              var slotDiv = document.createElement("div");
-              var available = hasAnyAvailable(event.slots);
-
-              if (!available) {
-                slotDiv.className = "slot slot-all-full";
-                slotDiv.setAttribute("data-eventid", event.eventId);
-                var fullText = document.createElement("div");
-                fullText.style.cssText =
-                  "font-size:11px;color:#999;margin-bottom:4px;";
-                fullText.textContent = "Full";
-                slotDiv.appendChild(fullText);
+              if (!event) {
+                var emptyDiv = document.createElement("div");
+                emptyDiv.className = "slot slot-empty";
+                td.appendChild(emptyDiv);
               } else {
-                slotDiv.className = "slot slot-mixed";
+                var slotDiv = document.createElement("div");
+                var available = hasAnyAvailable(event.slots);
+                slotDiv.className = available
+                  ? "slot slot-mixed"
+                  : "slot slot-all-full";
                 slotDiv.setAttribute("data-eventid", event.eventId);
                 ROLE_KEYS.forEach(function (r, idx) {
                   var s = event.slots[r.key];
@@ -1381,43 +1393,52 @@
                   var roleCount = document.createElement("span");
                   roleCount.className = "role-count " + r.countClass;
                   var remaining = s.max - s.filled;
+                  if (remaining <= 0) {
+                    roleRow.classList.add("is-full");
+                  }
                   roleCount.textContent =
                     remaining <= 0 ? "Full" : remaining + " left";
                   roleRow.appendChild(roleLabel);
                   roleRow.appendChild(roleCount);
                   slotDiv.appendChild(roleRow);
                 });
-              }
 
-              if (event.signups.length > 0) {
-                var namesDiv = document.createElement("div");
-                namesDiv.className = "slot-names";
-                ROLE_KEYS.forEach(function (r) {
-                  var roleSignups = event.signupsByRole[r.label] || [];
-                  if (roleSignups.length === 0) return;
-                  var roleSpan = document.createElement("span");
-                  roleSpan.className = r.countClass + " " + r.nameClass;
-                  roleSpan.style.cssText = "font-size:10px;font-weight:500;";
-                  roleSpan.textContent = roleSignups
-                    .map(function (s) {
-                      return s.name;
-                    })
-                    .join(", ");
-                  namesDiv.appendChild(roleSpan);
+                if (event.signups.length > 0) {
+                  var namesDiv = document.createElement("div");
+                  namesDiv.className = "slot-names";
+                  ROLE_KEYS.forEach(function (r) {
+                    var roleSignups = event.signupsByRole[r.label] || [];
+                    if (roleSignups.length === 0) return;
+                    var nameGroup = document.createElement("div");
+                    nameGroup.className = "slot-name-group";
+                    var roleSpan = document.createElement("span");
+                    roleSpan.className =
+                      "slot-name-role-label " + r.countClass + " " + r.nameClass;
+                    roleSpan.textContent = r.label + ":";
+                    nameGroup.appendChild(roleSpan);
+                    var namesSpan = document.createElement("span");
+                    namesSpan.className = r.countClass + " " + r.nameClass;
+                    namesSpan.textContent = roleSignups
+                      .map(function (s) {
+                        return s.name;
+                      })
+                      .join(", ");
+                    nameGroup.appendChild(namesSpan);
+                    namesDiv.appendChild(nameGroup);
+                  });
+                  slotDiv.appendChild(namesDiv);
+                }
 
-                  // Add a line break between role groups if more than one role has signups
-                  namesDiv.appendChild(document.createElement("br"));
-                });
-                slotDiv.appendChild(namesDiv);
-                // Show hint text only when there are existing signups
                 var hintDiv = document.createElement("div");
                 hintDiv.className = "slot-hint";
-                hintDiv.textContent = "登録、またはキャンセルする";
+                hintDiv.textContent =
+                  event.signups.length > 0
+                    ? "登録、またはキャンセルする"
+                    : "クリックして登録";
                 slotDiv.appendChild(hintDiv);
-              }
 
-              td.appendChild(slotDiv);
-            }
+                td.appendChild(slotDiv);
+              }
             tr.appendChild(td);
           });
           tbody.appendChild(tr);
