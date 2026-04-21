@@ -2,7 +2,7 @@
  * @fileoverview Signup App - Google Apps Script backend.
  * Serves the web app and handles all interactions with Google Sheets.
  * @author endotaatodne
- * @version 0.1.5
+ * @version 0.1.6
  */
 
 const MASTER_SHEET_ID =
@@ -499,7 +499,8 @@ function checkRateLimit(eventId, name, cls, action) {
   const actionKey = action === "cancel" ? "cancel" : "signup";
   const namePart = normaliseCompact(name).substring(0, 3);
   const clsPart = normaliseCompact(cls).substring(0, 3);
-  const key = "rl_" + actionKey + "_" + eventId + "_" + namePart + "_" + clsPart;
+  const key =
+    "rl_" + actionKey + "_" + eventId + "_" + namePart + "_" + clsPart;
 
   const hits = cache.get(key);
   if (hits && parseInt(hits, 10) >= 3) return false;
@@ -508,7 +509,11 @@ function checkRateLimit(eventId, name, cls, action) {
   const eventKey = "rl_" + actionKey + "_event_" + eventId;
   const eventHits = cache.get(eventKey);
   if (eventHits && parseInt(eventHits, 10) >= 20) return false;
-  cache.put(eventKey, eventHits ? String(parseInt(eventHits, 10) + 1) : "1", 60);
+  cache.put(
+    eventKey,
+    eventHits ? String(parseInt(eventHits, 10) + 1) : "1",
+    60,
+  );
 
   return true;
 }
@@ -530,9 +535,16 @@ function getEventConfig() {
   ).values;
   const config = {};
   rows.slice(1).forEach(function (row) {
-    const alias = String(row[0] || "").trim().toLowerCase();
+    const alias = String(row[0] || "")
+      .trim()
+      .toLowerCase();
     const sheetId = String(row[1] || "").trim();
-    if (alias && isValidAlias(alias) && sheetId && /^[a-zA-Z0-9_\-]{20,60}$/.test(sheetId)) {
+    if (
+      alias &&
+      isValidAlias(alias) &&
+      sheetId &&
+      /^[a-zA-Z0-9_\-]{20,60}$/.test(sheetId)
+    ) {
       config[alias] = sheetId;
     }
   });
@@ -627,7 +639,12 @@ function validateClassInput(cls) {
   return { ok: true, value: normalisedClass };
 }
 
-function getSheetData(spreadsheet, sheetName, expectedHeaders, includeDisplayValues) {
+function getSheetData(
+  spreadsheet,
+  sheetName,
+  expectedHeaders,
+  includeDisplayValues,
+) {
   const sheet = spreadsheet.getSheetByName(sheetName);
   if (!sheet) {
     throw new Error('The "' + sheetName + '" sheet is missing.');
@@ -704,7 +721,7 @@ function normaliseHeaderValue(value) {
 
 function validateEventRow(row, rowNumber) {
   if (!row || row.length < EVENT_HEADER_ALIASES.length) {
-    throw new Error('Malformed row ' + rowNumber + ' in "Events" sheet.');
+    throw new Error("Malformed row " + rowNumber + ' in "Events" sheet.');
   }
 
   parsePositiveIntegerCell(
@@ -743,7 +760,7 @@ function validateEventRow(row, rowNumber) {
 
 function validateSignupRow(row, displayRow, rowNumber) {
   if (!row || row.length < SIGNUP_HEADER_ALIASES.length) {
-    throw new Error('Malformed row ' + rowNumber + ' in "Signups" sheet.');
+    throw new Error("Malformed row " + rowNumber + ' in "Signups" sheet.');
   }
 
   requireNonEmptyCell(
