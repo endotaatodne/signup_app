@@ -1017,7 +1017,6 @@
             type="text"
             id="inputName"
             placeholder="保護者名"
-            maxlength="10"
           />
           <input
             type="text"
@@ -1058,7 +1057,6 @@
             type="text"
             id="cancelName"
             placeholder="保護者名"
-            maxlength="10"
           />
           <input
             type="text"
@@ -1903,8 +1901,8 @@
           showCancelMessage("名前を入力してください", false);
           return;
         }
-        if (name.length > 10) {
-          showCancelMessage("名前は１０文字内で入力してください", false);
+        if (name.length > 50) {
+          showCancelMessage("名前は５０文字以下で入力してください。", false);
           return;
         }
         if (!cls) {
@@ -2046,8 +2044,8 @@
           showModalMessage("名前を入力してください。", false);
           return;
         }
-        if (name.length > 10) {
-          showModalMessage("名前は１０文字以下で入力してください。", false);
+        if (name.length > 50) {
+          showModalMessage("名前は５０文字以下で入力してください。", false);
           return;
         }
         if (!/^[\p{L}\p{N}\s\-'.]+$/u.test(name)) {

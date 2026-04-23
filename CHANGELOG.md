@@ -1,3 +1,8 @@
+## v0.1.7 - 2026-04-23
+
+- Patch
+  - Changes the input character limit for name from 10 to 50.
+
 ## v0.1.6 - 2026-04-21
 
 - Patch
