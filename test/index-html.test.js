@@ -1,3 +1,5 @@
+const fs = require("node:fs");
+const path = require("node:path");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
@@ -203,6 +205,8 @@ function loadClient(options = {}) {
       "normaliseClassComparable",
       "showMessage",
       "showCancelMessage",
+      "findAndConfirmCancel",
+      "submitSignup",
       "buildMobileAgenda",
       "renderResponsiveView",
     ],
@@ -334,6 +338,79 @@ test("showCancelMessage forwards to the cancel message target", () => {
   assert.equal(cancelNode.textContent, "入力内容をご確認ください。");
   assert.equal(cancelNode.className, "modal-message error");
   assert.equal(cancelNode.style.display, "block");
+});
+
+test("index.html leaves name length enforcement to validation while keeping class inputs at 10", () => {
+  const htmlSource = fs.readFileSync(
+    path.resolve(__dirname, "..", "index.html"),
+    "utf8",
+  );
+  function getInputBlock(id) {
+    const afterId = htmlSource.split(`id="${id}"`)[1];
+    if (!afterId) return null;
+    return afterId.split("/>")[0];
+  }
+
+  const inputNameBlock = getInputBlock("inputName");
+  const cancelNameBlock = getInputBlock("cancelName");
+  const inputClassBlock = getInputBlock("inputClass");
+  const cancelClassBlock = getInputBlock("cancelClass");
+
+  assert.ok(inputNameBlock);
+  assert.ok(cancelNameBlock);
+  assert.ok(inputClassBlock);
+  assert.ok(cancelClassBlock);
+  assert.doesNotMatch(inputNameBlock, /maxlength=/);
+  assert.doesNotMatch(cancelNameBlock, /maxlength=/);
+  assert.match(inputClassBlock, /maxlength="10"/);
+  assert.match(cancelClassBlock, /maxlength="10"/);
+});
+
+test("findAndConfirmCancel enforces the 50-character name limit client-side", () => {
+  const cancelMessage = createElement("div");
+  cancelMessage.style = { display: "none" };
+  const cancelRole = createElement("select");
+  cancelRole.value = "general";
+
+  const { exports: client } = loadClient({
+    elements: {
+      cancelRole,
+      cancelName: { ...createElement("input"), value: "A".repeat(51) },
+      cancelClass: { ...createElement("input"), value: "1-1" },
+      cancelMessage,
+    },
+  });
+
+  client.findAndConfirmCancel();
+
+  assert.equal(cancelMessage.textContent, "名前は５０文字以下で入力してください。");
+  assert.equal(cancelMessage.className, "modal-message error");
+  assert.equal(cancelMessage.style.display, "block");
+});
+
+test("submitSignup enforces the 50-character name limit client-side", () => {
+  const modalMessage = createElement("div");
+  modalMessage.style = { display: "none" };
+  const submitBtn = createElement("button");
+
+  const { exports: client, context } = loadClient({
+    elements: {
+      honeypot: { ...createElement("input"), value: "" },
+      inputName: { ...createElement("input"), value: "A".repeat(51) },
+      inputClass: { ...createElement("input"), value: "1-1" },
+      submitBtn,
+      modalMessage,
+    },
+  });
+
+  context.PAGE_LOAD_TIME = Date.now() - 4000;
+  context.currentRole = "general";
+
+  client.submitSignup();
+
+  assert.equal(modalMessage.textContent, "名前は５０文字以下で入力してください。");
+  assert.equal(modalMessage.className, "modal-message error");
+  assert.equal(modalMessage.style.display, "block");
 });
 
 test("buildMobileAgenda groups mobile signup names by role", () => {

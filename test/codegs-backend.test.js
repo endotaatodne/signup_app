@@ -237,6 +237,26 @@ test("submitSignup appends a normalised signup row on success", () => {
   assert.equal(lock.released, true);
 });
 
+test("submitSignup accepts names up to 50 characters", () => {
+  const { app, spreadsheets } = loadBackend();
+  const signupsSheet = spreadsheets[EVENT_SHEET_ID].getSheetByName("Signups");
+  const longName = "A".repeat(50);
+
+  const result = app.submitSignup(
+    "1",
+    longName,
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+  const signupRows = signupsSheet.getDataRange().getValues();
+  const appendedRow = signupRows[signupRows.length - 1];
+
+  assert.equal(result.success, true);
+  assert.equal(result.name, longName);
+  assert.equal(appendedRow[2], longName);
+});
+
 test("submitSignup rejects duplicate names after normalisation", () => {
   const signupRows = [
     ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
@@ -327,6 +347,31 @@ test("cancelSignup matches submitSignup class-length validation", () => {
   assert.equal(submitResult.success, false);
   assert.equal(cancelResult.success, false);
   assert.equal(cancelResult.message, submitResult.message);
+});
+
+test("cancelSignup matches submitSignup name-length validation", () => {
+  const { app } = loadBackend();
+  const longName = "A".repeat(51);
+
+  const submitResult = app.submitSignup(
+    "1",
+    longName,
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+  const cancelResult = app.cancelSignup(
+    "1",
+    longName,
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+
+  assert.equal(submitResult.success, false);
+  assert.equal(cancelResult.success, false);
+  assert.equal(cancelResult.message, submitResult.message);
+  assert.match(submitResult.message, /５０文字以下/);
 });
 
 test("cancelSignup rejects non-canonical role labels", () => {

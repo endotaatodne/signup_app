@@ -2,7 +2,7 @@
  * @fileoverview Signup App - Google Apps Script backend.
  * Serves the web app and handles all interactions with Google Sheets.
  * @author endotaatodne
- * @version 0.1.6
+ * @version 0.1.7
  */
 
 const MASTER_SHEET_ID =
@@ -599,10 +599,10 @@ function validateNameInput(name) {
   }
 
   const normalisedName = normaliseWhitespace(name);
-  if (normalisedName.length > 10) {
+  if (normalisedName.length > 50) {
     return {
       ok: false,
-      message: "名前は１０文字以下で入力してください。",
+      message: "名前は５０文字以下で入力してください。",
     };
   }
 
