@@ -1,3 +1,8 @@
+## v0.1.8 - 2026-04-26
+
+- Patch
+  - Changes font size on the registration screen.
+
 ## v0.1.7 - 2026-04-23
 
 - Patch
