@@ -224,17 +224,44 @@ test("submitSignup appends a normalised signup row on success", () => {
   const { app, spreadsheets, lock } = loadBackend();
   const signupsSheet = spreadsheets[EVENT_SHEET_ID].getSheetByName("Signups");
 
-  const result = app.submitSignup("1", " Alice ", "１－２", app.ROLES.general, "spring-fete");
+  const result = app.submitSignup(
+    "1",
+    " Alice ",
+    "四ー二",
+    app.ROLES.general,
+    "spring-fete",
+  );
   const signupRows = signupsSheet.getDataRange().getValues();
   const appendedRow = signupRows[signupRows.length - 1];
 
   assert.equal(result.success, true);
   assert.equal(result.name, "Alice");
-  assert.equal(result.cls, "1-2");
+  assert.equal(result.cls, "4-2");
   assert.equal(appendedRow[2], "Alice");
-  assert.equal(appendedRow[3], "1-2");
+  assert.equal(appendedRow[3], "4-2");
   assert.equal(appendedRow[4], app.ROLES.general);
   assert.equal(lock.released, true);
+});
+
+test("submitSignup preserves Kanji numerals in names while normalising class", () => {
+  const { app, spreadsheets } = loadBackend();
+  const signupsSheet = spreadsheets[EVENT_SHEET_ID].getSheetByName("Signups");
+
+  const result = app.submitSignup(
+    "1",
+    " 日本三郎 ",
+    "四ー二",
+    app.ROLES.general,
+    "spring-fete",
+  );
+  const signupRows = signupsSheet.getDataRange().getValues();
+  const appendedRow = signupRows[signupRows.length - 1];
+
+  assert.equal(result.success, true);
+  assert.equal(result.name, "日本三郎");
+  assert.equal(result.cls, "4-2");
+  assert.equal(appendedRow[2], "日本三郎");
+  assert.equal(appendedRow[3], "4-2");
 });
 
 test("submitSignup accepts names up to 50 characters", () => {
@@ -291,12 +318,12 @@ test("cancelSignup matches normalised class values and deletes the correct row",
   ];
   const signupDisplayRows = [
     ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
-    ["s1", "1", "Alice", "１－１", "一般保護者", "2026-04-01"],
+    ["s1", "1", "Alice", "四ー一", "一般保護者", "2026-04-01"],
   ];
   const { app, spreadsheets, lock } = loadBackend({ signupRows, signupDisplayRows });
   const signupsSheet = spreadsheets[EVENT_SHEET_ID].getSheetByName("Signups");
 
-  const result = app.cancelSignup("1", " Alice ", "1-1", app.ROLES.general, "spring-fete");
+  const result = app.cancelSignup("1", " Alice ", "4-1", app.ROLES.general, "spring-fete");
 
   assert.equal(result.success, true);
   assert.deepEqual(signupsSheet.__state.deletedRows, [2]);

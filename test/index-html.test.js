@@ -297,7 +297,11 @@ test("class normalization in index.html matches the backend contract", () => {
   const { exports: client } = loadClient();
 
   assert.equal(client.normaliseClassValue(" １ー２ "), "1-2");
-  assert.equal(client.normaliseClassComparable("１ー2"), client.normaliseClassComparable("1-2"));
+  assert.equal(client.normaliseClassValue("四ー二"), "4-2");
+  assert.equal(
+    client.normaliseClassComparable("四ー2"),
+    client.normaliseClassComparable("4-2"),
+  );
   assert.equal(client.normaliseClassSeparators("クラスーA"), "クラスーA");
 });
 
