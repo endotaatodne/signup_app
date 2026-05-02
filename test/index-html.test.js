@@ -74,6 +74,7 @@ function createDocument(elements = {}) {
     elements,
     body: {
       classList: createClassList(),
+      style: {},
     },
     documentElement: {
       clientWidth: 0,
@@ -416,6 +417,96 @@ test("submitSignup enforces the 50-character name limit client-side", () => {
   assert.equal(modalMessage.textContent, "名前は５０文字以下で入力してください。");
   assert.equal(modalMessage.className, "modal-message error");
   assert.equal(modalMessage.style.display, "block");
+});
+
+test("submitSignup refreshes grid data after a stale full-slot rejection", () => {
+  const modalMessage = createElement("div");
+  modalMessage.style = { display: "none" };
+  const submitBtn = createElement("button");
+  const roleButtons = createElement("div");
+  const freshGridData = {
+    events: [
+      {
+        eventId: 1,
+        activity: "Hall Monitor",
+        subtitle: "Morning",
+        startTime: "09:30",
+        endTime: "11:00",
+        location: "Gym",
+        description: "Guide arrivals",
+        slots: {
+          general: { max: 2, filled: 2 },
+          classRep: { max: 1, filled: 1 },
+          committee: { max: 0, filled: 0 },
+        },
+        signups: [],
+      },
+    ],
+    times: ["09:30"],
+    activities: ["Hall Monitor"],
+  };
+  let submitCalls = 0;
+  let refreshCalls = 0;
+  const google = {
+    script: {
+      run: {
+        withSuccessHandler(handler) {
+          return {
+            withFailureHandler() {
+              return this;
+            },
+            getDeployedUrl() {
+              handler("https://example.com/app");
+              return this;
+            },
+            submitSignup() {
+              submitCalls += 1;
+              handler({
+                success: false,
+                code: "slot_full",
+                message: "Slot is full.",
+              });
+              return this;
+            },
+            getGridDataForAlias(receivedAlias) {
+              refreshCalls += 1;
+              assert.equal(receivedAlias, "test-alias");
+              handler({ success: true, gridData: freshGridData });
+              return this;
+            },
+          };
+        },
+      },
+    },
+  };
+
+  const { exports: client, context } = loadClient({
+    elements: {
+      honeypot: { ...createElement("input"), value: "" },
+      inputName: { ...createElement("input"), value: "Alice" },
+      inputClass: { ...createElement("input"), value: "1-1" },
+      submitBtn,
+      modalMessage,
+      roleButtons,
+    },
+    extraGlobals: {
+      google,
+    },
+  });
+
+  context.PAGE_LOAD_TIME = Date.now() - 4000;
+  context.currentEventId = 1;
+  context.currentRole = client.ROLE_KEYS[0].label;
+
+  client.submitSignup();
+
+  assert.equal(submitCalls, 1);
+  assert.equal(refreshCalls, 1);
+  assert.equal(client.getEventById(1).slots.general.filled, 2);
+  assert.equal(modalMessage.textContent, "Slot is full.");
+  assert.equal(modalMessage.className, "modal-message error");
+  assert.equal(submitBtn.disabled, false);
+  assert.equal(roleButtons.children[0].children[1].textContent, "Full");
 });
 
 test("desktop grid typography overrides are scoped to desktop layout", () => {

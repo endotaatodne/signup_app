@@ -2102,6 +2102,40 @@
         showMessage("cancelMessage", message, success);
       }
 
+      function rebuildCurrentView() {
+        if (isCompactLayout()) {
+          buildMobileAgenda();
+        } else {
+          buildGrid();
+        }
+      }
+
+      function shouldRefreshAfterSubmitRejection(result) {
+        return result && result.code === "slot_full";
+      }
+
+      function refreshGridDataAfterSubmitRejection(eventId, message) {
+        google.script.run
+          .withSuccessHandler(function (result) {
+            if (!result || !result.success || !result.gridData) return;
+
+            gridData = result.gridData;
+            buildGridIndexes();
+            rebuildCurrentView();
+
+            if (
+              currentEventId !== null &&
+              String(currentEventId) === String(eventId) &&
+              getEventById(eventId)
+            ) {
+              openModal(eventId);
+              showModalMessage(message, false);
+            }
+          })
+          .withFailureHandler(function () {})
+          .getGridDataForAlias(alias);
+      }
+
       function submitSignup() {
         // This is intentionally only a low-friction client-side filter. Real
         // abuse protection is enforced server-side via rate limiting.
@@ -2180,6 +2214,12 @@
             } else {
               btn.disabled = false;
               btn.textContent = SIGNUP_BTN_TEXT;
+              if (shouldRefreshAfterSubmitRejection(result)) {
+                refreshGridDataAfterSubmitRejection(
+                  currentEventId,
+                  result.message,
+                );
+              }
             }
           })
           .withFailureHandler(function (error) {

@@ -199,6 +199,34 @@ function getGridData(spreadsheet) {
 }
 
 /**
+ * Fetches fresh public grid data for an event alias.
+ * @param {string} alias - Event alias from the URL
+ * @returns {{success: boolean, gridData?: Object, message?: string}}
+ */
+function getGridDataForAlias(alias) {
+  try {
+    if (!isValidAlias(alias)) {
+      return { success: false, message: "不正なリクエストです。" };
+    }
+
+    const config = getEventConfig();
+    const sheetId = config[alias.toLowerCase()];
+    if (!sheetId) {
+      return { success: false, message: "不正なリクエストです。" };
+    }
+
+    const spreadsheet = SpreadsheetApp.openById(sheetId);
+    return { success: true, gridData: getGridData(spreadsheet) };
+  } catch (e) {
+    console.error("getGridDataForAlias error: " + e.message);
+    return {
+      success: false,
+      message: "エラーが発生しました。再度試してください。",
+    };
+  }
+}
+
+/**
  * Submits a new signup for a given event and role.
  * SheetId is derived server-side from the alias — never trusted from client.
  * @param {number} eventId - The EventID from the Events sheet
@@ -308,6 +336,7 @@ function submitSignup(eventId, name, cls, role, alias) {
     if (roleSignups.length >= maxSlots) {
       return {
         success: false,
+        code: "slot_full",
         message: "申し訳ありません、この枠のボランティア募集は終了しました。",
       };
     }

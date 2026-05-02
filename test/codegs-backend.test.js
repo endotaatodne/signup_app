@@ -89,6 +89,7 @@ function loadBackend(options = {}) {
       "ROLES",
       "doGet",
       "getGridData",
+      "getGridDataForAlias",
       "submitSignup",
       "cancelSignup",
       "checkRateLimit",
@@ -180,6 +181,25 @@ test("doGet returns an error page when the alias is invalid", () => {
 
   assert.equal(result.kind, "html");
   assert.match(result.content, /Invalid event link/);
+});
+
+test("getGridDataForAlias returns fresh public grid data for a valid alias", () => {
+  const { app } = loadBackend();
+
+  const result = app.getGridDataForAlias("Spring-Fete");
+
+  assert.equal(result.success, true);
+  assert.equal(result.gridData.events[0].activity, "Hall Monitor");
+  assert.equal(result.gridData.events[0].slots.general.filled, 0);
+});
+
+test("getGridDataForAlias rejects invalid aliases safely", () => {
+  const { app } = loadBackend();
+
+  const result = app.getGridDataForAlias("<bad>");
+
+  assert.equal(result.success, false);
+  assert.ok(!("gridData" in result));
 });
 
 test("checkRateLimit limits repeated person submissions and global event flooding", () => {
@@ -395,6 +415,7 @@ test("submitSignup rejects a full role slot", () => {
   const result = app.submitSignup("1", "Carol", "1-3", app.ROLES.general, "spring-fete");
 
   assert.equal(result.success, false);
+  assert.equal(result.code, "slot_full");
   assert.match(result.message, /募集は終了しました/);
 });
 
