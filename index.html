@@ -173,6 +173,26 @@
         line-height: 1.2;
         white-space: nowrap;
       }
+      body.desktop-layout th {
+        font-size: 17px;
+        line-height: 1.25;
+      }
+      body.desktop-layout .activity-title {
+        font-size: 18px;
+        line-height: 1.25;
+      }
+      body.desktop-layout .activity-subtitle {
+        font-size: 15px;
+        line-height: 1.3;
+      }
+      body.desktop-layout td.time-cell {
+        font-size: 16px;
+        line-height: 1.35;
+      }
+      body.desktop-layout td.desc-cell {
+        font-size: 15px;
+        line-height: 1.45;
+      }
       body.desktop-layout .modal .role-buttons {
         gap: 10px;
       }
@@ -1323,13 +1343,14 @@
           var th = document.createElement("th");
           var event = gridIndexes.firstEventByActivity[a];
           var actDiv = document.createElement("div");
-          actDiv.style.cssText = "font-size:13px;font-weight:600;";
+          actDiv.className = "activity-title";
+          actDiv.style.fontWeight = "600";
           actDiv.textContent = a;
           th.appendChild(actDiv);
           if (event && event.subtitle) {
             var personDiv = document.createElement("div");
-            personDiv.style.cssText =
-              "font-size:11px;font-weight:400;color:#888;margin-top:2px;";
+            personDiv.className = "activity-subtitle";
+            personDiv.style.cssText = "font-weight:400;color:#888;margin-top:2px;";
             personDiv.textContent = event.subtitle;
             th.appendChild(personDiv);
           }
