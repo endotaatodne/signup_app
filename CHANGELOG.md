@@ -1,3 +1,11 @@
+## v0.1.9 - 2026-05-03
+
+- Patch
+  - Cleans up changelog messages and README wording.
+  - Adds further handling for numeric class entries, including Kanji numerals.
+  - Adjusts font sizes on the desktop registration screen.
+  - Updates unit tests.
+
 ## v0.1.8 - 2026-04-26
 
 - Patch
