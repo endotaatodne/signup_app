@@ -824,10 +824,35 @@ function normaliseWhitespace(value) {
     .trim();
 }
 
+// Class matching canonicalises a narrow Kanji digit set. Names must preserve
+// these characters verbatim.
+const CLASS_KANJI_DIGITS = {
+  "\u3007": "0",
+  "\u96F6": "0",
+  "\u4E00": "1",
+  "\u4E8C": "2",
+  "\u4E09": "3",
+  "\u56DB": "4",
+  "\u4E94": "5",
+  "\u516D": "6",
+  "\u4E03": "7",
+  "\u516B": "8",
+  "\u4E5D": "9",
+};
+
 function normaliseAsciiDigits(value) {
   return String(value).replace(/[\uFF10-\uFF19]/g, function (char) {
     return String.fromCharCode(char.charCodeAt(0) - 0xfee0);
   });
+}
+
+function normaliseKanjiDigits(value) {
+  return String(value).replace(
+    /[\u3007\u96F6\u4E00\u4E8C\u4E09\u56DB\u4E94\u516D\u4E03\u516B\u4E5D]/g,
+    function (char) {
+      return CLASS_KANJI_DIGITS[char];
+    },
+  );
 }
 
 function isClassTokenChar(char) {
@@ -862,7 +887,7 @@ function normaliseClassSeparators(value) {
 
 function normaliseClassValue(value) {
   return normaliseClassSeparators(
-    normaliseWhitespace(normaliseAsciiDigits(value)),
+    normaliseWhitespace(normaliseKanjiDigits(normaliseAsciiDigits(value))),
   );
 }
 
