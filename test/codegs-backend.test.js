@@ -61,6 +61,7 @@ function loadBackend(options = {}) {
     extraSpreadsheets = {},
     nowValue,
     cacheStore,
+    lockWaitFails = false,
   } = options;
 
   const masterSpreadsheet = createSpreadsheet("Master", {
@@ -82,6 +83,7 @@ function loadBackend(options = {}) {
     spreadsheets,
     nowValue,
     cacheStore,
+    lockWaitFails,
   });
 
   const { exports: app } = loadCodeGs(
@@ -291,6 +293,22 @@ test("submitSignup appends a normalised signup row on success", () => {
   assert.equal(lock.released, true);
 });
 
+test("submitSignup does not release a lock that was not acquired", () => {
+  const { app, lock } = loadBackend({ lockWaitFails: true });
+
+  const result = app.submitSignup(
+    "1",
+    "Alice",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+
+  assert.equal(result.success, false);
+  assert.equal(lock.released, false);
+  assert.equal(lock.releaseCount, 0);
+});
+
 test("submitSignup rate limits are isolated for aliases backed by different sheets", () => {
   const cacheStore = new Map();
   const secondSpreadsheet = createSpreadsheet("Summer Fete", {
@@ -436,6 +454,22 @@ test("cancelSignup matches normalised class values and deletes the correct row",
   assert.equal(result.success, true);
   assert.deepEqual(signupsSheet.__state.deletedRows, [2]);
   assert.equal(lock.released, true);
+});
+
+test("cancelSignup does not release a lock that was not acquired", () => {
+  const { app, lock } = loadBackend({ lockWaitFails: true });
+
+  const result = app.cancelSignup(
+    "1",
+    "Alice",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+
+  assert.equal(result.success, false);
+  assert.equal(lock.released, false);
+  assert.equal(lock.releaseCount, 0);
 });
 
 test("cancelSignup uses the same invalid-character validation as submitSignup", () => {

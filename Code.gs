@@ -238,10 +238,12 @@ function getGridDataForAlias(alias) {
  */
 function submitSignup(eventId, name, cls, role, alias) {
   const lock = LockService.getScriptLock();
+  let lockAcquired = false;
   try {
     // Acquire lock with graceful timeout handling
     try {
       lock.waitLock(5000);
+      lockAcquired = true;
     } catch (e) {
       return {
         success: false,
@@ -379,7 +381,9 @@ function submitSignup(eventId, name, cls, role, alias) {
       message: "エラーが発生しました。再度試してください。",
     };
   } finally {
-    lock.releaseLock();
+    if (lockAcquired) {
+      lock.releaseLock();
+    }
   }
 }
 
@@ -394,10 +398,12 @@ function submitSignup(eventId, name, cls, role, alias) {
  */
 function cancelSignup(eventId, name, cls, role, alias) {
   const lock = LockService.getScriptLock();
+  let lockAcquired = false;
   try {
     // Acquire lock
     try {
       lock.waitLock(5000);
+      lockAcquired = true;
     } catch (e) {
       return {
         success: false,
@@ -510,7 +516,9 @@ function cancelSignup(eventId, name, cls, role, alias) {
       message: "エラーが発生しました。再度試してください。",
     };
   } finally {
-    lock.releaseLock();
+    if (lockAcquired) {
+      lock.releaseLock();
+    }
   }
 }
 
