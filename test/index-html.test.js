@@ -207,6 +207,7 @@ function loadClient(options = {}) {
       "showCancelMessage",
       "findAndConfirmCancel",
       "submitSignup",
+      "buildGrid",
       "buildMobileAgenda",
       "renderResponsiveView",
     ],
@@ -415,6 +416,59 @@ test("submitSignup enforces the 50-character name limit client-side", () => {
   assert.equal(modalMessage.textContent, "名前は５０文字以下で入力してください。");
   assert.equal(modalMessage.className, "modal-message error");
   assert.equal(modalMessage.style.display, "block");
+});
+
+test("desktop grid typography overrides are scoped to desktop layout", () => {
+  const htmlSource = fs.readFileSync(
+    path.resolve(__dirname, "..", "index.html"),
+    "utf8",
+  );
+
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout td\.time-cell\s*{[\s\S]*?font-size:\s*16px;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout td\.desc-cell\s*{[\s\S]*?font-size:\s*15px;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout \.activity-title\s*{[\s\S]*?font-size:\s*18px;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout \.activity-subtitle\s*{[\s\S]*?font-size:\s*15px;/,
+  );
+  assert.doesNotMatch(
+    htmlSource,
+    /body\.compact-layout [^{]*(?:td\.time-cell|td\.desc-cell|\.activity-title|\.activity-subtitle)/,
+  );
+});
+
+test("buildGrid renders desktop header text with CSS classes", () => {
+  const table = createElement("table");
+  const { exports: client } = loadClient({
+    elements: {
+      grid: table,
+    },
+  });
+
+  client.buildGridIndexes();
+  client.buildGrid();
+
+  const headerRow = table.children[0].children[0];
+  const firstActivityHeader = headerRow.children[2];
+  const title = firstActivityHeader.children[0];
+  const subtitle = firstActivityHeader.children[1];
+
+  assert.equal(title.className, "activity-title");
+  assert.equal(title.textContent, "Hall Monitor");
+  assert.equal(title.style.fontWeight, "600");
+  assert.equal(title.style.cssText || "", "");
+  assert.equal(subtitle.className, "activity-subtitle");
+  assert.equal(subtitle.textContent, "Morning");
+  assert.equal(subtitle.style.cssText, "font-weight:400;color:#888;margin-top:2px;");
 });
 
 test("buildMobileAgenda groups mobile signup names by role", () => {
