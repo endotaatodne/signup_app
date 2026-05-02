@@ -9,6 +9,7 @@ const {
 } = require("../test-support/gas-mocks");
 
 const EVENT_SHEET_ID = "eventsheetid1234567890";
+const SECOND_EVENT_SHEET_ID = "secondsheetid1234567890";
 const MASTER_SHEET_ID = "master-sheet-id";
 
 function createEventRows() {
@@ -211,6 +212,33 @@ test("checkRateLimit keeps signup and cancel buckets isolated", () => {
   assert.equal(app.checkRateLimit(1, "Alice", "1-1", "cancel"), false);
 });
 
+test("checkRateLimit keeps event sheet scopes isolated", () => {
+  const cacheStore = new Map();
+  const { app } = loadBackend({ cacheStore });
+
+  assert.equal(app.checkRateLimit(1, "Alice", "1-1", "signup", "sheet-a"), true);
+  assert.equal(app.checkRateLimit(1, "Alice", "1-1", "signup", "sheet-a"), true);
+  assert.equal(app.checkRateLimit(1, "Alice", "1-1", "signup", "sheet-a"), true);
+  assert.equal(app.checkRateLimit(1, "Alice", "1-1", "signup", "sheet-a"), false);
+  assert.equal(app.checkRateLimit(1, "Alice", "1-1", "signup", "sheet-b"), true);
+
+  const { app: eventFloodApp } = loadBackend({ cacheStore: new Map() });
+  for (let i = 0; i < 20; i += 1) {
+    assert.equal(
+      eventFloodApp.checkRateLimit(1, `User${i}`, `${i}`, "signup", "sheet-a"),
+      true,
+    );
+  }
+  assert.equal(
+    eventFloodApp.checkRateLimit(1, "Overflow", "9", "signup", "sheet-a"),
+    false,
+  );
+  assert.equal(
+    eventFloodApp.checkRateLimit(1, "Overflow", "9", "signup", "sheet-b"),
+    true,
+  );
+});
+
 test("checkRateLimit limits global event flooding for cancellation attempts", () => {
   const { app } = loadBackend({ cacheStore: new Map() });
 
@@ -241,6 +269,65 @@ test("submitSignup appends a normalised signup row on success", () => {
   assert.equal(appendedRow[3], "4-2");
   assert.equal(appendedRow[4], app.ROLES.general);
   assert.equal(lock.released, true);
+});
+
+test("submitSignup rate limits are isolated for aliases backed by different sheets", () => {
+  const cacheStore = new Map();
+  const secondSpreadsheet = createSpreadsheet("Summer Fete", {
+    Events: createSheet(createEventRows()),
+    Signups: createSheet([
+      ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
+    ]),
+  });
+  const { app } = loadBackend({
+    cacheStore,
+    configRows: [
+      ["Alias", "SheetId"],
+      ["Spring-Fete", EVENT_SHEET_ID],
+      ["Summer-Fete", SECOND_EVENT_SHEET_ID],
+    ],
+    extraSpreadsheets: {
+      [SECOND_EVENT_SHEET_ID]: secondSpreadsheet,
+    },
+  });
+
+  assert.equal(
+    app.submitSignup("1", "Alice", "1-1", app.ROLES.general, "spring-fete")
+      .success,
+    true,
+  );
+  const duplicateAttempt = app.submitSignup(
+    "1",
+    "Alice",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+  const finalDuplicateAttempt = app.submitSignup(
+    "1",
+    "Alice",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+  const rateLimitedAttempt = app.submitSignup(
+    "1",
+    "Alice",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+
+  assert.equal(duplicateAttempt.success, false);
+  assert.equal(finalDuplicateAttempt.message, duplicateAttempt.message);
+  assert.equal(rateLimitedAttempt.success, false);
+  assert.notEqual(rateLimitedAttempt.message, duplicateAttempt.message);
+
+  assert.equal(
+    app.submitSignup("1", "Alice", "1-1", app.ROLES.general, "summer-fete")
+      .success,
+    true,
+  );
 });
 
 test("submitSignup preserves Kanji numerals in names while normalising class", () => {

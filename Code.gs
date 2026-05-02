@@ -262,7 +262,7 @@ function submitSignup(eventId, name, cls, role, alias) {
 
     // Rate limiting — composite key prevents bypass by name variation,
     // global event cap prevents flood attacks
-    if (!checkRateLimit(eventId, name, cls, "signup")) {
+    if (!checkRateLimit(eventId, name, cls, "signup", sheetId)) {
       return {
         success: false,
         message: "使用回数を超過しました。少し待ってからお試しください。",
@@ -407,18 +407,18 @@ function cancelSignup(eventId, name, cls, role, alias) {
       return { success: false, message: "ポジションが不正です。" };
     }
 
-    if (!checkRateLimit(parsedEventId, name, cls, "cancel")) {
-      return {
-        success: false,
-        message: "使用回数を超過しました。少し待ってからお試しください。",
-      };
-    }
-
     // Derive sheetId server-side
     const config = getEventConfig();
     const sheetId = config[alias.toLowerCase()];
     if (!sheetId) {
       return { success: false, message: "不正なリクエストです。" };
+    }
+
+    if (!checkRateLimit(parsedEventId, name, cls, "cancel", sheetId)) {
+      return {
+        success: false,
+        message: "使用回数を超過しました。少し待ってからお試しください。",
+      };
     }
 
     const spreadsheet = SpreadsheetApp.openById(sheetId);
@@ -492,21 +492,34 @@ function cancelSignup(eventId, name, cls, role, alias) {
  * @param {string} name - The participant's name
  * @param {string} cls - The participant's class
  * @param {string} [action] - Logical action key for separate limits
+ * @param {string} [scope] - Event sheet scope to isolate concurrent events
  * @returns {boolean} true if allowed, false if rate limited
  */
-function checkRateLimit(eventId, name, cls, action) {
+function checkRateLimit(eventId, name, cls, action, scope) {
   const cache = CacheService.getScriptCache();
   const actionKey = action === "cancel" ? "cancel" : "signup";
+  const scopeKey = String(scope || "default")
+    .replace(/[\s\u3000]+/g, "")
+    .substring(0, 80) || "default";
   const namePart = normaliseCompact(name).substring(0, 3);
   const clsPart = normaliseCompact(cls).substring(0, 3);
   const key =
-    "rl_" + actionKey + "_" + eventId + "_" + namePart + "_" + clsPart;
+    "rl_" +
+    actionKey +
+    "_" +
+    scopeKey +
+    "_" +
+    eventId +
+    "_" +
+    namePart +
+    "_" +
+    clsPart;
 
   const hits = cache.get(key);
   if (hits && parseInt(hits, 10) >= 3) return false;
   cache.put(key, hits ? String(parseInt(hits, 10) + 1) : "1", 60);
 
-  const eventKey = "rl_" + actionKey + "_event_" + eventId;
+  const eventKey = "rl_" + actionKey + "_event_" + scopeKey + "_" + eventId;
   const eventHits = cache.get(eventKey);
   if (eventHits && parseInt(eventHits, 10) >= 20) return false;
   cache.put(
