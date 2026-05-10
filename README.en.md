@@ -2,7 +2,7 @@
 
 [日本語はこちら](README.ja.md)
 
-A free, open source volunteer signup app built on Google Apps Script and Google Sheets. This app was developed to assist volunteer signup management for Japanese school events.
+A free, open-source volunteer signup app built on Google Apps Script and Google Sheets. This app was developed to assist with volunteer signup management for Japanese school events.
 
 ---
 
@@ -13,7 +13,7 @@ A free, open source volunteer signup app built on Google Apps Script and Google 
 - Three volunteer roles per slot — General, Class Rep, Committee (fully configurable)
 - Role-based slot limits — each role has its own quota
 - Roles with zero quota are hidden automatically
-- Colour coded roles — green (General), amber (Class Rep), blue (Committee)
+- Colour-coded roles — green (General), amber (Class Rep), blue (Committee)
 - Names displayed in role colour in each grid cell
 - Users sign up with name and class — no Google account required
 - Users can cancel their own signup via the modal
@@ -25,9 +25,9 @@ A free, open source volunteer signup app built on Google Apps Script and Google 
 - Notes/description column per time slot
 - Hint text shown on slots with existing signups
 - Page title driven dynamically by the Google Sheet name
-- Multiple events supported via URL parameter — no redeployment needed
+- Multiple events supported via a URL parameter — no redeployment needed
 - Works on mobile — signup and cancellation via clean modal popup
-- Fully Unicode compatible — supports any language
+- Fully Unicode-compatible — supports any language
 - Data stored in Google Sheets — easy to view and manage
 - Free to run — no hosting costs beyond a Google account
 
@@ -57,7 +57,7 @@ The admin manages events directly in Google Sheets. Users visit the public web a
 - [VS Code](https://code.visualstudio.com) or any text editor
 - Git (optional, for version control)
 
-Recommended: Use a dedicated Google account for this app rather than your personal account. The app runs as the account owner, so all Sheets access and script execution happens under that account. A dedicated account keeps your personal data separate, makes it easier to share admin access with a colleague, and avoids any impact on your personal Google services if the app's quota is exceeded.
+Recommended: Use a dedicated Google account for this app rather than your personal account. The app runs as the account owner, so all Sheets access and script execution happen under that account. A dedicated account keeps your personal data separate, makes it easier to share admin access with a colleague, and avoids any impact on your personal Google services if the app's quota is exceeded.
 
 ---
 
@@ -180,7 +180,7 @@ clasp push
    - **Execute as:** Me
    - **Who has access:** Anyone
 5. Click **Deploy**
-6. Authorise the permissions when prompted
+6. Authorise the requested permissions when prompted
 7. Copy the web app URL ending in `/exec`
 8. Note your **Deployment ID** for future redeployments
 
@@ -194,7 +194,7 @@ Each event gets its own URL using the `?event=` parameter:
 https://script.google.com/.../exec?event=myevent
 ```
 
-The alias in the URL must match the **Event Alias** column in your Config tab exactly (case insensitive).
+The alias in the URL must match the **Event Alias** column in your Config tab exactly (case-insensitive).
 
 Visiting the URL without a parameter shows a friendly "No event specified" message.
 
@@ -222,7 +222,7 @@ Delete the row from the **Config tab** — the event URL immediately stops worki
 
 ### Viewing Signups
 
-All signups are in the **Signups tab** of each event Sheet with:
+All signups are in the **Signups tab** of each event Sheet, with:
 
 - Signup ID
 - Event ID
@@ -252,7 +252,7 @@ Users can cancel their own signup from the app:
 | ------ | -------------- | ----------------------------------------------------------------------- |
 | A      | EventID        | Unique number per row (e.g. 1, 2, 3)                                    |
 | B      | Activity       | Activity name — shown as grid column header                             |
-| C      | SubTitle       | Subtitle to be shown below the column title — shown below activity name |
+| C      | SubTitle       | Subtitle shown below the column title — shown below the activity name    |
 | D      | Date           | Date in YYYY-MM-DD format                                               |
 | E      | StartTime      | Start time in HH:MM format (e.g. 09:00)                                 |
 | F      | EndTime        | End time in HH:MM format (e.g. 10:00)                                   |

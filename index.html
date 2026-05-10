@@ -154,6 +154,61 @@
         color: #6f6f6f;
       }
 
+      body.desktop-layout .role-row {
+        flex-direction: column;
+        justify-content: center;
+        gap: 3px;
+        margin-bottom: 7px;
+        padding: 8px 6px;
+        min-width: 0;
+        text-align: center;
+      }
+      body.desktop-layout .role-label,
+      body.desktop-layout .role-count {
+        display: block;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-size: 17px;
+        line-height: 1.2;
+        white-space: nowrap;
+      }
+      body.desktop-layout th {
+        font-size: 17px;
+        line-height: 1.25;
+      }
+      body.desktop-layout .activity-title {
+        font-size: 18px;
+        line-height: 1.25;
+      }
+      body.desktop-layout .activity-subtitle {
+        font-size: 15px;
+        line-height: 1.3;
+      }
+      body.desktop-layout td.time-cell {
+        font-size: 16px;
+        line-height: 1.35;
+      }
+      body.desktop-layout td.desc-cell {
+        font-size: 15px;
+        line-height: 1.45;
+      }
+      body.desktop-layout .modal .role-buttons {
+        gap: 10px;
+      }
+      body.desktop-layout .modal .role-btn {
+        padding: 14px 18px;
+      }
+      body.desktop-layout .modal .role-btn-label {
+        font-size: 20px;
+        line-height: 1.2;
+      }
+      body.desktop-layout .modal .role-btn-count {
+        font-size: 16px;
+        line-height: 1.3;
+        margin-top: 3px;
+      }
+
       /* Role colours */
       .count-general {
         color: #2e7d32;
@@ -1288,13 +1343,14 @@
           var th = document.createElement("th");
           var event = gridIndexes.firstEventByActivity[a];
           var actDiv = document.createElement("div");
-          actDiv.style.cssText = "font-size:13px;font-weight:600;";
+          actDiv.className = "activity-title";
+          actDiv.style.fontWeight = "600";
           actDiv.textContent = a;
           th.appendChild(actDiv);
           if (event && event.subtitle) {
             var personDiv = document.createElement("div");
-            personDiv.style.cssText =
-              "font-size:11px;font-weight:400;color:#888;margin-top:2px;";
+            personDiv.className = "activity-subtitle";
+            personDiv.style.cssText = "font-weight:400;color:#888;margin-top:2px;";
             personDiv.textContent = event.subtitle;
             th.appendChild(personDiv);
           }
@@ -1590,10 +1646,35 @@
           .trim();
       }
 
+      // Class matching canonicalises a narrow Kanji digit set. Names must
+      // preserve these characters verbatim.
+      var CLASS_KANJI_DIGITS = {
+        "\u3007": "0",
+        "\u96F6": "0",
+        "\u4E00": "1",
+        "\u4E8C": "2",
+        "\u4E09": "3",
+        "\u56DB": "4",
+        "\u4E94": "5",
+        "\u516D": "6",
+        "\u4E03": "7",
+        "\u516B": "8",
+        "\u4E5D": "9",
+      };
+
       function normaliseAsciiDigits(value) {
-        return String(value).replace(/[０-９]/g, function (char) {
+        return String(value).replace(/[\uFF10-\uFF19]/g, function (char) {
           return String.fromCharCode(char.charCodeAt(0) - 0xfee0);
         });
+      }
+
+      function normaliseKanjiDigits(value) {
+        return String(value).replace(
+          /[\u3007\u96F6\u4E00\u4E8C\u4E09\u56DB\u4E94\u516D\u4E03\u516B\u4E5D]/g,
+          function (char) {
+            return CLASS_KANJI_DIGITS[char];
+          },
+        );
       }
 
       function isClassTokenChar(char) {
@@ -1628,7 +1709,7 @@
 
       function normaliseClassValue(value) {
         return normaliseClassSeparators(
-          normaliseWhitespace(normaliseAsciiDigits(value)),
+          normaliseWhitespace(normaliseKanjiDigits(normaliseAsciiDigits(value))),
         );
       }
 
@@ -2021,6 +2102,40 @@
         showMessage("cancelMessage", message, success);
       }
 
+      function rebuildCurrentView() {
+        if (isCompactLayout()) {
+          buildMobileAgenda();
+        } else {
+          buildGrid();
+        }
+      }
+
+      function shouldRefreshAfterSubmitRejection(result) {
+        return result && result.code === "slot_full";
+      }
+
+      function refreshGridDataAfterSubmitRejection(eventId, message) {
+        google.script.run
+          .withSuccessHandler(function (result) {
+            if (!result || !result.success || !result.gridData) return;
+
+            gridData = result.gridData;
+            buildGridIndexes();
+            rebuildCurrentView();
+
+            if (
+              currentEventId !== null &&
+              String(currentEventId) === String(eventId) &&
+              getEventById(eventId)
+            ) {
+              openModal(eventId);
+              showModalMessage(message, false);
+            }
+          })
+          .withFailureHandler(function () {})
+          .getGridDataForAlias(alias);
+      }
+
       function submitSignup() {
         // This is intentionally only a low-friction client-side filter. Real
         // abuse protection is enforced server-side via rate limiting.
@@ -2099,6 +2214,12 @@
             } else {
               btn.disabled = false;
               btn.textContent = SIGNUP_BTN_TEXT;
+              if (shouldRefreshAfterSubmitRejection(result)) {
+                refreshGridDataAfterSubmitRejection(
+                  currentEventId,
+                  result.message,
+                );
+              }
             }
           })
           .withFailureHandler(function (error) {

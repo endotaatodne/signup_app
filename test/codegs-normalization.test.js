@@ -9,6 +9,7 @@ const { exports: codeGs } = loadCodeGs(
   [
     "ROLES",
     "getCanonicalRole",
+    "validateNameInput",
     "normaliseWhitespace",
     "normaliseAsciiDigits",
     "isClassTokenChar",
@@ -24,6 +25,7 @@ const { exports: codeGs } = loadCodeGs(
 const {
   ROLES,
   getCanonicalRole,
+  validateNameInput,
   normaliseWhitespace,
   normaliseAsciiDigits,
   isClassTokenChar,
@@ -39,13 +41,17 @@ test("normaliseWhitespace collapses mixed regular and full-width spaces", () => 
 });
 
 test("normaliseAsciiDigits converts full-width digits without changing ASCII digits", () => {
-  assert.equal(normaliseAsciiDigits("Year ２０２６ Class 3"), "Year 2026 Class 3");
+  assert.equal(
+    normaliseAsciiDigits("Year ２０２６ Class 3"),
+    "Year 2026 Class 3",
+  );
 });
 
-test("normaliseClassValue standardises full-width digits and dash variants", () => {
+test("normaliseClassValue standardises full-width, Kanji digits, and dash variants", () => {
   assert.equal(normaliseClassValue(" １－２ "), "1-2");
   assert.equal(normaliseClassValue("１−２"), "1-2");
   assert.equal(normaliseClassValue("１ー２"), "1-2");
+  assert.equal(normaliseClassValue("四ー二"), "4-2");
 });
 
 test("normaliseClassSeparators converts prolonged sound marks only inside class-like tokens", () => {
@@ -63,9 +69,18 @@ test("normaliseComparable remains a whitespace and case canonicalizer", () => {
   assert.equal(normaliseComparable("  AbC\u3000Def "), "abc def");
 });
 
-test("normaliseClassComparable treats half-width and full-width digits as equal", () => {
+test("validateNameInput preserves Kanji numerals in names", () => {
+  const result = validateNameInput(" 日本三郎 ");
+
+  assert.equal(result.ok, true);
+  assert.equal(result.value, "日本三郎");
+});
+
+test("normaliseClassComparable treats ASCII, full-width, and Kanji digits as equal", () => {
   assert.equal(normaliseClassComparable("１−2"), normaliseClassComparable("1-2"));
   assert.equal(normaliseClassComparable("１ー2"), normaliseClassComparable("1-2"));
+  assert.equal(normaliseClassComparable("四-二"), normaliseClassComparable("4-2"));
+  assert.equal(normaliseClassComparable("零ー一"), normaliseClassComparable("0-1"));
 });
 
 test("normaliseClassComparable does not broaden equivalence to full-width Latin letters", () => {

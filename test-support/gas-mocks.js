@@ -124,12 +124,18 @@ function createMockDate(nowValue = "2026-04-19T00:00:00Z") {
   };
 }
 
-function createLock() {
+function createLock(shouldFailWait) {
   return {
     released: false,
-    waitLock() {},
+    releaseCount: 0,
+    waitLock() {
+      if (shouldFailWait) {
+        throw new Error("Lock wait failed");
+      }
+    },
     releaseLock() {
       this.released = true;
+      this.releaseCount += 1;
     },
   };
 }
@@ -142,10 +148,11 @@ function createGasMocks(options = {}) {
     uuidValues = ["uuid-1"],
     deployedUrl = "https://example.com/app",
     nowValue = "2026-04-19T00:00:00Z",
+    lockWaitFails = false,
   } = options;
 
   let uuidIndex = 0;
-  const lock = createLock();
+  const lock = createLock(lockWaitFails);
   const logs = [];
 
   return {

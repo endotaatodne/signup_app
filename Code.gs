@@ -2,7 +2,7 @@
  * @fileoverview Signup App - Google Apps Script backend.
  * Serves the web app and handles all interactions with Google Sheets.
  * @author endotaatodne
- * @version 0.1.8
+ * @version 0.1.9
  */
 
 const MASTER_SHEET_ID =
@@ -199,6 +199,34 @@ function getGridData(spreadsheet) {
 }
 
 /**
+ * Fetches fresh public grid data for an event alias.
+ * @param {string} alias - Event alias from the URL
+ * @returns {{success: boolean, gridData?: Object, message?: string}}
+ */
+function getGridDataForAlias(alias) {
+  try {
+    if (!isValidAlias(alias)) {
+      return { success: false, message: "不正なリクエストです。" };
+    }
+
+    const config = getEventConfig();
+    const sheetId = config[alias.toLowerCase()];
+    if (!sheetId) {
+      return { success: false, message: "不正なリクエストです。" };
+    }
+
+    const spreadsheet = SpreadsheetApp.openById(sheetId);
+    return { success: true, gridData: getGridData(spreadsheet) };
+  } catch (e) {
+    console.error("getGridDataForAlias error: " + e.message);
+    return {
+      success: false,
+      message: "エラーが発生しました。再度試してください。",
+    };
+  }
+}
+
+/**
  * Submits a new signup for a given event and role.
  * SheetId is derived server-side from the alias — never trusted from client.
  * @param {number} eventId - The EventID from the Events sheet
@@ -210,10 +238,12 @@ function getGridData(spreadsheet) {
  */
 function submitSignup(eventId, name, cls, role, alias) {
   const lock = LockService.getScriptLock();
+  let lockAcquired = false;
   try {
     // Acquire lock with graceful timeout handling
     try {
       lock.waitLock(5000);
+      lockAcquired = true;
     } catch (e) {
       return {
         success: false,
@@ -262,7 +292,7 @@ function submitSignup(eventId, name, cls, role, alias) {
 
     // Rate limiting — composite key prevents bypass by name variation,
     // global event cap prevents flood attacks
-    if (!checkRateLimit(eventId, name, cls, "signup")) {
+    if (!checkRateLimit(eventId, name, cls, "signup", sheetId)) {
       return {
         success: false,
         message: "使用回数を超過しました。少し待ってからお試しください。",
@@ -308,6 +338,7 @@ function submitSignup(eventId, name, cls, role, alias) {
     if (roleSignups.length >= maxSlots) {
       return {
         success: false,
+        code: "slot_full",
         message: "申し訳ありません、この枠のボランティア募集は終了しました。",
       };
     }
@@ -350,7 +381,9 @@ function submitSignup(eventId, name, cls, role, alias) {
       message: "エラーが発生しました。再度試してください。",
     };
   } finally {
-    lock.releaseLock();
+    if (lockAcquired) {
+      lock.releaseLock();
+    }
   }
 }
 
@@ -365,10 +398,12 @@ function submitSignup(eventId, name, cls, role, alias) {
  */
 function cancelSignup(eventId, name, cls, role, alias) {
   const lock = LockService.getScriptLock();
+  let lockAcquired = false;
   try {
     // Acquire lock
     try {
       lock.waitLock(5000);
+      lockAcquired = true;
     } catch (e) {
       return {
         success: false,
@@ -407,18 +442,18 @@ function cancelSignup(eventId, name, cls, role, alias) {
       return { success: false, message: "ポジションが不正です。" };
     }
 
-    if (!checkRateLimit(parsedEventId, name, cls, "cancel")) {
-      return {
-        success: false,
-        message: "使用回数を超過しました。少し待ってからお試しください。",
-      };
-    }
-
     // Derive sheetId server-side
     const config = getEventConfig();
     const sheetId = config[alias.toLowerCase()];
     if (!sheetId) {
       return { success: false, message: "不正なリクエストです。" };
+    }
+
+    if (!checkRateLimit(parsedEventId, name, cls, "cancel", sheetId)) {
+      return {
+        success: false,
+        message: "使用回数を超過しました。少し待ってからお試しください。",
+      };
     }
 
     const spreadsheet = SpreadsheetApp.openById(sheetId);
@@ -481,7 +516,9 @@ function cancelSignup(eventId, name, cls, role, alias) {
       message: "エラーが発生しました。再度試してください。",
     };
   } finally {
-    lock.releaseLock();
+    if (lockAcquired) {
+      lock.releaseLock();
+    }
   }
 }
 
@@ -492,21 +529,34 @@ function cancelSignup(eventId, name, cls, role, alias) {
  * @param {string} name - The participant's name
  * @param {string} cls - The participant's class
  * @param {string} [action] - Logical action key for separate limits
+ * @param {string} [scope] - Event sheet scope to isolate concurrent events
  * @returns {boolean} true if allowed, false if rate limited
  */
-function checkRateLimit(eventId, name, cls, action) {
+function checkRateLimit(eventId, name, cls, action, scope) {
   const cache = CacheService.getScriptCache();
   const actionKey = action === "cancel" ? "cancel" : "signup";
+  const scopeKey = String(scope || "default")
+    .replace(/[\s\u3000]+/g, "")
+    .substring(0, 80) || "default";
   const namePart = normaliseCompact(name).substring(0, 3);
   const clsPart = normaliseCompact(cls).substring(0, 3);
   const key =
-    "rl_" + actionKey + "_" + eventId + "_" + namePart + "_" + clsPart;
+    "rl_" +
+    actionKey +
+    "_" +
+    scopeKey +
+    "_" +
+    eventId +
+    "_" +
+    namePart +
+    "_" +
+    clsPart;
 
   const hits = cache.get(key);
   if (hits && parseInt(hits, 10) >= 3) return false;
   cache.put(key, hits ? String(parseInt(hits, 10) + 1) : "1", 60);
 
-  const eventKey = "rl_" + actionKey + "_event_" + eventId;
+  const eventKey = "rl_" + actionKey + "_event_" + scopeKey + "_" + eventId;
   const eventHits = cache.get(eventKey);
   if (eventHits && parseInt(eventHits, 10) >= 20) return false;
   cache.put(
@@ -824,10 +874,35 @@ function normaliseWhitespace(value) {
     .trim();
 }
 
+// Class matching canonicalises a narrow Kanji digit set. Names must preserve
+// these characters verbatim.
+const CLASS_KANJI_DIGITS = {
+  "\u3007": "0",
+  "\u96F6": "0",
+  "\u4E00": "1",
+  "\u4E8C": "2",
+  "\u4E09": "3",
+  "\u56DB": "4",
+  "\u4E94": "5",
+  "\u516D": "6",
+  "\u4E03": "7",
+  "\u516B": "8",
+  "\u4E5D": "9",
+};
+
 function normaliseAsciiDigits(value) {
   return String(value).replace(/[\uFF10-\uFF19]/g, function (char) {
     return String.fromCharCode(char.charCodeAt(0) - 0xfee0);
   });
+}
+
+function normaliseKanjiDigits(value) {
+  return String(value).replace(
+    /[\u3007\u96F6\u4E00\u4E8C\u4E09\u56DB\u4E94\u516D\u4E03\u516B\u4E5D]/g,
+    function (char) {
+      return CLASS_KANJI_DIGITS[char];
+    },
+  );
 }
 
 function isClassTokenChar(char) {
@@ -862,7 +937,7 @@ function normaliseClassSeparators(value) {
 
 function normaliseClassValue(value) {
   return normaliseClassSeparators(
-    normaliseWhitespace(normaliseAsciiDigits(value)),
+    normaliseWhitespace(normaliseKanjiDigits(normaliseAsciiDigits(value))),
   );
 }
 

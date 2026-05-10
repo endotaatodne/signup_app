@@ -9,6 +9,7 @@ const {
 } = require("../test-support/gas-mocks");
 
 const EVENT_SHEET_ID = "eventsheetid1234567890";
+const SECOND_EVENT_SHEET_ID = "secondsheetid1234567890";
 const MASTER_SHEET_ID = "master-sheet-id";
 
 function createEventRows() {
@@ -60,6 +61,7 @@ function loadBackend(options = {}) {
     extraSpreadsheets = {},
     nowValue,
     cacheStore,
+    lockWaitFails = false,
   } = options;
 
   const masterSpreadsheet = createSpreadsheet("Master", {
@@ -81,6 +83,7 @@ function loadBackend(options = {}) {
     spreadsheets,
     nowValue,
     cacheStore,
+    lockWaitFails,
   });
 
   const { exports: app } = loadCodeGs(
@@ -88,6 +91,7 @@ function loadBackend(options = {}) {
       "ROLES",
       "doGet",
       "getGridData",
+      "getGridDataForAlias",
       "submitSignup",
       "cancelSignup",
       "checkRateLimit",
@@ -181,6 +185,25 @@ test("doGet returns an error page when the alias is invalid", () => {
   assert.match(result.content, /Invalid event link/);
 });
 
+test("getGridDataForAlias returns fresh public grid data for a valid alias", () => {
+  const { app } = loadBackend();
+
+  const result = app.getGridDataForAlias("Spring-Fete");
+
+  assert.equal(result.success, true);
+  assert.equal(result.gridData.events[0].activity, "Hall Monitor");
+  assert.equal(result.gridData.events[0].slots.general.filled, 0);
+});
+
+test("getGridDataForAlias rejects invalid aliases safely", () => {
+  const { app } = loadBackend();
+
+  const result = app.getGridDataForAlias("<bad>");
+
+  assert.equal(result.success, false);
+  assert.ok(!("gridData" in result));
+});
+
 test("checkRateLimit limits repeated person submissions and global event flooding", () => {
   const { app } = loadBackend({ cacheStore: new Map() });
 
@@ -211,6 +234,33 @@ test("checkRateLimit keeps signup and cancel buckets isolated", () => {
   assert.equal(app.checkRateLimit(1, "Alice", "1-1", "cancel"), false);
 });
 
+test("checkRateLimit keeps event sheet scopes isolated", () => {
+  const cacheStore = new Map();
+  const { app } = loadBackend({ cacheStore });
+
+  assert.equal(app.checkRateLimit(1, "Alice", "1-1", "signup", "sheet-a"), true);
+  assert.equal(app.checkRateLimit(1, "Alice", "1-1", "signup", "sheet-a"), true);
+  assert.equal(app.checkRateLimit(1, "Alice", "1-1", "signup", "sheet-a"), true);
+  assert.equal(app.checkRateLimit(1, "Alice", "1-1", "signup", "sheet-a"), false);
+  assert.equal(app.checkRateLimit(1, "Alice", "1-1", "signup", "sheet-b"), true);
+
+  const { app: eventFloodApp } = loadBackend({ cacheStore: new Map() });
+  for (let i = 0; i < 20; i += 1) {
+    assert.equal(
+      eventFloodApp.checkRateLimit(1, `User${i}`, `${i}`, "signup", "sheet-a"),
+      true,
+    );
+  }
+  assert.equal(
+    eventFloodApp.checkRateLimit(1, "Overflow", "9", "signup", "sheet-a"),
+    false,
+  );
+  assert.equal(
+    eventFloodApp.checkRateLimit(1, "Overflow", "9", "signup", "sheet-b"),
+    true,
+  );
+});
+
 test("checkRateLimit limits global event flooding for cancellation attempts", () => {
   const { app } = loadBackend({ cacheStore: new Map() });
 
@@ -224,17 +274,119 @@ test("submitSignup appends a normalised signup row on success", () => {
   const { app, spreadsheets, lock } = loadBackend();
   const signupsSheet = spreadsheets[EVENT_SHEET_ID].getSheetByName("Signups");
 
-  const result = app.submitSignup("1", " Alice ", "１－２", app.ROLES.general, "spring-fete");
+  const result = app.submitSignup(
+    "1",
+    " Alice ",
+    "四ー二",
+    app.ROLES.general,
+    "spring-fete",
+  );
   const signupRows = signupsSheet.getDataRange().getValues();
   const appendedRow = signupRows[signupRows.length - 1];
 
   assert.equal(result.success, true);
   assert.equal(result.name, "Alice");
-  assert.equal(result.cls, "1-2");
+  assert.equal(result.cls, "4-2");
   assert.equal(appendedRow[2], "Alice");
-  assert.equal(appendedRow[3], "1-2");
+  assert.equal(appendedRow[3], "4-2");
   assert.equal(appendedRow[4], app.ROLES.general);
   assert.equal(lock.released, true);
+});
+
+test("submitSignup does not release a lock that was not acquired", () => {
+  const { app, lock } = loadBackend({ lockWaitFails: true });
+
+  const result = app.submitSignup(
+    "1",
+    "Alice",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+
+  assert.equal(result.success, false);
+  assert.equal(lock.released, false);
+  assert.equal(lock.releaseCount, 0);
+});
+
+test("submitSignup rate limits are isolated for aliases backed by different sheets", () => {
+  const cacheStore = new Map();
+  const secondSpreadsheet = createSpreadsheet("Summer Fete", {
+    Events: createSheet(createEventRows()),
+    Signups: createSheet([
+      ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
+    ]),
+  });
+  const { app } = loadBackend({
+    cacheStore,
+    configRows: [
+      ["Alias", "SheetId"],
+      ["Spring-Fete", EVENT_SHEET_ID],
+      ["Summer-Fete", SECOND_EVENT_SHEET_ID],
+    ],
+    extraSpreadsheets: {
+      [SECOND_EVENT_SHEET_ID]: secondSpreadsheet,
+    },
+  });
+
+  assert.equal(
+    app.submitSignup("1", "Alice", "1-1", app.ROLES.general, "spring-fete")
+      .success,
+    true,
+  );
+  const duplicateAttempt = app.submitSignup(
+    "1",
+    "Alice",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+  const finalDuplicateAttempt = app.submitSignup(
+    "1",
+    "Alice",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+  const rateLimitedAttempt = app.submitSignup(
+    "1",
+    "Alice",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+
+  assert.equal(duplicateAttempt.success, false);
+  assert.equal(finalDuplicateAttempt.message, duplicateAttempt.message);
+  assert.equal(rateLimitedAttempt.success, false);
+  assert.notEqual(rateLimitedAttempt.message, duplicateAttempt.message);
+
+  assert.equal(
+    app.submitSignup("1", "Alice", "1-1", app.ROLES.general, "summer-fete")
+      .success,
+    true,
+  );
+});
+
+test("submitSignup preserves Kanji numerals in names while normalising class", () => {
+  const { app, spreadsheets } = loadBackend();
+  const signupsSheet = spreadsheets[EVENT_SHEET_ID].getSheetByName("Signups");
+
+  const result = app.submitSignup(
+    "1",
+    " 日本三郎 ",
+    "四ー二",
+    app.ROLES.general,
+    "spring-fete",
+  );
+  const signupRows = signupsSheet.getDataRange().getValues();
+  const appendedRow = signupRows[signupRows.length - 1];
+
+  assert.equal(result.success, true);
+  assert.equal(result.name, "日本三郎");
+  assert.equal(result.cls, "4-2");
+  assert.equal(appendedRow[2], "日本三郎");
+  assert.equal(appendedRow[3], "4-2");
 });
 
 test("submitSignup accepts names up to 50 characters", () => {
@@ -281,6 +433,7 @@ test("submitSignup rejects a full role slot", () => {
   const result = app.submitSignup("1", "Carol", "1-3", app.ROLES.general, "spring-fete");
 
   assert.equal(result.success, false);
+  assert.equal(result.code, "slot_full");
   assert.match(result.message, /募集は終了しました/);
 });
 
@@ -291,16 +444,32 @@ test("cancelSignup matches normalised class values and deletes the correct row",
   ];
   const signupDisplayRows = [
     ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
-    ["s1", "1", "Alice", "１－１", "一般保護者", "2026-04-01"],
+    ["s1", "1", "Alice", "四ー一", "一般保護者", "2026-04-01"],
   ];
   const { app, spreadsheets, lock } = loadBackend({ signupRows, signupDisplayRows });
   const signupsSheet = spreadsheets[EVENT_SHEET_ID].getSheetByName("Signups");
 
-  const result = app.cancelSignup("1", " Alice ", "1-1", app.ROLES.general, "spring-fete");
+  const result = app.cancelSignup("1", " Alice ", "4-1", app.ROLES.general, "spring-fete");
 
   assert.equal(result.success, true);
   assert.deepEqual(signupsSheet.__state.deletedRows, [2]);
   assert.equal(lock.released, true);
+});
+
+test("cancelSignup does not release a lock that was not acquired", () => {
+  const { app, lock } = loadBackend({ lockWaitFails: true });
+
+  const result = app.cancelSignup(
+    "1",
+    "Alice",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+
+  assert.equal(result.success, false);
+  assert.equal(lock.released, false);
+  assert.equal(lock.releaseCount, 0);
 });
 
 test("cancelSignup uses the same invalid-character validation as submitSignup", () => {
