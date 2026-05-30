@@ -137,6 +137,19 @@ cd signup-app
 clasp create --title "Signup App"
 ```
 
+`clasp create` creates a local `.clasp.json` file in the repository root. This file binds your local checkout to the Apps Script project that `clasp push` and `clasp deploy` will update. It contains the Apps Script project script ID, so keep it local only: do not commit it, paste it into issues, or share it with others. This repository already lists `.clasp.json` in `.gitignore`.
+
+If you need to connect this checkout to an existing Apps Script project instead of creating a new one, create or update `.clasp.json` locally with placeholders like this:
+
+```json
+{
+  "scriptId": "YOUR_SCRIPT_ID",
+  "rootDir": "."
+}
+```
+
+Find the script ID in Apps Script under **Project Settings** -> **Script ID**, replace `YOUR_SCRIPT_ID`, and save the file. Do not put Sheet IDs or deployment IDs in `.clasp.json`; it should point to the Apps Script project itself.
+
 ### Step 8 — Set Script Properties
 
 The Master Sheet ID is stored securely in Script Properties.
@@ -170,6 +183,8 @@ The keys (`general`, `classRep`, `committee`) must stay the same — only change
 ```bash
 clasp push
 ```
+
+This command reads the local `.clasp.json` file to decide which Apps Script project to update. If the file is missing or points to the wrong script ID, `clasp push` will fail or update the wrong project.
 
 ### Step 10 — Deploy as a Web App
 
@@ -352,6 +367,7 @@ npm run deploy
 - All Google Sheets should be set to **Restricted** sharing — only you can edit
 - The web app runs as you (the deployer) — anonymous users cannot access your Sheets directly
 - `MASTER_SHEET_ID` is stored in Script Properties
+- `.clasp.json` is local-only CLASP configuration containing the Apps Script project script ID; it is included in `.gitignore` and should not be version controlled or shared
 - Only Sheet IDs registered in the Config tab can be loaded — arbitrary Sheet IDs are rejected
 - The sheet identifier is derived server-side from the event alias — clients never supply a sheet ID directly
 - Input length and characters are validated both client-side and server-side

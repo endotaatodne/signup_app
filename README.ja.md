@@ -137,6 +137,19 @@ cd signup-app
 clasp create --title "Signup App"
 ```
 
+`clasp create`を実行すると、リポジトリルートにローカル用の`.clasp.json`が作成されます。このファイルは、`clasp push`や`clasp deploy`が更新するApps Scriptプロジェクトとローカルのチェックアウトをひも付けます。Apps ScriptプロジェクトのスクリプトIDが含まれるため、ローカル専用として扱い、コミットしたり、Issueなどに貼り付けたり、他の人と共有したりしないでください。このリポジトリでは`.clasp.json`を`.gitignore`に含めています。
+
+新規作成ではなく既存のApps Scriptプロジェクトにこのチェックアウトを接続する場合は、ローカルで`.clasp.json`を作成または更新します。共有する文書には実際のIDを書かず、形式は次の例を参考にします：
+
+```json
+{
+  "scriptId": "YOUR_SCRIPT_ID",
+  "rootDir": "."
+}
+```
+
+スクリプトIDはApps Scriptの**プロジェクトの設定** -> **スクリプト ID**で確認し、`YOUR_SCRIPT_ID`を置き換えて保存します。Sheet IDやデプロイメントIDではなく、Apps Scriptプロジェクト自体のスクリプトIDを指定してください。
+
 ### ステップ8 — スクリプトプロパティの設定
 
 マスターシートIDはスクリプトプロパティに安全に保存します。
@@ -170,6 +183,8 @@ const ROLES = {
 ```bash
 clasp push
 ```
+
+このコマンドはローカルの`.clasp.json`を読み取り、どのApps Scriptプロジェクトを更新するかを判断します。ファイルがない場合やスクリプトIDが間違っている場合、`clasp push`は失敗するか、意図しないプロジェクトを更新してしまいます。
 
 ### ステップ10 — Webアプリとしてデプロイ
 
@@ -352,6 +367,7 @@ npm run deploy
 - すべてのGoogle Sheetsは**制限付き**共有に設定 — 編集できるのは管理者のみ
 - Webアプリはデプロイ者として実行 — 匿名ユーザーはSheetsに直接アクセス不可
 - `MASTER_SHEET_ID`はスクリプトプロパティに保存
+- `.clasp.json`はApps ScriptプロジェクトのスクリプトIDを含むローカル専用のCLASP設定です。`.gitignore`に含まれており、バージョン管理したり共有したりしないでください
 - Configタブに登録されたSheet IDのみ読み込み可能 — 未登録のSheet IDは拒否
 - シート識別子はサーバーサイドでイベントエイリアスから導出 — クライアントからSheet IDを直接送信しない
 - 入力の文字数と文字種類をクライアント・サーバー両側で検証
