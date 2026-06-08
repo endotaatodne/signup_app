@@ -1223,9 +1223,44 @@
         border-radius: 12px;
       }
 
+      body.compact-layout {
+        padding: 0;
+        background: #f5f2ee;
+      }
+
+      body.compact-layout h1 {
+        margin: 0 0 18px;
+        padding: 18px 16px 16px;
+        background: #ffffff;
+        border-bottom: 1px solid #e8e4df;
+      }
+
+      body.compact-layout .mobile-agenda {
+        padding: 0 14px 80px;
+      }
+
+      body.compact-layout .mobile-activity-group {
+        margin-bottom: 18px;
+      }
+
+      body.compact-layout .mobile-slot-card {
+        min-height: 196px;
+        padding: 34px 22px 26px;
+        margin-bottom: 18px;
+        border: 2px solid transparent;
+        border-radius: 12px;
+        background: #ffffff;
+        box-shadow: 0 10px 26px rgba(26, 26, 24, 0.1);
+      }
+
+      body.compact-layout .mobile-slot-card:not(.is-full):active {
+        transform: translateY(1px) scale(0.992);
+        box-shadow: 0 5px 16px rgba(26, 26, 24, 0.08);
+      }
+
       body.compact-layout .mobile-slot-card.is-full {
-        border-color: #ded8d0;
-        box-shadow: none;
+        border-color: transparent;
+        box-shadow: 0 5px 16px rgba(26, 26, 24, 0.06);
         opacity: 0.88;
       }
 
@@ -1267,8 +1302,9 @@
 
       @media (max-width: 420px) {
         body.compact-layout .mobile-slot-card {
-          min-height: 170px;
-          padding: 30px 20px 22px;
+          min-height: 182px;
+          padding: 32px 18px 24px;
+          margin-bottom: 16px;
         }
 
         body.compact-layout .mobile-slot-title {
