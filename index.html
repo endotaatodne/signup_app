@@ -1517,11 +1517,12 @@
       function buildGridIndexes() {
         var events = (gridData && gridData.events) || [];
         var indexes = {
-          eventById: {},
-          firstEventByActivity: {},
-          firstEventByTime: {},
-          eventsByTime: {},
-          eventByActivityAndTime: {},
+          eventById: Object.create(null),
+          firstEventByActivity: Object.create(null),
+          firstEventByTime: Object.create(null),
+          eventsByActivity: Object.create(null),
+          eventsByTime: Object.create(null),
+          eventByActivityAndTime: Object.create(null),
         };
 
         events.forEach(function (event) {
@@ -1530,6 +1531,11 @@
           if (!indexes.firstEventByActivity[event.activity]) {
             indexes.firstEventByActivity[event.activity] = event;
           }
+
+          if (!indexes.eventsByActivity[event.activity]) {
+            indexes.eventsByActivity[event.activity] = [];
+          }
+          indexes.eventsByActivity[event.activity].push(event);
 
           if (!indexes.firstEventByTime[event.startTime]) {
             indexes.firstEventByTime[event.startTime] = event;
@@ -1557,6 +1563,20 @@
         });
 
         gridIndexes = indexes;
+      }
+
+      function compareEventsByTime(a, b) {
+        var startA = String((a && a.startTime) || "");
+        var startB = String((b && b.startTime) || "");
+        if (startA !== startB) return startA < startB ? -1 : 1;
+
+        var endA = String((a && a.endTime) || "");
+        var endB = String((b && b.endTime) || "");
+        if (endA !== endB) return endA < endB ? -1 : 1;
+
+        return String((a && a.eventId) || "").localeCompare(
+          String((b && b.eventId) || ""),
+        );
       }
 
       function getEventById(eventId) {
@@ -1787,27 +1807,18 @@
           return;
         }
 
-        var times = gridData.times;
+        var activities = gridData.activities || [];
         while (container.firstChild) {
           container.removeChild(container.firstChild);
         }
 
-        times.forEach(function (time) {
+        activities.forEach(function (activity) {
           var section = document.createElement("section");
-          section.className = "mobile-time-group";
+          section.className = "mobile-time-group mobile-activity-group";
 
-          var matchedEvent = gridIndexes.firstEventByTime[time];
-
-          var heading = document.createElement("h2");
-          heading.className = "mobile-time-heading";
-          heading.textContent = formatTimeRange(
-            time,
-            matchedEvent ? matchedEvent.endTime : "",
-          );
-          section.appendChild(heading);
-
-          var matchingEvents = gridIndexes.eventsByTime[time] || [];
-
+          var matchingEvents = (gridIndexes.eventsByActivity[activity] || [])
+            .slice()
+            .sort(compareEventsByTime);
           matchingEvents.forEach(function (event) {
             var card = document.createElement("button");
             card.className =
@@ -1828,8 +1839,8 @@
             var timeLine = document.createElement("div");
             timeLine.className = "mobile-slot-time";
             timeLine.textContent = event.endTime
-              ? formatTimeRange(event.startTime || time, event.endTime)
-              : formatTime(event.startTime || time);
+              ? formatTimeRange(event.startTime, event.endTime)
+              : formatTime(event.startTime);
             titleWrap.appendChild(timeLine);
 
             var meta = document.createElement("div");

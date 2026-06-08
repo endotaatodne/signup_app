@@ -575,7 +575,7 @@ test("buildMobileAgenda groups mobile signup names by role", () => {
   client.buildMobileAgenda();
 
   const firstSection = mobileNode.children[0];
-  const firstCard = firstSection.children[1];
+  const firstCard = firstSection.children[0];
   const summary = firstCard.children[1];
   const namesList = firstCard.children[2];
 
@@ -594,6 +594,99 @@ test("buildMobileAgenda groups mobile signup names by role", () => {
     client.ROLE_KEYS[1].label + ":",
   );
   assert.equal(namesList.children[1].children[1].textContent, "Bob");
+});
+
+test("buildMobileAgenda groups mobile cards by activity and sorts each group by time", () => {
+  const mobileNode = createElement("div");
+  mobileNode.style = {};
+  const { exports: client } = loadClient({
+    gridData: {
+      activities: ["Bake Sale", "Games"],
+      times: ["09:30", "10:00", "11:00"],
+      events: [
+        {
+          eventId: 3,
+          activity: "Games",
+          subtitle: "",
+          startTime: "10:00",
+          endTime: "10:30",
+          location: "Oval",
+          description: "",
+          slots: {
+            general: { max: 1, filled: 0 },
+            classRep: { max: 0, filled: 0 },
+            committee: { max: 0, filled: 0 },
+          },
+          signups: [],
+        },
+        {
+          eventId: 2,
+          activity: "Bake Sale",
+          subtitle: "",
+          startTime: "11:00",
+          endTime: "11:30",
+          location: "Hall",
+          description: "",
+          slots: {
+            general: { max: 1, filled: 0 },
+            classRep: { max: 0, filled: 0 },
+            committee: { max: 0, filled: 0 },
+          },
+          signups: [],
+        },
+        {
+          eventId: 1,
+          activity: "Bake Sale",
+          subtitle: "",
+          startTime: "09:30",
+          endTime: "10:00",
+          location: "Hall",
+          description: "",
+          slots: {
+            general: { max: 1, filled: 0 },
+            classRep: { max: 0, filled: 0 },
+            committee: { max: 0, filled: 0 },
+          },
+          signups: [],
+        },
+      ],
+    },
+    elements: {
+      mobileAgenda: mobileNode,
+    },
+  });
+
+  client.buildGridIndexes();
+  client.buildMobileAgenda();
+
+  function getTitleWrap(card) {
+    return card.children[0].children[0];
+  }
+
+  const bakeSaleSection = mobileNode.children[0];
+  const gamesSection = mobileNode.children[1];
+  const firstBakeSaleCard = bakeSaleSection.children[0];
+  const secondBakeSaleCard = bakeSaleSection.children[1];
+  const firstGamesCard = gamesSection.children[0];
+
+  assert.equal(mobileNode.children.length, 2);
+  assert.equal(bakeSaleSection.children.length, 2);
+  assert.equal(
+    getTitleWrap(firstBakeSaleCard).children[0].textContent,
+    "Bake Sale",
+  );
+  assert.equal(
+    getTitleWrap(firstBakeSaleCard).children[1].textContent,
+    "9:30 am - 10:00 am",
+  );
+  assert.equal(
+    getTitleWrap(secondBakeSaleCard).children[1].textContent,
+    "11:00 am - 11:30 am",
+  );
+  assert.equal(
+    getTitleWrap(firstGamesCard).children[0].textContent,
+    "Games",
+  );
 });
 
 test("renderResponsiveView toggles layout classes and target visibility", () => {
