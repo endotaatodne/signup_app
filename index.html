@@ -1036,6 +1036,233 @@
       h1 {
         text-align: center;
       }
+
+      /* Card-focused visual refresh inspired by the equipment manager app. */
+      .slot:not(.slot-empty),
+      .mobile-slot-card {
+        position: relative;
+        overflow: hidden;
+        background: #ffffff;
+        border: 1.5px solid #e8e4df;
+        border-radius: 12px;
+        box-shadow: 0 1px 2px rgba(26, 26, 24, 0.04);
+      }
+
+      .slot:not(.slot-empty)::before,
+      .mobile-slot-card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: #e87b45;
+      }
+
+      .activity-accent-0::before {
+        background: #e87b45;
+      }
+
+      .activity-accent-1::before {
+        background: #3b82a0;
+      }
+
+      .activity-accent-2::before {
+        background: #8a9a5b;
+      }
+
+      .activity-accent-3::before {
+        background: #d9a441;
+      }
+
+      .activity-accent-4::before {
+        background: #9b6f9f;
+      }
+
+      .activity-accent-5::before {
+        background: #c05a47;
+      }
+
+      .slot:not(.slot-empty) {
+        padding: 12px 10px 9px;
+        transition:
+          transform 0.15s ease,
+          box-shadow 0.15s ease,
+          border-color 0.15s ease,
+          opacity 0.15s ease;
+      }
+
+      .slot:not(.slot-empty):hover {
+        border-color: #d8d1c8;
+        box-shadow: 0 8px 24px rgba(26, 26, 24, 0.1);
+        opacity: 1;
+        transform: translateY(-2px);
+      }
+
+      .slot-all-full,
+      .mobile-slot-card.is-full {
+        background: #f1efeb;
+        border-color: #ded8d0;
+      }
+
+      .role-row {
+        border-color: rgba(26, 26, 24, 0.08);
+        border-radius: 7px;
+      }
+
+      body.desktop-layout .role-row {
+        align-items: stretch;
+        min-height: 0;
+      }
+
+      body.desktop-layout .role-label,
+      body.desktop-layout .role-count {
+        overflow: hidden;
+        text-overflow: clip;
+        white-space: nowrap;
+        overflow-wrap: normal;
+      }
+
+      body.desktop-layout .role-label.role-fit-fallback,
+      body.desktop-layout .role-count.role-fit-fallback {
+        white-space: normal;
+        overflow-wrap: anywhere;
+      }
+
+      .mobile-slot-card {
+        min-height: 158px;
+        padding: 28px 22px 22px;
+        margin-bottom: 16px;
+        transition:
+          transform 0.15s ease,
+          box-shadow 0.15s ease,
+          border-color 0.15s ease;
+      }
+
+      .mobile-slot-card:not(.is-full):hover {
+        border-color: #d8d1c8;
+        box-shadow: 0 8px 24px rgba(26, 26, 24, 0.1);
+        transform: translateY(-2px);
+      }
+
+      .mobile-slot-card:active,
+      .mobile-slot-card:not(.is-full):active {
+        transform: scale(0.992);
+      }
+
+      .mobile-slot-title {
+        font-size: 22px;
+      }
+
+      .mobile-slot-meta {
+        color: #77736d;
+        font-size: 16px;
+      }
+
+      .mobile-slot-desc {
+        color: #77736d;
+        font-size: 17px;
+      }
+
+      .mobile-slot-summary {
+        gap: 6px;
+        margin-top: 12px;
+      }
+
+      .mobile-slot-summary-item {
+        display: inline-flex;
+        align-items: center;
+        min-height: 24px;
+        padding: 3px 9px;
+        border-radius: 999px;
+        background: #f5f2ee;
+        color: #555;
+        font-size: 12px;
+        line-height: 1.25;
+      }
+
+      .mobile-slot-summary-item.role-general {
+        background: #edf7ee;
+      }
+
+      .mobile-slot-summary-item.role-classrep {
+        background: #fff4da;
+      }
+
+      .mobile-slot-summary-item.role-committee {
+        background: #eaf3ff;
+      }
+
+      .mobile-slot-summary-item.is-full {
+        background: #ebe8e3;
+        color: #8a8580;
+      }
+
+      .mobile-slot-names {
+        margin-top: 11px;
+        padding-top: 9px;
+        border-top: 1px solid #ebe8e3;
+      }
+
+      body.compact-layout .mobile-slot-card {
+        min-height: 188px;
+        padding: 32px 22px 24px;
+        margin-bottom: 16px;
+        border-radius: 12px;
+      }
+
+      body.compact-layout .mobile-slot-card.is-full {
+        border-color: #ded8d0;
+        box-shadow: none;
+        opacity: 0.88;
+      }
+
+      body.compact-layout .mobile-slot-title {
+        font-size: 32px;
+        line-height: 1.2;
+      }
+
+      body.compact-layout .mobile-slot-meta,
+      body.compact-layout .mobile-slot-desc {
+        font-size: 22px;
+        line-height: 1.35;
+      }
+
+      body.compact-layout .mobile-slot-summary-item {
+        font-size: 18px;
+        min-height: 36px;
+        padding: 6px 13px;
+      }
+
+      body.compact-layout .mobile-slot-names {
+        font-size: 20px;
+        line-height: 1.4;
+      }
+
+      body.compact-layout .mobile-slot-role-label,
+      body.compact-layout .mobile-slot-name-list {
+        font-size: 18px;
+      }
+
+      @media (max-width: 420px) {
+        body.compact-layout .mobile-slot-card {
+          min-height: 170px;
+          padding: 30px 20px 22px;
+        }
+
+        body.compact-layout .mobile-slot-title {
+          font-size: 30px;
+        }
+
+        body.compact-layout .mobile-slot-meta,
+        body.compact-layout .mobile-slot-desc {
+          font-size: 20px;
+        }
+
+        body.compact-layout .mobile-slot-summary-item {
+          font-size: 17px;
+        }
+      }
     </style>
   </head>
   <body>
@@ -1208,6 +1435,58 @@
 
       function getEventLookupKey(activity, startTime) {
         return activity + "\u0000" + startTime;
+      }
+
+      function getActivityAccentClass(activity) {
+        var activities = (gridData && gridData.activities) || [];
+        var activityIndex = activities.indexOf(activity);
+        if (activityIndex < 0) activityIndex = 0;
+        return "activity-accent-" + (activityIndex % 6);
+      }
+
+      function fitDesktopRolePillText() {
+        if (isCompactLayout() || !window.getComputedStyle) return;
+
+        var wrapper = getDesktopGridWrapper();
+        if (!wrapper || !wrapper.querySelectorAll) return;
+
+        var labels = wrapper.querySelectorAll(".role-label, .role-count");
+        Array.prototype.forEach.call(labels, function (label) {
+          if (!label.style || !label.classList) return;
+
+          label.classList.remove("role-fit-fallback");
+          label.style.fontSize = "";
+
+          var availableWidth = label.clientWidth;
+          var neededWidth = label.scrollWidth;
+          if (!availableWidth || !neededWidth || neededWidth <= availableWidth + 1) {
+            return;
+          }
+
+          var computedSize = parseFloat(window.getComputedStyle(label).fontSize);
+          if (!computedSize) return;
+
+          var minSize = label.className.indexOf("role-count") >= 0 ? 11 : 12;
+          var fittedSize = Math.max(
+            minSize,
+            Math.floor(((availableWidth - 2) / neededWidth) * computedSize * 10) /
+              10,
+          );
+
+          label.style.fontSize = fittedSize + "px";
+
+          while (
+            label.scrollWidth > label.clientWidth + 1 &&
+            fittedSize > minSize
+          ) {
+            fittedSize = Math.max(minSize, fittedSize - 0.5);
+            label.style.fontSize = fittedSize + "px";
+          }
+
+          if (label.scrollWidth > label.clientWidth + 1) {
+            label.classList.add("role-fit-fallback");
+          }
+        });
       }
 
       function buildGridIndexes() {
@@ -1392,9 +1671,10 @@
               } else {
                 var slotDiv = document.createElement("div");
                 var available = hasAnyAvailable(event.slots);
-                slotDiv.className = available
-                  ? "slot slot-mixed"
-                  : "slot slot-all-full";
+                slotDiv.className =
+                  (available ? "slot slot-mixed" : "slot slot-all-full") +
+                  " " +
+                  getActivityAccentClass(activity);
                 slotDiv.setAttribute("data-eventid", event.eventId);
                 ROLE_KEYS.forEach(function (r, idx) {
                   var s = event.slots[r.key];
@@ -1468,6 +1748,7 @@
         }
         table.appendChild(thead);
         table.appendChild(tbody);
+        fitDesktopRolePillText();
       }
 
       function buildMobileAgenda() {
@@ -1504,7 +1785,8 @@
 
           matchingEvents.forEach(function (event) {
             var card = document.createElement("button");
-            card.className = "mobile-slot-card";
+            card.className =
+              "mobile-slot-card " + getActivityAccentClass(event.activity);
             card.type = "button";
             card.setAttribute("data-eventid", event.eventId);
 
@@ -1611,6 +1893,7 @@
         document.body.classList.toggle("desktop-layout", !compact);
 
         if (!layoutChanged) {
+          if (!compact) fitDesktopRolePillText();
           return;
         }
 
