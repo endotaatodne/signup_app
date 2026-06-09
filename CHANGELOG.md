@@ -1,3 +1,16 @@
+## v0.2.0 - 2026-06-09
+
+- Minor update
+  - Refreshes the mobile signup screen with a card-based layout, clearer spacing, larger touch targets, and improved full-slot styling.
+  - Adds a mobile-only display toggle so users can group signup cards by time or by activity.
+  - Remembers the selected mobile display mode between visits.
+  - Shows time ranges, location, subtitle, description, role availability, and grouped signup names more clearly in the mobile card view.
+  - Adds activity accent styling and keeps the desktop grid/table layout separate from the mobile card layout.
+  - Updates frontend unit tests for the mobile grouping modes, display-mode persistence, responsive layout behavior, and refreshed rendering.
+  - Updates English and Japanese README documentation for the mobile card view and display toggle.
+  - Adds a Japanese administrator operations guide.
+  - Bumps the app version to 0.2.0.
+
 ## v0.1.9 - 2026-05-03
 
 - Patch

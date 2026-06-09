@@ -8,8 +8,9 @@ A free, open-source volunteer signup app built on Google Apps Script and Google 
 
 ## Features
 
-- Grid view — activities across the top, time slots down the side
-- Time ranges displayed per slot (e.g. 9:00 am - 10:00 am)
+- Desktop grid view — activities across the top, time slots down the side
+- Mobile card view — switch between grouping by time and grouping by activity
+- Time ranges displayed per slot/card (e.g. 9:00 am - 10:00 am)
 - Three volunteer roles per slot — General, Class Rep, Committee (fully configurable)
 - Role-based slot limits — each role has its own quota
 - Roles with zero quota are hidden automatically
@@ -21,12 +22,12 @@ A free, open-source volunteer signup app built on Google Apps Script and Google 
 - Notes shown in the modal when clicking a slot
 - Slot limits enforced server-side with race condition protection
 - Duplicate name prevention per slot
-- Subtitle shown per activity column (e.g. responsible person)
-- Notes/description column per time slot
+- Subtitle and location shown for each activity/card (e.g. responsible person and room)
+- Notes/description shown per time slot and card
 - Hint text shown on slots with existing signups
 - Page title driven dynamically by the Google Sheet name
 - Multiple events supported via a URL parameter — no redeployment needed
-- Works on mobile — signup and cancellation via clean modal popup
+- Works on mobile — display preference is remembered, with signup and cancellation via a clean modal popup
 - Fully Unicode-compatible — supports any language
 - Data stored in Google Sheets — easy to view and manage
 - Free to run — no hosting costs beyond a Google account
@@ -266,13 +267,13 @@ Users can cancel their own signup from the app:
 | Column | Field          | Description                                                             |
 | ------ | -------------- | ----------------------------------------------------------------------- |
 | A      | EventID        | Unique number per row (e.g. 1, 2, 3)                                    |
-| B      | Activity       | Activity name — shown as grid column header                             |
-| C      | SubTitle       | Subtitle shown below the column title — shown below the activity name    |
+| B      | Activity       | Activity name — shown as desktop grid header and mobile card title       |
+| C      | SubTitle       | Subtitle shown below the activity name where space allows                |
 | D      | Date           | Date in YYYY-MM-DD format                                               |
 | E      | StartTime      | Start time in HH:MM format (e.g. 09:00)                                 |
 | F      | EndTime        | End time in HH:MM format (e.g. 10:00)                                   |
-| G      | Description    | Short notes shown in the grid                                           |
-| H      | Location       | Room or location name                                                   |
+| G      | Description    | Short notes shown in the grid, mobile cards, and modal                  |
+| H      | Location       | Room or location name shown in headers/cards and the modal               |
 | I      | GeneralSlots   | Max General volunteer spots (0 = not needed)                            |
 | J      | ClassRepSlots  | Max Class Rep spots (0 = not needed)                                    |
 | K      | CommitteeSlots | Max Committee spots (0 = not needed)                                    |
@@ -387,7 +388,7 @@ npm run deploy
 ```
 signup-app/
 ├── Code.gs          # Backend — reads/writes Google Sheets, serves web app (no secrets hardcoded)
-├── index.html       # Frontend — grid view, modal signup and cancellation form
+├── index.html       # Frontend — desktop grid, mobile cards, modal signup and cancellation form
 ├── appsscript.json  # Apps Script configuration
 ├── .claspignore     # Excludes local test/dev files from Apps Script deployments
 ├── test/            # Unit tests for backend and frontend logic
@@ -421,7 +422,7 @@ Current test coverage includes:
 
 - `Code.gs` backend logic such as config loading, signup/cancellation flows, rate limiting, sanitisation, and normalization
 - Shared normalization behavior for names, classes, digits, and class separators
-- `index.html` client-side utility and state logic such as event indexing, layout decisions, message rendering, and client normalization
+- `index.html` client-side utility and state logic such as event indexing, layout decisions, mobile display mode, message rendering, and client normalization
 
 Testing strategy:
 

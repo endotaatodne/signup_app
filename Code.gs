@@ -2,7 +2,7 @@
  * @fileoverview Signup App - Google Apps Script backend.
  * Serves the web app and handles all interactions with Google Sheets.
  * @author endotaatodne
- * @version 0.1.9
+ * @version 0.2.0
  */
 
 const MASTER_SHEET_ID =
@@ -535,9 +535,10 @@ function cancelSignup(eventId, name, cls, role, alias) {
 function checkRateLimit(eventId, name, cls, action, scope) {
   const cache = CacheService.getScriptCache();
   const actionKey = action === "cancel" ? "cancel" : "signup";
-  const scopeKey = String(scope || "default")
-    .replace(/[\s\u3000]+/g, "")
-    .substring(0, 80) || "default";
+  const scopeKey =
+    String(scope || "default")
+      .replace(/[\s\u3000]+/g, "")
+      .substring(0, 80) || "default";
   const namePart = normaliseCompact(name).substring(0, 3);
   const clsPart = normaliseCompact(cls).substring(0, 3);
   const key =
