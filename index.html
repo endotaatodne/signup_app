@@ -1525,7 +1525,7 @@
       var resizeTimer = null;
       var lastCompactLayout = null;
       var MOBILE_DISPLAY_MODE_STORAGE_KEY = "signupApp.mobileDisplayMode";
-      var DEFAULT_MOBILE_DISPLAY_MODE = "activity";
+      var DEFAULT_MOBILE_DISPLAY_MODE = "time";
 
       var ROLE_KEYS = [
         {
@@ -1576,7 +1576,8 @@
       }
 
       function normaliseMobileDisplayMode(mode) {
-        return mode === "time" ? "time" : DEFAULT_MOBILE_DISPLAY_MODE;
+        if (mode === "time" || mode === "activity") return mode;
+        return DEFAULT_MOBILE_DISPLAY_MODE;
       }
 
       function getStoredMobileDisplayMode() {

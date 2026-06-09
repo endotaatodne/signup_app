@@ -598,6 +598,7 @@ test("buildMobileAgenda groups mobile signup names by role", () => {
   });
 
   client.buildGridIndexes();
+  client.setMobileDisplayMode("activity");
   client.buildMobileAgenda();
 
   const firstSection = mobileNode.children[0];
@@ -683,6 +684,7 @@ test("buildMobileAgenda groups mobile cards by activity and sorts each group by 
   });
 
   client.buildGridIndexes();
+  client.setMobileDisplayMode("activity");
   client.buildMobileAgenda();
 
   function getTitleWrap(card) {
@@ -719,7 +721,7 @@ test("mobile display mode restores saved preference and updates the control", ()
   const activityBtn = createElement("button");
   const timeBtn = createElement("button");
   const storage = createLocalStorage({
-    "signupApp.mobileDisplayMode": "time",
+    "signupApp.mobileDisplayMode": "activity",
   });
 
   const { exports: client } = loadClient({
@@ -729,6 +731,27 @@ test("mobile display mode restores saved preference and updates the control", ()
     },
     windowOverrides: {
       localStorage: storage,
+    },
+  });
+
+  assert.equal(client.getMobileDisplayMode(), "activity");
+  assert.equal(activityBtn.getAttribute("aria-pressed"), "true");
+  assert.equal(timeBtn.getAttribute("aria-pressed"), "false");
+  assert.equal(activityBtn.classList.has("active"), true);
+  assert.equal(timeBtn.classList.has("active"), false);
+});
+
+test("mobile display mode defaults to time when no preference is saved", () => {
+  const activityBtn = createElement("button");
+  const timeBtn = createElement("button");
+
+  const { exports: client } = loadClient({
+    elements: {
+      mobileDisplayModeActivity: activityBtn,
+      mobileDisplayModeTime: timeBtn,
+    },
+    windowOverrides: {
+      localStorage: createLocalStorage(),
     },
   });
 
@@ -743,7 +766,9 @@ test("buildMobileAgenda can group mobile cards by time with headings", () => {
   const mobileNode = createElement("div");
   mobileNode.className = "mobile-agenda";
   mobileNode.style = {};
-  const storage = createLocalStorage();
+  const storage = createLocalStorage({
+    "signupApp.mobileDisplayMode": "activity",
+  });
 
   const { exports: client } = loadClient({
     gridData: {
