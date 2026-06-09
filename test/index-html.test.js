@@ -99,6 +99,20 @@ function createDocument(elements = {}) {
   };
 }
 
+function createLocalStorage(initialValues = {}) {
+  const values = { ...initialValues };
+  return {
+    getItem(key) {
+      return Object.prototype.hasOwnProperty.call(values, key)
+        ? values[key]
+        : null;
+    },
+    setItem(key, value) {
+      values[key] = String(value);
+    },
+  };
+}
+
 function loadClient(options = {}) {
   const {
     gridData = {
@@ -192,6 +206,9 @@ function loadClient(options = {}) {
       "buildGridIndexes",
       "getEventById",
       "getRoleMetaByLabel",
+      "getMobileDisplayMode",
+      "setMobileDisplayMode",
+      "updateMobileDisplayModeControl",
       "getEffectiveWidth",
       "isCompactLayout",
       "hasAnyAvailable",
@@ -210,6 +227,8 @@ function loadClient(options = {}) {
       "submitSignup",
       "buildGrid",
       "buildMobileAgenda",
+      "buildMobileAgendaByActivity",
+      "buildMobileAgendaByTime",
       "renderResponsiveView",
     ],
     {
@@ -552,6 +571,7 @@ test("buildGrid renders desktop header text with CSS classes", () => {
   const firstActivityHeader = headerRow.children[2];
   const title = firstActivityHeader.children[0];
   const subtitle = firstActivityHeader.children[1];
+  const location = firstActivityHeader.children[2];
 
   assert.equal(title.className, "activity-title");
   assert.equal(title.textContent, "Hall Monitor");
@@ -560,6 +580,12 @@ test("buildGrid renders desktop header text with CSS classes", () => {
   assert.equal(subtitle.className, "activity-subtitle");
   assert.equal(subtitle.textContent, "Morning");
   assert.equal(subtitle.style.cssText, "font-weight:400;color:#888;margin-top:2px;");
+  assert.equal(location.className, "activity-location");
+  assert.equal(location.textContent, "Gym");
+  assert.equal(
+    location.style.cssText,
+    "font-weight:400;color:#999;margin-top:3px;font-size:0.88em;",
+  );
 });
 
 test("buildMobileAgenda groups mobile signup names by role", () => {
@@ -687,6 +713,122 @@ test("buildMobileAgenda groups mobile cards by activity and sorts each group by 
     getTitleWrap(firstGamesCard).children[0].textContent,
     "Games",
   );
+});
+
+test("mobile display mode restores saved preference and updates the control", () => {
+  const activityBtn = createElement("button");
+  const timeBtn = createElement("button");
+  const storage = createLocalStorage({
+    "signupApp.mobileDisplayMode": "time",
+  });
+
+  const { exports: client } = loadClient({
+    elements: {
+      mobileDisplayModeActivity: activityBtn,
+      mobileDisplayModeTime: timeBtn,
+    },
+    windowOverrides: {
+      localStorage: storage,
+    },
+  });
+
+  assert.equal(client.getMobileDisplayMode(), "time");
+  assert.equal(activityBtn.getAttribute("aria-pressed"), "false");
+  assert.equal(timeBtn.getAttribute("aria-pressed"), "true");
+  assert.equal(activityBtn.classList.has("active"), false);
+  assert.equal(timeBtn.classList.has("active"), true);
+});
+
+test("buildMobileAgenda can group mobile cards by time with headings", () => {
+  const mobileNode = createElement("div");
+  mobileNode.className = "mobile-agenda";
+  mobileNode.style = {};
+  const storage = createLocalStorage();
+
+  const { exports: client } = loadClient({
+    gridData: {
+      activities: ["Bake Sale", "Games"],
+      times: ["09:30", "10:00"],
+      events: [
+        {
+          eventId: 2,
+          activity: "Games",
+          subtitle: "",
+          startTime: "09:30",
+          endTime: "10:00",
+          location: "Oval",
+          description: "",
+          slots: {
+            general: { max: 1, filled: 0 },
+            classRep: { max: 0, filled: 0 },
+            committee: { max: 0, filled: 0 },
+          },
+          signups: [],
+        },
+        {
+          eventId: 1,
+          activity: "Bake Sale",
+          subtitle: "",
+          startTime: "09:30",
+          endTime: "10:00",
+          location: "Hall",
+          description: "",
+          slots: {
+            general: { max: 1, filled: 0 },
+            classRep: { max: 0, filled: 0 },
+            committee: { max: 0, filled: 0 },
+          },
+          signups: [],
+        },
+        {
+          eventId: 3,
+          activity: "Bake Sale",
+          subtitle: "",
+          startTime: "10:00",
+          endTime: "10:30",
+          location: "Hall",
+          description: "",
+          slots: {
+            general: { max: 1, filled: 0 },
+            classRep: { max: 0, filled: 0 },
+            committee: { max: 0, filled: 0 },
+          },
+          signups: [],
+        },
+      ],
+    },
+    elements: {
+      mobileAgenda: mobileNode,
+    },
+    windowOverrides: {
+      innerWidth: 800,
+      screen: { width: 820 },
+      visualViewport: { width: 790 },
+      localStorage: storage,
+    },
+  });
+
+  client.buildGridIndexes();
+  client.setMobileDisplayMode("time");
+
+  function getTitleWrap(card) {
+    return card.children[0].children[0];
+  }
+
+  const firstTimeSection = mobileNode.children[0];
+  const secondTimeSection = mobileNode.children[1];
+  const firstCard = firstTimeSection.children[1];
+  const secondCard = firstTimeSection.children[2];
+
+  assert.equal(storage.getItem("signupApp.mobileDisplayMode"), "time");
+  assert.equal(mobileNode.className, "mobile-agenda mobile-display-by-time");
+  assert.equal(mobileNode.children.length, 2);
+  assert.equal(firstTimeSection.children[0].className, "mobile-time-heading");
+  assert.equal(firstTimeSection.children[0].textContent, "9:30 am - 10:00 am");
+  assert.equal(getTitleWrap(firstCard).children[0].textContent, "Bake Sale");
+  assert.equal(getTitleWrap(firstCard).children[1].className, "mobile-slot-meta");
+  assert.equal(getTitleWrap(secondCard).children[0].textContent, "Games");
+  assert.equal(secondTimeSection.children[0].textContent, "10:00 am - 10:30 am");
 });
 
 test("renderResponsiveView toggles layout classes and target visibility", () => {

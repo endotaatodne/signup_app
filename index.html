@@ -736,6 +736,39 @@
         margin-bottom: 16px;
       }
 
+      .mobile-display-mode-control {
+        display: none;
+      }
+
+      body.compact-layout .mobile-display-mode-control {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 4px;
+        margin: -4px 14px 18px;
+        padding: 4px;
+        background: #e7e1d8;
+        border: 1px solid #ddd5cb;
+        border-radius: 10px;
+      }
+
+      .mobile-display-mode-btn {
+        min-height: 44px;
+        padding: 9px 10px;
+        border: 0;
+        border-radius: 7px;
+        background: transparent;
+        color: #69635d;
+        cursor: pointer;
+        font-size: 16px;
+        font-weight: 700;
+      }
+
+      .mobile-display-mode-btn.active {
+        background: #ffffff;
+        color: #25211e;
+        box-shadow: 0 2px 8px rgba(26, 26, 24, 0.1);
+      }
+
       body.compact-layout #desktopGridWrapper {
         display: none !important;
       }
@@ -1280,6 +1313,16 @@
         line-height: 1.3;
       }
 
+      body.compact-layout .mobile-agenda.mobile-display-by-time
+        .mobile-time-heading {
+        display: block;
+        margin: 0 2px 12px;
+        color: #37312b;
+        font-size: 26px;
+        font-weight: 800;
+        line-height: 1.25;
+      }
+
       body.compact-layout .mobile-slot-desc {
         font-weight: 700;
       }
@@ -1328,6 +1371,30 @@
   </head>
   <body>
     <h1 id="pageTitle"></h1>
+    <div
+      id="mobileDisplayModeControl"
+      class="mobile-display-mode-control"
+      aria-label="Mobile display mode"
+    >
+      <button
+        id="mobileDisplayModeTime"
+        class="mobile-display-mode-btn"
+        type="button"
+        data-mobile-display-mode="time"
+        aria-pressed="false"
+      >
+        時間でまとめる
+      </button>
+      <button
+        id="mobileDisplayModeActivity"
+        class="mobile-display-mode-btn"
+        type="button"
+        data-mobile-display-mode="activity"
+        aria-pressed="false"
+      >
+        グループでまとめる
+      </button>
+    </div>
     <div class="grid-wrapper" id="desktopGridWrapper">
       <table id="grid"></table>
     </div>
@@ -1457,6 +1524,8 @@
       var currentRole = null;
       var resizeTimer = null;
       var lastCompactLayout = null;
+      var MOBILE_DISPLAY_MODE_STORAGE_KEY = "signupApp.mobileDisplayMode";
+      var DEFAULT_MOBILE_DISPLAY_MODE = "activity";
 
       var ROLE_KEYS = [
         {
@@ -1493,6 +1562,7 @@
         return acc;
       }, {});
       var gridIndexes = null;
+      var mobileDisplayMode = getStoredMobileDisplayMode();
 
       function getEventLookupKey(activity, startTime) {
         return activity + "\u0000" + startTime;
@@ -1503,6 +1573,67 @@
         var activityIndex = activities.indexOf(activity);
         if (activityIndex < 0) activityIndex = 0;
         return "activity-accent-" + (activityIndex % 6);
+      }
+
+      function normaliseMobileDisplayMode(mode) {
+        return mode === "time" ? "time" : DEFAULT_MOBILE_DISPLAY_MODE;
+      }
+
+      function getStoredMobileDisplayMode() {
+        try {
+          if (window.localStorage) {
+            return normaliseMobileDisplayMode(
+              window.localStorage.getItem(MOBILE_DISPLAY_MODE_STORAGE_KEY),
+            );
+          }
+        } catch (e) {}
+        return DEFAULT_MOBILE_DISPLAY_MODE;
+      }
+
+      function saveMobileDisplayMode(mode) {
+        try {
+          if (window.localStorage) {
+            window.localStorage.setItem(
+              MOBILE_DISPLAY_MODE_STORAGE_KEY,
+              normaliseMobileDisplayMode(mode),
+            );
+          }
+        } catch (e) {}
+      }
+
+      function getMobileDisplayMode() {
+        return normaliseMobileDisplayMode(mobileDisplayMode);
+      }
+
+      function updateMobileDisplayModeControl() {
+        var activeMode = getMobileDisplayMode();
+        [
+          { id: "mobileDisplayModeActivity", mode: "activity" },
+          { id: "mobileDisplayModeTime", mode: "time" },
+        ].forEach(function (item) {
+          var btn = document.getElementById(item.id);
+          if (!btn) return;
+          var active = item.mode === activeMode;
+          if (btn.classList && btn.classList.toggle) {
+            btn.classList.toggle("active", active);
+          }
+          btn.setAttribute("aria-pressed", active ? "true" : "false");
+        });
+      }
+
+      function setMobileDisplayMode(mode) {
+        var nextMode = normaliseMobileDisplayMode(mode);
+        if (mobileDisplayMode === nextMode) {
+          updateMobileDisplayModeControl();
+          return;
+        }
+
+        mobileDisplayMode = nextMode;
+        saveMobileDisplayMode(nextMode);
+        updateMobileDisplayModeControl();
+        if (isCompactLayout()) {
+          buildMobileAgenda();
+        }
       }
 
       function fitDesktopRolePillText() {
@@ -1714,6 +1845,14 @@
             personDiv.textContent = event.subtitle;
             th.appendChild(personDiv);
           }
+          if (event && event.location) {
+            var locationDiv = document.createElement("div");
+            locationDiv.className = "activity-location";
+            locationDiv.style.cssText =
+              "font-weight:400;color:#999;margin-top:3px;font-size:0.88em;";
+            locationDiv.textContent = event.location;
+            th.appendChild(locationDiv);
+          }
           headerRow.appendChild(th);
         });
         thead.appendChild(headerRow);
@@ -1832,7 +1971,7 @@
         fitDesktopRolePillText();
       }
 
-      function buildMobileAgenda() {
+      function buildMobileAgendaByActivity() {
         if (!gridData || !gridData.events) {
           setTimeout(buildMobileAgenda, 200);
           return;
@@ -1843,6 +1982,7 @@
           return;
         }
 
+        setMobileAgendaModeClass(container, "activity");
         var activities = gridData.activities || [];
         while (container.firstChild) {
           container.removeChild(container.firstChild);
@@ -1960,6 +2100,205 @@
 
           container.appendChild(section);
         });
+      }
+
+      function setMobileAgendaModeClass(container, mode) {
+        var baseClass = String(container.className || "")
+          .replace(/\bmobile-display-by-(activity|time)\b/g, "")
+          .replace(/\s+/g, " ")
+          .trim();
+        container.className = (
+          baseClass +
+          " mobile-display-by-" +
+          normaliseMobileDisplayMode(mode)
+        ).trim();
+      }
+
+      function compareEventsByActivityOrder(a, b) {
+        var activities = (gridData && gridData.activities) || [];
+        var indexA = activities.indexOf(a.activity);
+        var indexB = activities.indexOf(b.activity);
+        if (indexA < 0) indexA = activities.length;
+        if (indexB < 0) indexB = activities.length;
+        if (indexA !== indexB) return indexA - indexB;
+        return compareEventsByTime(a, b);
+      }
+
+      function eventsShareEndTime(events) {
+        if (!events || events.length < 2) return true;
+        var endTime = String(events[0].endTime || "");
+        return events.every(function (event) {
+          return String(event.endTime || "") === endTime;
+        });
+      }
+
+      function getMobileTimeHeadingText(time, events) {
+        var matchingEvents = events || [];
+        if (
+          matchingEvents.length > 0 &&
+          matchingEvents[0].endTime &&
+          eventsShareEndTime(matchingEvents)
+        ) {
+          return formatTimeRange(time, matchingEvents[0].endTime);
+        }
+        return formatTime(time);
+      }
+
+      function buildMobileSlotCard(event, options) {
+        options = options || {};
+        var showTime = options.showTime !== false;
+        var card = document.createElement("button");
+        card.className = "mobile-slot-card " + getActivityAccentClass(event.activity);
+        card.type = "button";
+        card.setAttribute("data-eventid", event.eventId);
+
+        var header = document.createElement("div");
+        header.className = "mobile-slot-header";
+
+        var titleWrap = document.createElement("div");
+
+        var title = document.createElement("div");
+        title.className = "mobile-slot-title";
+        title.textContent = event.activity;
+        titleWrap.appendChild(title);
+
+        if (showTime) {
+          var timeLine = document.createElement("div");
+          timeLine.className = "mobile-slot-time";
+          timeLine.textContent = event.endTime
+            ? formatTimeRange(event.startTime, event.endTime)
+            : formatTime(event.startTime);
+          titleWrap.appendChild(timeLine);
+        }
+
+        var meta = document.createElement("div");
+        meta.className = "mobile-slot-meta";
+        meta.textContent = event.location || "";
+        titleWrap.appendChild(meta);
+
+        if (event.subtitle && event.subtitle.trim() !== "") {
+          var subtitle = document.createElement("div");
+          subtitle.className = "mobile-slot-meta";
+          subtitle.textContent = event.subtitle;
+          titleWrap.appendChild(subtitle);
+        }
+
+        if (event.description && event.description.trim() !== "") {
+          var desc = document.createElement("div");
+          desc.className = "mobile-slot-desc";
+          desc.textContent = event.description;
+          titleWrap.appendChild(desc);
+        }
+
+        var badge = document.createElement("div");
+        badge.className = "mobile-slot-badge";
+        var available = hasAnyAvailable(event.slots);
+        badge.textContent = available ? "" : "Full";
+        if (!available) {
+          badge.classList.add("is-full");
+          card.classList.add("is-full");
+        }
+
+        header.appendChild(titleWrap);
+        header.appendChild(badge);
+        card.appendChild(header);
+
+        var summary = document.createElement("div");
+        summary.className = "mobile-slot-summary";
+        ROLE_KEYS.forEach(function (r) {
+          var s = event.slots[r.key];
+          if (s.max === 0) return;
+          var remaining = s.max - s.filled;
+          var item = document.createElement("span");
+          item.className =
+            "mobile-slot-summary-item role-" +
+            r.key.replace("classRep", "classrep");
+          if (remaining <= 0) item.classList.add("is-full");
+          item.textContent =
+            r.label + "\u00a0" + (remaining <= 0 ? "Full" : remaining + " left");
+          summary.appendChild(item);
+        });
+        card.appendChild(summary);
+
+        if (event.signups && event.signups.length > 0) {
+          var namesList = document.createElement("div");
+          namesList.className = "mobile-slot-names";
+          ROLE_KEYS.forEach(function (r) {
+            var roleSignups = event.signupsByRole[r.label] || [];
+            if (roleSignups.length === 0) return;
+            var group = document.createElement("div");
+            group.className = "mobile-slot-name-group";
+
+            var roleLabel = document.createElement("span");
+            roleLabel.className = "mobile-slot-role-label " + r.nameClass;
+            roleLabel.textContent = r.label + ":";
+            group.appendChild(roleLabel);
+
+            var namesSpan = document.createElement("span");
+            namesSpan.className = "mobile-slot-name-list " + r.nameClass;
+            namesSpan.textContent = roleSignups
+              .map(function (signup) {
+                return signup.name;
+              })
+              .join(", ");
+            group.appendChild(namesSpan);
+
+            namesList.appendChild(group);
+          });
+          card.appendChild(namesList);
+        }
+
+        return card;
+      }
+
+      function buildMobileAgendaByTime() {
+        if (!gridData || !gridData.events) {
+          setTimeout(buildMobileAgenda, 200);
+          return;
+        }
+        var container = getMobileAgenda();
+        if (!container) {
+          setTimeout(buildMobileAgenda, 200);
+          return;
+        }
+
+        setMobileAgendaModeClass(container, "time");
+        while (container.firstChild) {
+          container.removeChild(container.firstChild);
+        }
+
+        var times = gridData.times || [];
+        times.forEach(function (time) {
+          var matchingEvents = (gridIndexes.eventsByTime[time] || [])
+            .slice()
+            .sort(compareEventsByActivityOrder);
+          if (matchingEvents.length === 0) return;
+
+          var section = document.createElement("section");
+          section.className = "mobile-time-group";
+
+          var heading = document.createElement("h2");
+          heading.className = "mobile-time-heading";
+          heading.textContent = getMobileTimeHeadingText(time, matchingEvents);
+          section.appendChild(heading);
+
+          var showCardTimes = !eventsShareEndTime(matchingEvents);
+          matchingEvents.forEach(function (event) {
+            section.appendChild(
+              buildMobileSlotCard(event, { showTime: showCardTimes }),
+            );
+          });
+
+          container.appendChild(section);
+        });
+      }
+
+      function buildMobileAgenda() {
+        if (getMobileDisplayMode() === "time") {
+          buildMobileAgendaByTime();
+        } else {
+          buildMobileAgendaByActivity();
+        }
       }
 
       function renderResponsiveView() {
@@ -2660,8 +2999,19 @@
             openModal(slot.getAttribute("data-eventid"));
           }
         });
+      document
+        .getElementById("mobileDisplayModeControl")
+        .addEventListener("click", function (e) {
+          var btn =
+            e.target && e.target.closest
+              ? e.target.closest("[data-mobile-display-mode]")
+              : null;
+          if (!btn) return;
+          setMobileDisplayMode(btn.getAttribute("data-mobile-display-mode"));
+        });
 
       document.getElementById("pageTitle").textContent = PAGE_TITLE;
+      updateMobileDisplayModeControl();
 
       google.script.run
         .withSuccessHandler(function (url) {
