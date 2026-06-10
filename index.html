@@ -859,7 +859,7 @@
       }
 
       body.compact-layout .mobile-slot-summary-item {
-        /* TEXT_SIZE: [SIGN-UP CARD] Mobile slot summary items (e.g. "General 3 left", "Committee Full") */
+        /* TEXT_SIZE: [SIGN-UP CARD] Mobile slot summary items (e.g. "General 残り3枠", "Committee Full") */
         font-size: 23px;
         font-weight: 600;
       }
@@ -964,7 +964,7 @@
       }
 
       body.compact-layout .role-btn-count {
-        /* TEXT_SIZE: [POP-UP] Mobile role button count (e.g. "3 spots left", "Full") */
+        /* TEXT_SIZE: [POP-UP] Mobile role button count (e.g. "残り3枠", "Full") */
         font-size: 15px;
         font-weight: 500;
         margin-top: 0;
@@ -1804,6 +1804,10 @@
         });
       }
 
+      function formatRemainingSlots(remaining) {
+        return "残り" + remaining + "枠";
+      }
+
       function buildGrid() {
         if (!gridData || !gridData.events) {
           setTimeout(buildGrid, 200);
@@ -1920,7 +1924,7 @@
                     roleRow.classList.add("is-full");
                   }
                   roleCount.textContent =
-                    remaining <= 0 ? "Full" : remaining + " left";
+                    remaining <= 0 ? "Full" : formatRemainingSlots(remaining);
                   roleRow.appendChild(roleLabel);
                   roleRow.appendChild(roleCount);
                   slotDiv.appendChild(roleRow);
@@ -2067,7 +2071,9 @@
                 r.key.replace("classRep", "classrep");
               if (remaining <= 0) item.classList.add("is-full");
               item.textContent =
-                r.label + " " + (remaining <= 0 ? "Full" : remaining + " left");
+                r.label +
+                " " +
+                (remaining <= 0 ? "Full" : formatRemainingSlots(remaining));
               summary.appendChild(item);
             });
             card.appendChild(summary);
@@ -2219,7 +2225,9 @@
             r.key.replace("classRep", "classrep");
           if (remaining <= 0) item.classList.add("is-full");
           item.textContent =
-            r.label + "\u00a0" + (remaining <= 0 ? "Full" : remaining + " left");
+            r.label +
+            "\u00a0" +
+            (remaining <= 0 ? "Full" : formatRemainingSlots(remaining));
           summary.appendChild(item);
         });
         card.appendChild(summary);
@@ -2512,7 +2520,7 @@
           countDiv.className = "role-btn-count";
           countDiv.textContent = isFull
             ? "Full"
-            : remaining + " spot" + (remaining > 1 ? "s" : "") + " left";
+            : formatRemainingSlots(remaining);
           btn.appendChild(labelDiv);
           btn.appendChild(countDiv);
           roleButtons.appendChild(btn);
