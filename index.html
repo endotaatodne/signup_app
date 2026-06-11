@@ -1326,6 +1326,12 @@
         line-height: 1.25;
       }
 
+      body.compact-layout .mobile-agenda.mobile-display-by-time
+        .mobile-slot-time {
+        color: #4b5563;
+        font-weight: 600;
+      }
+
       body.compact-layout .mobile-slot-desc {
         font-weight: 700;
       }
@@ -2294,11 +2300,8 @@
           heading.textContent = getMobileTimeHeadingText(time, matchingEvents);
           section.appendChild(heading);
 
-          var showCardTimes = !eventsShareEndTime(matchingEvents);
           matchingEvents.forEach(function (event) {
-            section.appendChild(
-              buildMobileSlotCard(event, { showTime: showCardTimes }),
-            );
+            section.appendChild(buildMobileSlotCard(event));
           });
 
           container.appendChild(section);
