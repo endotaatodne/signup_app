@@ -2301,7 +2301,7 @@
           section.appendChild(heading);
 
           matchingEvents.forEach(function (event) {
-            section.appendChild(buildMobileSlotCard(event));
+            section.appendChild(buildMobileSlotCard(event, { showTime: false }));
           });
 
           container.appendChild(section);

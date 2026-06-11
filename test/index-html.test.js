@@ -250,6 +250,18 @@ test("b64decode restores UTF-8 text", () => {
   assert.equal(client.b64decode(encoded), "こんにちは");
 });
 
+test("server template data is injected only as quoted base64 values", () => {
+  const htmlSource = fs.readFileSync(
+    path.resolve(__dirname, "..", "index.html"),
+    "utf8",
+  );
+
+  assert.match(htmlSource, /JSON\.parse\(b64decode\("<\?!= gridData \?>"\)\)/);
+  assert.match(htmlSource, /var alias = b64decode\("<\?!= alias \?>"\);/);
+  assert.match(htmlSource, /JSON\.parse\(b64decode\("<\?!= roles \?>"\)\)/);
+  assert.match(htmlSource, /var PAGE_TITLE = b64decode\("<\?!= title \?>"\);/);
+});
+
 test("buildGridIndexes creates lookups and groups signups by role", () => {
   const { exports: client, context } = loadClient();
 
@@ -852,6 +864,7 @@ test("buildMobileAgenda can group mobile cards by time with headings", () => {
   assert.equal(firstTimeSection.children[0].textContent, "9:30 am - 10:00 am");
   assert.equal(getTitleWrap(firstCard).children[0].textContent, "Bake Sale");
   assert.equal(getTitleWrap(firstCard).children[1].className, "mobile-slot-meta");
+  assert.notEqual(getTitleWrap(firstCard).children[1].className, "mobile-slot-time");
   assert.equal(getTitleWrap(secondCard).children[0].textContent, "Games");
   assert.equal(secondTimeSection.children[0].textContent, "10:00 am - 10:30 am");
 });
