@@ -128,8 +128,8 @@ clasp login
 ### Step 6 — Clone This Repo
 
 ```bash
-git clone https://github.com/YOURUSERNAME/signup-app.git
-cd signup-app
+git clone https://github.com/endotaatodne/signup_app.git
+cd signup_app
 ```
 
 ### Step 7 — Create an Apps Script Project
@@ -264,19 +264,19 @@ Users can cancel their own signup from the app:
 
 ## Events Tab Column Reference
 
-| Column | Field          | Description                                                             |
-| ------ | -------------- | ----------------------------------------------------------------------- |
-| A      | EventID        | Unique number per row (e.g. 1, 2, 3)                                    |
-| B      | Activity       | Activity name — shown as desktop grid header and mobile card title       |
-| C      | SubTitle       | Subtitle shown below the activity name where space allows                |
-| D      | Date           | Date in YYYY-MM-DD format                                               |
-| E      | StartTime      | Start time in HH:MM format (e.g. 09:00)                                 |
-| F      | EndTime        | End time in HH:MM format (e.g. 10:00)                                   |
-| G      | Description    | Short notes shown in the grid, mobile cards, and modal                  |
-| H      | Location       | Room or location name shown in headers/cards and the modal               |
-| I      | GeneralSlots   | Max General volunteer spots (0 = not needed)                            |
-| J      | ClassRepSlots  | Max Class Rep spots (0 = not needed)                                    |
-| K      | CommitteeSlots | Max Committee spots (0 = not needed)                                    |
+| Column | Field          | Description                                                        |
+| ------ | -------------- | ------------------------------------------------------------------ |
+| A      | EventID        | Unique number per row (e.g. 1, 2, 3)                               |
+| B      | Activity       | Activity name — shown as desktop grid header and mobile card title |
+| C      | SubTitle       | Subtitle shown below the activity name where space allows          |
+| D      | Date           | Date in YYYY-MM-DD format                                          |
+| E      | StartTime      | Start time in HH:MM format (e.g. 09:00)                            |
+| F      | EndTime        | End time in HH:MM format (e.g. 10:00)                              |
+| G      | Description    | Short notes shown in the grid, mobile cards, and modal             |
+| H      | Location       | Room or location name shown in headers/cards and the modal         |
+| I      | GeneralSlots   | Max General volunteer spots (0 = not needed)                       |
+| J      | ClassRepSlots  | Max Class Rep spots (0 = not needed)                               |
+| K      | CommitteeSlots | Max Committee spots (0 = not needed)                               |
 
 ---
 
@@ -386,7 +386,7 @@ npm run deploy
 ## Project Structure
 
 ```
-signup-app/
+signup_app/
 ├── Code.gs          # Backend — reads/writes Google Sheets, serves web app (no secrets hardcoded)
 ├── index.html       # Frontend — desktop grid, mobile cards, modal signup and cancellation form
 ├── appsscript.json  # Apps Script configuration
@@ -395,6 +395,8 @@ signup-app/
 ├── test-support/    # Test harnesses and Apps Script/browser mocks
 ├── package.json     # Local test commands
 ├── CHANGELOG.md     # Version history
+├── README.md        # Documentation index
+├── README.ja.md     # Japanese README
 └── README.en.md     # This file
 ```
 
