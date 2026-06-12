@@ -1,5 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 
 const { loadCodeGs } = require("../test-support/load-codegs");
 const {
@@ -90,20 +92,20 @@ function loadBackend(options = {}) {
     [
       "ROLES",
       "doGet",
-      "getGridData",
+      "getGridData_",
       "getGridDataForAlias",
       "submitSignup",
       "cancelSignup",
-      "checkRateLimit",
-      "getEventConfig",
-      "sanitiseForScript",
-      "getCanonicalRole",
-      "normaliseWhitespace",
-      "normaliseAsciiDigits",
-      "normaliseClassValue",
-      "normaliseComparable",
-      "normaliseClassComparable",
-      "normaliseCompact",
+      "checkRateLimit_",
+      "getEventConfig_",
+      "sanitiseForScript_",
+      "getCanonicalRole_",
+      "normaliseWhitespace_",
+      "normaliseAsciiDigits_",
+      "normaliseClassValue_",
+      "normaliseComparable_",
+      "normaliseClassComparable_",
+      "normaliseCompact_",
       "getDeployedUrl",
     ],
     mockEnv.globals,
@@ -117,25 +119,41 @@ function loadBackend(options = {}) {
   };
 }
 
-test("getEventConfig normalises aliases and filters invalid sheet IDs", () => {
+test("only intended backend entry points are browser-callable", () => {
+  const source = fs.readFileSync(path.resolve(__dirname, "..", "Code.gs"), "utf8");
+  const publicFunctions = [...source.matchAll(/^function\s+([A-Za-z0-9_]+)\s*\(/gm)]
+    .map((match) => match[1])
+    .filter((name) => !name.endsWith("_"))
+    .sort();
+
+  assert.deepEqual(publicFunctions, [
+    "cancelSignup",
+    "doGet",
+    "getDeployedUrl",
+    "getGridDataForAlias",
+    "submitSignup",
+  ]);
+});
+
+test("getEventConfig_ normalises aliases and filters invalid sheet IDs", () => {
   const { app } = loadBackend();
-  const config = Object.fromEntries(Object.entries(app.getEventConfig()));
+  const config = Object.fromEntries(Object.entries(app.getEventConfig_()));
 
   assert.deepEqual(config, {
     "spring-fete": EVENT_SHEET_ID,
   });
 });
 
-test("sanitiseForScript escapes script-sensitive characters", () => {
+test("sanitiseForScript_ escapes script-sensitive characters", () => {
   const { app } = loadBackend();
 
   assert.equal(
-    app.sanitiseForScript(`<&>"'/\``),
+    app.sanitiseForScript_(`<&>"'/\``),
     "\\u003c\\u0026\\u003e\\u0022\\u0027\\u002f\\u0060",
   );
 });
 
-test("getGridData uses display values for class text and computes role counts", () => {
+test("getGridData_ uses display values for class text and computes role counts", () => {
   const signupRows = [
     ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
     ["s1", 1, "Alice", new Date("2026-04-01T00:00:00Z"), "一般保護者", new Date()],
@@ -148,7 +166,7 @@ test("getGridData uses display values for class text and computes role counts", 
   ];
   const { app, spreadsheets } = loadBackend({ signupRows, signupDisplayRows });
 
-  const gridData = app.getGridData(spreadsheets[EVENT_SHEET_ID]);
+  const gridData = app.getGridData_(spreadsheets[EVENT_SHEET_ID]);
   const event = gridData.events[0];
 
   assert.equal(event.date, "20 Apr 2026");
@@ -204,70 +222,70 @@ test("getGridDataForAlias rejects invalid aliases safely", () => {
   assert.ok(!("gridData" in result));
 });
 
-test("checkRateLimit limits repeated person submissions and global event flooding", () => {
+test("checkRateLimit_ limits repeated person submissions and global event flooding", () => {
   const { app } = loadBackend({ cacheStore: new Map() });
 
-  assert.equal(app.checkRateLimit(1, "Alice", "1-1"), true);
-  assert.equal(app.checkRateLimit(1, "Alice", "1-1"), true);
-  assert.equal(app.checkRateLimit(1, "Alice", "1-1"), true);
-  assert.equal(app.checkRateLimit(1, "Alice", "1-1"), false);
+  assert.equal(app.checkRateLimit_(1, "Alice", "1-1"), true);
+  assert.equal(app.checkRateLimit_(1, "Alice", "1-1"), true);
+  assert.equal(app.checkRateLimit_(1, "Alice", "1-1"), true);
+  assert.equal(app.checkRateLimit_(1, "Alice", "1-1"), false);
 
   const { app: eventFloodApp } = loadBackend({ cacheStore: new Map() });
   for (let i = 0; i < 20; i += 1) {
-    assert.equal(eventFloodApp.checkRateLimit(1, `User${i}`, `${i}`), true);
+    assert.equal(eventFloodApp.checkRateLimit_(1, `User${i}`, `${i}`), true);
   }
-  assert.equal(eventFloodApp.checkRateLimit(1, "Overflow", "9"), false);
+  assert.equal(eventFloodApp.checkRateLimit_(1, "Overflow", "9"), false);
 });
 
-test("checkRateLimit keeps signup and cancel buckets isolated", () => {
+test("checkRateLimit_ keeps signup and cancel buckets isolated", () => {
   const cacheStore = new Map();
   const { app } = loadBackend({ cacheStore });
 
-  assert.equal(app.checkRateLimit(1, "Alice", "1-1", "signup"), true);
-  assert.equal(app.checkRateLimit(1, "Alice", "1-1", "signup"), true);
-  assert.equal(app.checkRateLimit(1, "Alice", "1-1", "signup"), true);
-  assert.equal(app.checkRateLimit(1, "Alice", "1-1", "signup"), false);
+  assert.equal(app.checkRateLimit_(1, "Alice", "1-1", "signup"), true);
+  assert.equal(app.checkRateLimit_(1, "Alice", "1-1", "signup"), true);
+  assert.equal(app.checkRateLimit_(1, "Alice", "1-1", "signup"), true);
+  assert.equal(app.checkRateLimit_(1, "Alice", "1-1", "signup"), false);
 
-  assert.equal(app.checkRateLimit(1, "Alice", "1-1", "cancel"), true);
-  assert.equal(app.checkRateLimit(1, "Alice", "1-1", "cancel"), true);
-  assert.equal(app.checkRateLimit(1, "Alice", "1-1", "cancel"), true);
-  assert.equal(app.checkRateLimit(1, "Alice", "1-1", "cancel"), false);
+  assert.equal(app.checkRateLimit_(1, "Alice", "1-1", "cancel"), true);
+  assert.equal(app.checkRateLimit_(1, "Alice", "1-1", "cancel"), true);
+  assert.equal(app.checkRateLimit_(1, "Alice", "1-1", "cancel"), true);
+  assert.equal(app.checkRateLimit_(1, "Alice", "1-1", "cancel"), false);
 });
 
-test("checkRateLimit keeps event sheet scopes isolated", () => {
+test("checkRateLimit_ keeps event sheet scopes isolated", () => {
   const cacheStore = new Map();
   const { app } = loadBackend({ cacheStore });
 
-  assert.equal(app.checkRateLimit(1, "Alice", "1-1", "signup", "sheet-a"), true);
-  assert.equal(app.checkRateLimit(1, "Alice", "1-1", "signup", "sheet-a"), true);
-  assert.equal(app.checkRateLimit(1, "Alice", "1-1", "signup", "sheet-a"), true);
-  assert.equal(app.checkRateLimit(1, "Alice", "1-1", "signup", "sheet-a"), false);
-  assert.equal(app.checkRateLimit(1, "Alice", "1-1", "signup", "sheet-b"), true);
+  assert.equal(app.checkRateLimit_(1, "Alice", "1-1", "signup", "sheet-a"), true);
+  assert.equal(app.checkRateLimit_(1, "Alice", "1-1", "signup", "sheet-a"), true);
+  assert.equal(app.checkRateLimit_(1, "Alice", "1-1", "signup", "sheet-a"), true);
+  assert.equal(app.checkRateLimit_(1, "Alice", "1-1", "signup", "sheet-a"), false);
+  assert.equal(app.checkRateLimit_(1, "Alice", "1-1", "signup", "sheet-b"), true);
 
   const { app: eventFloodApp } = loadBackend({ cacheStore: new Map() });
   for (let i = 0; i < 20; i += 1) {
     assert.equal(
-      eventFloodApp.checkRateLimit(1, `User${i}`, `${i}`, "signup", "sheet-a"),
+      eventFloodApp.checkRateLimit_(1, `User${i}`, `${i}`, "signup", "sheet-a"),
       true,
     );
   }
   assert.equal(
-    eventFloodApp.checkRateLimit(1, "Overflow", "9", "signup", "sheet-a"),
+    eventFloodApp.checkRateLimit_(1, "Overflow", "9", "signup", "sheet-a"),
     false,
   );
   assert.equal(
-    eventFloodApp.checkRateLimit(1, "Overflow", "9", "signup", "sheet-b"),
+    eventFloodApp.checkRateLimit_(1, "Overflow", "9", "signup", "sheet-b"),
     true,
   );
 });
 
-test("checkRateLimit limits global event flooding for cancellation attempts", () => {
+test("checkRateLimit_ limits global event flooding for cancellation attempts", () => {
   const { app } = loadBackend({ cacheStore: new Map() });
 
   for (let i = 0; i < 20; i += 1) {
-    assert.equal(app.checkRateLimit(1, `User${i}`, `${i}`, "cancel"), true);
+    assert.equal(app.checkRateLimit_(1, `User${i}`, `${i}`, "cancel"), true);
   }
-  assert.equal(app.checkRateLimit(1, "Overflow", "9", "cancel"), false);
+  assert.equal(app.checkRateLimit_(1, "Overflow", "9", "cancel"), false);
 });
 
 test("submitSignup appends a normalised signup row on success", () => {
@@ -568,7 +586,7 @@ test("cancelSignup rate limits repeated lookup attempts", () => {
   assert.notEqual(attempts[3].message, attempts[0].message);
 });
 
-test("getGridData exposes only public signup fields and sanitised values", () => {
+test("getGridData_ exposes only public signup fields and sanitised values", () => {
   const { app, spreadsheets } = loadBackend();
   const signupRows = [
     ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
@@ -596,7 +614,7 @@ test("getGridData exposes only public signup fields and sanitised values", () =>
   spreadsheets[EVENT_SHEET_ID].getSheetByName("Signups").__state.displayValues =
     signupDisplayRows;
 
-  const event = app.getGridData(spreadsheets[EVENT_SHEET_ID]).events[0];
+  const event = app.getGridData_(spreadsheets[EVENT_SHEET_ID]).events[0];
   const signup = event.signups[0];
 
   assert.deepEqual(Object.keys(signup).sort(), ["cls", "name", "role"]);

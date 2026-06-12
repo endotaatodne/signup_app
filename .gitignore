@@ -1,7 +1,6 @@
 .clasprc.json
 .clasp.json
 node_modules/
-package-lock.json
 
 # Local environment and secrets
 .env

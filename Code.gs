@@ -2,7 +2,7 @@
  * @fileoverview Signup App - Google Apps Script backend.
  * Serves the web app and handles all interactions with Google Sheets.
  * @author endotaatodne
- * @version 0.1.9
+ * @version 0.2.0
  */
 
 const MASTER_SHEET_ID =
@@ -68,7 +68,7 @@ function doGet(e) {
       );
     }
 
-    const config = getEventConfig();
+    const config = getEventConfig_();
     const sheetId = config[alias.toLowerCase()];
 
     if (!sheetId) {
@@ -79,7 +79,7 @@ function doGet(e) {
 
     const spreadsheet = SpreadsheetApp.openById(sheetId);
     const title = spreadsheet.getName();
-    const gridData = JSON.stringify(getGridData(spreadsheet));
+    const gridData = JSON.stringify(getGridData_(spreadsheet));
 
     // Base64 encode all template data to prevent script injection
     const encodedGridData = Utilities.base64Encode(
@@ -114,8 +114,8 @@ function doGet(e) {
  * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} spreadsheet - The event spreadsheet
  * @returns {{events: Object[], times: string[], activities: string[]}}
  */
-function getGridData(spreadsheet) {
-  const data = getValidatedEventSpreadsheetData(spreadsheet);
+function getGridData_(spreadsheet) {
+  const data = getValidatedEventSpreadsheetData_(spreadsheet);
   const eventRows = data.eventRows;
   const signupRows = data.signupRows;
   const signupDisplayRows = data.signupDisplayRows;
@@ -126,11 +126,11 @@ function getGridData(spreadsheet) {
   signupRows.slice(1).forEach((row, index) => {
     const displayRow = signupDisplayRows[index + 1] || [];
     const eventId = row[1];
-    const name = sanitiseForScript(row[2]);
+    const name = sanitiseForScript_(row[2]);
     // Use the displayed sheet text for class so values like "1-1" are not
     // serialised as Date strings when Sheets auto-detects them internally.
-    const cls = sanitiseForScript(String(displayRow[3] || ""));
-    const role = sanitiseForScript(row[4]);
+    const cls = sanitiseForScript_(String(displayRow[3] || ""));
+    const role = sanitiseForScript_(row[4]);
     if (!signupsMap[eventId]) signupsMap[eventId] = [];
     if (!signupCountsMap[eventId]) {
       signupCountsMap[eventId] = {
@@ -155,8 +155,8 @@ function getGridData(spreadsheet) {
 
     return {
       eventId: eventId,
-      activity: sanitiseForScript(row[1]),
-      subtitle: sanitiseForScript(String(row[2])),
+      activity: sanitiseForScript_(row[1]),
+      subtitle: sanitiseForScript_(String(row[2])),
       date: Utilities.formatDate(
         new Date(row[3]),
         "Australia/Brisbane",
@@ -172,8 +172,8 @@ function getGridData(spreadsheet) {
         "Australia/Brisbane",
         "HH:mm",
       ),
-      description: sanitiseForScript(String(row[6])),
-      location: sanitiseForScript(String(row[7])),
+      description: sanitiseForScript_(String(row[6])),
+      location: sanitiseForScript_(String(row[7])),
       slots: {
         general: {
           max: generalMax,
@@ -205,18 +205,18 @@ function getGridData(spreadsheet) {
  */
 function getGridDataForAlias(alias) {
   try {
-    if (!isValidAlias(alias)) {
+    if (!isValidAlias_(alias)) {
       return { success: false, message: "不正なリクエストです。" };
     }
 
-    const config = getEventConfig();
+    const config = getEventConfig_();
     const sheetId = config[alias.toLowerCase()];
     if (!sheetId) {
       return { success: false, message: "不正なリクエストです。" };
     }
 
     const spreadsheet = SpreadsheetApp.openById(sheetId);
-    return { success: true, gridData: getGridData(spreadsheet) };
+    return { success: true, gridData: getGridData_(spreadsheet) };
   } catch (e) {
     console.error("getGridDataForAlias error: " + e.message);
     return {
@@ -252,47 +252,47 @@ function submitSignup(eventId, name, cls, role, alias) {
     }
 
     // Validate alias
-    if (!isValidAlias(alias)) {
+    if (!isValidAlias_(alias)) {
       return { success: false, message: "不正なリクエストです。" };
     }
 
     // Validate eventId as strict positive integer
-    const parsedEventId = parseRequestEventId(eventId);
+    const parsedEventId = parseRequestEventId_(eventId);
     if (parsedEventId === null) {
       return { success: false, message: "不正なリクエストです。" };
     }
     eventId = parsedEventId;
 
     // Derive sheetId server-side
-    const config = getEventConfig();
+    const config = getEventConfig_();
     const sheetId = config[alias.toLowerCase()];
     if (!sheetId) {
       return { success: false, message: "不正なリクエストです。" };
     }
 
     // Validate name
-    const nameValidation = validateNameInput(name);
+    const nameValidation = validateNameInput_(name);
     if (!nameValidation.ok) {
       return { success: false, message: nameValidation.message };
     }
     name = nameValidation.value;
 
     // Validate class
-    const classValidation = validateClassInput(cls);
+    const classValidation = validateClassInput_(cls);
     if (!classValidation.ok) {
       return { success: false, message: classValidation.message };
     }
     cls = classValidation.value;
 
     // Validate role against canonical values
-    const canonicalRole = getCanonicalRole(role);
+    const canonicalRole = getCanonicalRole_(role);
     if (!canonicalRole) {
       return { success: false, message: "ポジションを選択してください。" };
     }
 
     // Rate limiting — composite key prevents bypass by name variation,
     // global event cap prevents flood attacks
-    if (!checkRateLimit(eventId, name, cls, "signup", sheetId)) {
+    if (!checkRateLimit_(eventId, name, cls, "signup", sheetId)) {
       return {
         success: false,
         message: "使用回数を超過しました。少し待ってからお試しください。",
@@ -300,7 +300,7 @@ function submitSignup(eventId, name, cls, role, alias) {
     }
 
     const spreadsheet = SpreadsheetApp.openById(sheetId);
-    const data = getValidatedEventSpreadsheetData(spreadsheet);
+    const data = getValidatedEventSpreadsheetData_(spreadsheet);
     const eventRows = data.eventRows;
     const signupsSheet = data.signupsSheet;
     // Use loose equality intentionally because Sheets can surface EventID cells
@@ -345,9 +345,9 @@ function submitSignup(eventId, name, cls, role, alias) {
 
     // Normalise name for comparison — case insensitive, collapse regular
     // and full-width spaces (common in Japanese input)
-    const normalisedInput = normaliseComparable(name);
+    const normalisedInput = normaliseComparable_(name);
     const duplicate = existing.find(
-      (r) => normaliseComparable(r[2]) === normalisedInput,
+      (r) => normaliseComparable_(r[2]) === normalisedInput,
     );
     if (duplicate) {
       return {
@@ -412,44 +412,44 @@ function cancelSignup(eventId, name, cls, role, alias) {
     }
 
     // Validate alias
-    if (!isValidAlias(alias)) {
+    if (!isValidAlias_(alias)) {
       return { success: false, message: "不正なリクエストです。" };
     }
 
     // Validate eventId
-    const parsedEventId = parseRequestEventId(eventId);
+    const parsedEventId = parseRequestEventId_(eventId);
     if (parsedEventId === null) {
       return { success: false, message: "不正なリクエストです。" };
     }
 
     // Validate name
-    const nameValidation = validateNameInput(name);
+    const nameValidation = validateNameInput_(name);
     if (!nameValidation.ok) {
       return { success: false, message: nameValidation.message };
     }
     name = nameValidation.value;
 
     // Validate class
-    const classValidation = validateClassInput(cls);
+    const classValidation = validateClassInput_(cls);
     if (!classValidation.ok) {
       return { success: false, message: classValidation.message };
     }
     cls = classValidation.value;
 
     // Validate role against canonical values
-    const canonicalRole = getCanonicalRole(role);
+    const canonicalRole = getCanonicalRole_(role);
     if (!canonicalRole) {
       return { success: false, message: "ポジションが不正です。" };
     }
 
     // Derive sheetId server-side
-    const config = getEventConfig();
+    const config = getEventConfig_();
     const sheetId = config[alias.toLowerCase()];
     if (!sheetId) {
       return { success: false, message: "不正なリクエストです。" };
     }
 
-    if (!checkRateLimit(parsedEventId, name, cls, "cancel", sheetId)) {
+    if (!checkRateLimit_(parsedEventId, name, cls, "cancel", sheetId)) {
       return {
         success: false,
         message: "使用回数を超過しました。少し待ってからお試しください。",
@@ -457,7 +457,7 @@ function cancelSignup(eventId, name, cls, role, alias) {
     }
 
     const spreadsheet = SpreadsheetApp.openById(sheetId);
-    const data = getValidatedEventSpreadsheetData(spreadsheet);
+    const data = getValidatedEventSpreadsheetData_(spreadsheet);
     const eventExists = data.eventRows
       .slice(1)
       .some((row) => row[0] == parsedEventId);
@@ -469,17 +469,17 @@ function cancelSignup(eventId, name, cls, role, alias) {
     const signupDisplayRows = data.signupDisplayRows;
 
     // Normalise name for comparison
-    const normalisedInput = normaliseComparable(name);
-    const normalisedCls = normaliseClassComparable(cls);
+    const normalisedInput = normaliseComparable_(name);
+    const normalisedCls = normaliseClassComparable_(cls);
 
     // Find matching row — name + role + eventId
     let matchRowIndex = -1;
     for (let i = 1; i < signupRows.length; i++) {
       const rowEventId = signupRows[i][1];
-      const rowName = normaliseComparable(signupRows[i][2]);
+      const rowName = normaliseComparable_(signupRows[i][2]);
       // Compare against the displayed sheet text so values like "1-1" are
       // matched consistently even if Sheets auto-detects the raw cell value.
-      const rowCls = normaliseClassComparable(signupDisplayRows[i][3]);
+      const rowCls = normaliseClassComparable_(signupDisplayRows[i][3]);
       const rowRole = signupRows[i][4];
       if (
         // Use loose equality intentionally because Sheets can return EventID
@@ -532,14 +532,15 @@ function cancelSignup(eventId, name, cls, role, alias) {
  * @param {string} [scope] - Event sheet scope to isolate concurrent events
  * @returns {boolean} true if allowed, false if rate limited
  */
-function checkRateLimit(eventId, name, cls, action, scope) {
+function checkRateLimit_(eventId, name, cls, action, scope) {
   const cache = CacheService.getScriptCache();
   const actionKey = action === "cancel" ? "cancel" : "signup";
-  const scopeKey = String(scope || "default")
-    .replace(/[\s\u3000]+/g, "")
-    .substring(0, 80) || "default";
-  const namePart = normaliseCompact(name).substring(0, 3);
-  const clsPart = normaliseCompact(cls).substring(0, 3);
+  const scopeKey =
+    String(scope || "default")
+      .replace(/[\s\u3000]+/g, "")
+      .substring(0, 80) || "default";
+  const namePart = normaliseCompact_(name).substring(0, 3);
+  const clsPart = normaliseCompact_(cls).substring(0, 3);
   const key =
     "rl_" +
     actionKey +
@@ -573,12 +574,12 @@ function checkRateLimit(eventId, name, cls, action, scope) {
  * Validates Sheet ID format before trusting.
  * @returns {Object} Map of alias to Sheet ID
  */
-function getEventConfig() {
+function getEventConfig_() {
   if (!MASTER_SHEET_ID) {
     console.error("MASTER_SHEET_ID not set in Script Properties");
     return {};
   }
-  const rows = getSheetData(
+  const rows = getSheetData_(
     SpreadsheetApp.openById(MASTER_SHEET_ID),
     SHEET_NAMES.config,
     CONFIG_HEADER_ALIASES,
@@ -591,7 +592,7 @@ function getEventConfig() {
     const sheetId = String(row[1] || "").trim();
     if (
       alias &&
-      isValidAlias(alias) &&
+      isValidAlias_(alias) &&
       sheetId &&
       /^[a-zA-Z0-9_\-]{20,60}$/.test(sheetId)
     ) {
@@ -606,7 +607,7 @@ function getEventConfig() {
  * @param {string} str - The string to sanitise
  * @returns {string} Sanitised string
  */
-function sanitiseForScript(str) {
+function sanitiseForScript_(str) {
   if (!str) return "";
   return String(str)
     .replace(/&/g, "\\u0026")
@@ -618,7 +619,7 @@ function sanitiseForScript(str) {
     .replace(/`/g, "\\u0060");
 }
 
-function getCanonicalRole(role) {
+function getCanonicalRole_(role) {
   const roleKeyMap = {
     [ROLES.general]: ROLES.general,
     [ROLES.classRep]: ROLES.classRep,
@@ -627,11 +628,11 @@ function getCanonicalRole(role) {
   return roleKeyMap[role];
 }
 
-function isValidAlias(alias) {
+function isValidAlias_(alias) {
   return /^[a-zA-Z0-9\-]{1,50}$/.test(String(alias || ""));
 }
 
-function parseRequestEventId(eventId) {
+function parseRequestEventId_(eventId) {
   const parsedEventId = parseInt(eventId, 10);
   if (
     isNaN(parsedEventId) ||
@@ -643,12 +644,12 @@ function parseRequestEventId(eventId) {
   return parsedEventId;
 }
 
-function validateNameInput(name) {
+function validateNameInput_(name) {
   if (!name || typeof name !== "string" || name.trim().length === 0) {
     return { ok: false, message: "名前を入力してください。" };
   }
 
-  const normalisedName = normaliseWhitespace(name);
+  const normalisedName = normaliseWhitespace_(name);
   if (normalisedName.length > 50) {
     return {
       ok: false,
@@ -666,12 +667,12 @@ function validateNameInput(name) {
   return { ok: true, value: normalisedName };
 }
 
-function validateClassInput(cls) {
+function validateClassInput_(cls) {
   if (!cls || typeof cls !== "string" || cls.trim().length === 0) {
     return { ok: false, message: "クラスを入力してください。" };
   }
 
-  const normalisedClass = normaliseClassValue(cls);
+  const normalisedClass = normaliseClassValue_(cls);
   if (normalisedClass.length > 10) {
     return {
       ok: false,
@@ -689,7 +690,7 @@ function validateClassInput(cls) {
   return { ok: true, value: normalisedClass };
 }
 
-function getSheetData(
+function getSheetData_(
   spreadsheet,
   sheetName,
   expectedHeaders,
@@ -706,7 +707,7 @@ function getSheetData(
     throw new Error('The "' + sheetName + '" sheet is empty.');
   }
 
-  validateSheetHeaders(values[0], expectedHeaders, sheetName);
+  validateSheetHeaders_(values[0], expectedHeaders, sheetName);
 
   const result = {
     sheet: sheet,
@@ -720,13 +721,13 @@ function getSheetData(
   return result;
 }
 
-function getValidatedEventSpreadsheetData(spreadsheet) {
-  const eventsData = getSheetData(
+function getValidatedEventSpreadsheetData_(spreadsheet) {
+  const eventsData = getSheetData_(
     spreadsheet,
     SHEET_NAMES.events,
     EVENT_HEADER_ALIASES,
   );
-  const signupsData = getSheetData(
+  const signupsData = getSheetData_(
     spreadsheet,
     SHEET_NAMES.signups,
     SIGNUP_HEADER_ALIASES,
@@ -734,10 +735,10 @@ function getValidatedEventSpreadsheetData(spreadsheet) {
   );
 
   eventsData.values.slice(1).forEach(function (row, index) {
-    validateEventRow(row, index + 2);
+    validateEventRow_(row, index + 2);
   });
   signupsData.values.slice(1).forEach(function (row, index) {
-    validateSignupRow(row, signupsData.displayValues[index + 1], index + 2);
+    validateSignupRow_(row, signupsData.displayValues[index + 1], index + 2);
   });
 
   return {
@@ -748,7 +749,7 @@ function getValidatedEventSpreadsheetData(spreadsheet) {
   };
 }
 
-function validateSheetHeaders(headerRow, expectedHeaders, sheetName) {
+function validateSheetHeaders_(headerRow, expectedHeaders, sheetName) {
   if (!headerRow || headerRow.length < expectedHeaders.length) {
     throw new Error(
       'The "' + sheetName + '" sheet headers are missing or incomplete.',
@@ -756,95 +757,95 @@ function validateSheetHeaders(headerRow, expectedHeaders, sheetName) {
   }
 
   expectedHeaders.forEach(function (acceptedValues, index) {
-    const actualValue = normaliseHeaderValue(headerRow[index]);
+    const actualValue = normaliseHeaderValue_(headerRow[index]);
     if (acceptedValues.indexOf(actualValue) === -1) {
       throw new Error('The "' + sheetName + '" sheet headers are invalid.');
     }
   });
 }
 
-function normaliseHeaderValue(value) {
+function normaliseHeaderValue_(value) {
   return String(value == null ? "" : value)
     .replace(/[\s_-]+/g, "")
     .toLowerCase();
 }
 
-function validateEventRow(row, rowNumber) {
+function validateEventRow_(row, rowNumber) {
   if (!row || row.length < EVENT_HEADER_ALIASES.length) {
     throw new Error("Malformed row " + rowNumber + ' in "Events" sheet.');
   }
 
-  parsePositiveIntegerCell(
+  parsePositiveIntegerCell_(
     row[0],
     'Invalid EventID in "Events" sheet row ' + rowNumber + ".",
   );
-  requireNonEmptyCell(
+  requireNonEmptyCell_(
     row[1],
     'Activity is required in "Events" sheet row ' + rowNumber + ".",
   );
-  parseDateCell(
+  parseDateCell_(
     row[3],
     'Invalid date in "Events" sheet row ' + rowNumber + ".",
   );
-  parseDateCell(
+  parseDateCell_(
     row[4],
     'Invalid start time in "Events" sheet row ' + rowNumber + ".",
   );
-  parseDateCell(
+  parseDateCell_(
     row[5],
     'Invalid end time in "Events" sheet row ' + rowNumber + ".",
   );
-  parseNonNegativeIntegerCell(
+  parseNonNegativeIntegerCell_(
     row[8],
     'Invalid general slot limit in "Events" sheet row ' + rowNumber + ".",
   );
-  parseNonNegativeIntegerCell(
+  parseNonNegativeIntegerCell_(
     row[9],
     'Invalid class rep slot limit in "Events" sheet row ' + rowNumber + ".",
   );
-  parseNonNegativeIntegerCell(
+  parseNonNegativeIntegerCell_(
     row[10],
     'Invalid committee slot limit in "Events" sheet row ' + rowNumber + ".",
   );
 }
 
-function validateSignupRow(row, displayRow, rowNumber) {
+function validateSignupRow_(row, displayRow, rowNumber) {
   if (!row || row.length < SIGNUP_HEADER_ALIASES.length) {
     throw new Error("Malformed row " + rowNumber + ' in "Signups" sheet.');
   }
 
-  requireNonEmptyCell(
+  requireNonEmptyCell_(
     row[0],
     'SignupID is required in "Signups" sheet row ' + rowNumber + ".",
   );
-  parsePositiveIntegerCell(
+  parsePositiveIntegerCell_(
     row[1],
     'Invalid EventID in "Signups" sheet row ' + rowNumber + ".",
   );
-  requireNonEmptyCell(
+  requireNonEmptyCell_(
     row[2],
     'Name is required in "Signups" sheet row ' + rowNumber + ".",
   );
-  requireNonEmptyCell(
+  requireNonEmptyCell_(
     displayRow && displayRow[3] !== undefined ? displayRow[3] : row[3],
     'Class is required in "Signups" sheet row ' + rowNumber + ".",
   );
-  if (!getCanonicalRole(row[4])) {
+  if (!getCanonicalRole_(row[4])) {
     throw new Error('Invalid role in "Signups" sheet row ' + rowNumber + ".");
   }
-  parseDateCell(
+  parseDateCell_(
     row[5],
     'Invalid timestamp in "Signups" sheet row ' + rowNumber + ".",
   );
 }
 
-function requireNonEmptyCell(value, message) {
+function requireNonEmptyCell_(value, message) {
   if (String(value == null ? "" : value).trim() === "") {
     throw new Error(message);
   }
 }
 
-function parsePositiveIntegerCell(value, message) {
+function parsePositiveIntegerCell_(value, message) {
   const parsedValue = Number(value);
   if (!Number.isInteger(parsedValue) || parsedValue <= 0) {
     throw new Error(message);
@@ -852,7 +853,7 @@ function parsePositiveIntegerCell(value, message) {
   return parsedValue;
 }
 
-function parseNonNegativeIntegerCell(value, message) {
+function parseNonNegativeIntegerCell_(value, message) {
   const parsedValue = Number(value);
   if (!Number.isInteger(parsedValue) || parsedValue < 0) {
     throw new Error(message);
@@ -860,7 +861,7 @@ function parseNonNegativeIntegerCell(value, message) {
   return parsedValue;
 }
 
-function parseDateCell(value, message) {
+function parseDateCell_(value, message) {
   const parsedValue = new Date(value);
   if (isNaN(parsedValue.getTime())) {
     throw new Error(message);
@@ -868,7 +869,7 @@ function parseDateCell(value, message) {
   return parsedValue;
 }
 
-function normaliseWhitespace(value) {
+function normaliseWhitespace_(value) {
   return String(value)
     .replace(/[\s\u3000]+/g, " ")
     .trim();
@@ -890,13 +891,13 @@ const CLASS_KANJI_DIGITS = {
   "\u4E5D": "9",
 };
 
-function normaliseAsciiDigits(value) {
+function normaliseAsciiDigits_(value) {
   return String(value).replace(/[\uFF10-\uFF19]/g, function (char) {
     return String.fromCharCode(char.charCodeAt(0) - 0xfee0);
   });
 }
 
-function normaliseKanjiDigits(value) {
+function normaliseKanjiDigits_(value) {
   return String(value).replace(
     /[\u3007\u96F6\u4E00\u4E8C\u4E09\u56DB\u4E94\u516D\u4E03\u516B\u4E5D]/g,
     function (char) {
@@ -905,11 +906,11 @@ function normaliseKanjiDigits(value) {
   );
 }
 
-function isClassTokenChar(char) {
+function isClassTokenChar_(char) {
   return /^[0-9A-Za-z\uFF10-\uFF19\uFF21-\uFF3A\uFF41-\uFF5A]$/.test(char);
 }
 
-function normaliseClassSeparators(value) {
+function normaliseClassSeparators_(value) {
   const source = String(value);
   let result = "";
 
@@ -922,8 +923,8 @@ function normaliseClassSeparators(value) {
 
     if (
       char === "\u30FC" &&
-      isClassTokenChar(source.charAt(i - 1)) &&
-      isClassTokenChar(source.charAt(i + 1))
+      isClassTokenChar_(source.charAt(i - 1)) &&
+      isClassTokenChar_(source.charAt(i + 1))
     ) {
       result += "-";
       continue;
@@ -935,21 +936,21 @@ function normaliseClassSeparators(value) {
   return result;
 }
 
-function normaliseClassValue(value) {
-  return normaliseClassSeparators(
-    normaliseWhitespace(normaliseKanjiDigits(normaliseAsciiDigits(value))),
+function normaliseClassValue_(value) {
+  return normaliseClassSeparators_(
+    normaliseWhitespace_(normaliseKanjiDigits_(normaliseAsciiDigits_(value))),
   );
 }
 
-function normaliseComparable(value) {
-  return normaliseWhitespace(value).toLowerCase();
+function normaliseComparable_(value) {
+  return normaliseWhitespace_(value).toLowerCase();
 }
 
-function normaliseClassComparable(value) {
-  return normaliseClassValue(value).toLowerCase();
+function normaliseClassComparable_(value) {
+  return normaliseClassValue_(value).toLowerCase();
 }
 
-function normaliseCompact(value) {
+function normaliseCompact_(value) {
   return String(value)
     .toLowerCase()
     .replace(/[\s\u3000]+/g, "");
