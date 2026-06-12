@@ -746,24 +746,25 @@
       body.compact-layout .mobile-display-mode-control {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 4px;
+        gap: 6px;
         margin: -4px 14px 18px;
-        padding: 4px;
+        padding: 6px;
         background: #e7e1d8;
         border: 1px solid #ddd5cb;
-        border-radius: 10px;
+        border-radius: 15px;
       }
 
       .mobile-display-mode-btn {
-        min-height: 44px;
-        padding: 9px 10px;
+        min-height: 66px;
+        padding: 14px 15px;
         border: 0;
-        border-radius: 7px;
+        border-radius: 11px;
         background: transparent;
         color: #69635d;
         cursor: pointer;
-        font-size: 16px;
+        font-size: 24px;
         font-weight: 700;
+        line-height: 1.2;
       }
 
       .mobile-display-mode-btn.active {
@@ -2301,7 +2302,7 @@
           section.appendChild(heading);
 
           matchingEvents.forEach(function (event) {
-            section.appendChild(buildMobileSlotCard(event, { showTime: false }));
+            section.appendChild(buildMobileSlotCard(event));
           });
 
           container.appendChild(section);

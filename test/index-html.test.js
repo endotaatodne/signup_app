@@ -863,8 +863,9 @@ test("buildMobileAgenda can group mobile cards by time with headings", () => {
   assert.equal(firstTimeSection.children[0].className, "mobile-time-heading");
   assert.equal(firstTimeSection.children[0].textContent, "9:30 am - 10:00 am");
   assert.equal(getTitleWrap(firstCard).children[0].textContent, "Bake Sale");
-  assert.equal(getTitleWrap(firstCard).children[1].className, "mobile-slot-meta");
-  assert.notEqual(getTitleWrap(firstCard).children[1].className, "mobile-slot-time");
+  assert.equal(getTitleWrap(firstCard).children[1].className, "mobile-slot-time");
+  assert.equal(getTitleWrap(firstCard).children[1].textContent, "9:30 am - 10:00 am");
+  assert.equal(getTitleWrap(firstCard).children[2].className, "mobile-slot-meta");
   assert.equal(getTitleWrap(secondCard).children[0].textContent, "Games");
   assert.equal(secondTimeSection.children[0].textContent, "10:00 am - 10:30 am");
 });
