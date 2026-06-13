@@ -11,10 +11,10 @@ Google Apps ScriptとGoogle Sheetsで構築した、無料のオープンソー�
 - デスクトップのグリッド表示 — 横軸に活動、縦軸に時間帯
 - モバイルのカード表示 — 時間ごと／活動ごとのグループ表示を切り替え可能
 - 時間帯の範囲表示（スロット／カード、例：9:00 am - 10:00 am）
-- 3つのボランティア役割 — 一般保護者、学年委員、運営委員・役員（名称変更可能）
+- 4つのボランティア役割 — 一般保護者、学年委員、運営委員・役員、実行委員（名称変更可能）
 - 役割ごとの定員管理 — 役割ごとに独自の定員を設定
 - 定員が0の役割は自動的に非表示
-- 役割ごとのカラーコード — 緑（一般保護者）、琥珀（学年委員）、青（運営委員・役員）
+- 役割ごとのカラーコード — 緑（一般保護者）、琥珀（学年委員）、青（運営委員・役員）、紫（実行委員）
 - グリッドの名前表示も役割カラーで色分け
 - 名前とクラスで申込み — Googleアカウント不要
 - モーダルからキャンセルが可能
@@ -91,9 +91,9 @@ https://docs.google.com/spreadsheets/d/YOUR_MASTER_SHEET_ID/edit
 
 **Eventsタブ** — 1行目にヘッダーを追加：
 
-| A       | B        | C        | D    | E         | F       | G           | H        | I            | J             | K              |
-| ------- | -------- | -------- | ---- | --------- | ------- | ----------- | -------- | ------------ | ------------- | -------------- |
-| EventID | Activity | SubTitle | Date | StartTime | EndTime | Description | Location | GeneralSlots | ClassRepSlots | CommitteeSlots |
+| A       | B        | C        | D    | E         | F       | G           | H        | I            | J             | K                      | L                 |
+| ------- | -------- | -------- | ---- | --------- | ------- | ----------- | -------- | ------------ | ------------- | ---------------------- | ----------------- |
+| EventID | Activity | SubTitle | Date | StartTime | EndTime | Description | Location | GeneralSlots | ClassRepSlots | SteeringCommitteeSlots | OrgCommitteeSlots |
 
 **Signupsタブ** — 1行目にヘッダーを追加：
 
@@ -173,11 +173,12 @@ clasp create --title "Signup App"
 const ROLES = {
   general: "一般",
   classRep: "クラス代表",
-  committee: "委員会",
+  steeringCommittee: "運営委員・役員",
+  orgCommittee: "実行委員",
 };
 ```
 
-キー（`general`、`classRep`、`committee`）はそのままにして、右側の値のみ変更してください。
+キー（`general`、`classRep`、`steeringCommittee`、`orgCommittee`）はそのままにして、右側の値のみ変更してください。
 
 ### ステップ9 — コードのプッシュ
 
@@ -276,7 +277,8 @@ URLのエイリアスはConfigタブの**Event Alias**列と完全に一致し�
 | H   | Location       | ヘッダー／カード／モーダルに表示する部屋または場所名                          |
 | I   | GeneralSlots   | 一般ボランティアの最大定員（0=不要）                                          |
 | J   | ClassRepSlots  | クラス代表の最大定員（0=不要）                                                |
-| K   | CommitteeSlots | 委員会の最大定員（0=不要）                                                    |
+| K   | SteeringCommitteeSlots | 運営委員・役員の最大定員（0=不要）                                      |
+| L   | OrgCommitteeSlots | 実行委員の最大定員（0=不要）                                               |
 
 ---
 
@@ -290,11 +292,12 @@ URLのエイリアスはConfigタブの**Event Alias**列と完全に一致し�
 const ROLES = {
   general: "ボランティア",
   classRep: "チームリーダー",
-  committee: "コーディネーター",
+  steeringCommittee: "コーディネーター",
+  orgCommittee: "実行委員",
 };
 ```
 
-キー（`general`、`classRep`、`committee`）はそのままにして、右側の値のみ変更してください。再デプロイ後、すべての箇所に自動的に反映されます。
+キー（`general`、`classRep`、`steeringCommittee`、`orgCommittee`）はそのままにして、右側の値のみ変更してください。再デプロイ後、すべての箇所に自動的に反映されます。
 
 ### 役割カラーの変更
 
@@ -307,9 +310,12 @@ const ROLES = {
 .count-classrep {
   color: #f57f17;
 } /* 琥珀 */
-.count-committee {
+.count-steeringcommittee {
   color: #1565c0;
 } /* 青 */
+.count-orgcommittee {
+  color: #6a1b9a;
+} /* 紫 */
 ```
 
 ### ボタンテキストの変更

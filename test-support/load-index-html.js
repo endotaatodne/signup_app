@@ -22,7 +22,8 @@ function loadIndexHtml(exportsList, options = {}) {
     roles = {
       general: "一般保護者",
       classRep: "学年委員",
-      committee: "運営委員・役員",
+      steeringCommittee: "運営委員・役員",
+      orgCommittee: "実行委員",
     },
     title = "Test Event",
     globals = {},

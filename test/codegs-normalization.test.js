@@ -122,5 +122,10 @@ test("normaliseCompact_ removes regular and full-width spaces for rate-limit key
 test("getCanonicalRole_ only accepts canonical role labels", () => {
   assert.equal(getCanonicalRole_(ROLES.general), ROLES.general);
   assert.equal(getCanonicalRole_(ROLES.classRep), ROLES.classRep);
+  assert.equal(
+    getCanonicalRole_(ROLES.steeringCommittee),
+    ROLES.steeringCommittee,
+  );
+  assert.equal(getCanonicalRole_(ROLES.orgCommittee), ROLES.orgCommittee);
   assert.equal(getCanonicalRole_("general"), undefined);
 });

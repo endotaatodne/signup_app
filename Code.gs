@@ -2,7 +2,7 @@
  * @fileoverview Signup App - Google Apps Script backend.
  * Serves the web app and handles all interactions with Google Sheets.
  * @author endotaatodne
- * @version 0.2.1
+ * @version 0.2.2
  */
 
 const MASTER_SHEET_ID =
@@ -11,7 +11,8 @@ const MASTER_SHEET_ID =
 const ROLES = {
   general: "一般保護者",
   classRep: "学年委員",
-  committee: "運営委員・役員",
+  steeringCommittee: "運営委員・役員",
+  orgCommittee: "実行委員",
 };
 
 const SHEET_NAMES = {
@@ -32,7 +33,15 @@ const EVENT_HEADER_ALIASES = [
   ["location"],
   ["generalmax", "generalslots"],
   ["classrepmax", "classrepslots"],
-  ["committeemax", "committeeslots"],
+  // Keep the old Committee* aliases so existing event sheets can migrate
+  // without failing header validation immediately.
+  [
+    "steeringcommitteemax",
+    "steeringcommitteeslots",
+    "committeemax",
+    "committeeslots",
+  ],
+  ["orgcommitteemax", "orgcommitteeslots"],
 ];
 const SIGNUP_HEADER_ALIASES = [
   ["signupid"],
@@ -138,7 +147,8 @@ function getGridData_(spreadsheet) {
       signupCountsMap[eventId] = {
         [ROLES.general]: 0,
         [ROLES.classRep]: 0,
-        [ROLES.committee]: 0,
+        [ROLES.steeringCommittee]: 0,
+        [ROLES.orgCommittee]: 0,
       };
     }
     signupsMap[eventId].push({ name, cls, role });
@@ -153,7 +163,8 @@ function getGridData_(spreadsheet) {
     const signupCounts = signupCountsMap[eventId] || {};
     const generalMax = Number(row[8]) || 0;
     const classRepMax = Number(row[9]) || 0;
-    const committeeMax = Number(row[10]) || 0;
+    const steeringCommitteeMax = Number(row[10]) || 0;
+    const orgCommitteeMax = Number(row[11]) || 0;
 
     return {
       eventId: eventId,
@@ -185,9 +196,13 @@ function getGridData_(spreadsheet) {
           max: classRepMax,
           filled: signupCounts[ROLES.classRep] || 0,
         },
-        committee: {
-          max: committeeMax,
-          filled: signupCounts[ROLES.committee] || 0,
+        steeringCommittee: {
+          max: steeringCommitteeMax,
+          filled: signupCounts[ROLES.steeringCommittee] || 0,
+        },
+        orgCommittee: {
+          max: orgCommitteeMax,
+          filled: signupCounts[ROLES.orgCommittee] || 0,
         },
       },
       signups: allSignups,
@@ -396,7 +411,8 @@ function submitSignup(eventId, name, cls, role, alias) {
     const roleMaxMap = {
       [ROLES.general]: Number(eventRow[8]) || 0,
       [ROLES.classRep]: Number(eventRow[9]) || 0,
-      [ROLES.committee]: Number(eventRow[10]) || 0,
+      [ROLES.steeringCommittee]: Number(eventRow[10]) || 0,
+      [ROLES.orgCommittee]: Number(eventRow[11]) || 0,
     };
     const maxSlots = roleMaxMap[canonicalRole];
     if (maxSlots === 0) {
@@ -716,7 +732,8 @@ function getCanonicalRole_(role) {
   const roleKeyMap = {
     [ROLES.general]: ROLES.general,
     [ROLES.classRep]: ROLES.classRep,
-    [ROLES.committee]: ROLES.committee,
+    [ROLES.steeringCommittee]: ROLES.steeringCommittee,
+    [ROLES.orgCommittee]: ROLES.orgCommittee,
   };
   return roleKeyMap[role];
 }
@@ -898,7 +915,11 @@ function validateEventRow_(row, rowNumber) {
   );
   parseNonNegativeIntegerCell_(
     row[10],
-    'Invalid committee slot limit in "Events" sheet row ' + rowNumber + ".",
+    'Invalid steering committee slot limit in "Events" sheet row ' + rowNumber + ".",
+  );
+  parseNonNegativeIntegerCell_(
+    row[11],
+    'Invalid org committee slot limit in "Events" sheet row ' + rowNumber + ".",
   );
 }
 
