@@ -2385,6 +2385,20 @@
         });
       }
 
+      function normaliseBrackets(value) {
+        return String(value)
+          .replace(/\uFF08/g, "(")
+          .replace(/\uFF09/g, ")");
+      }
+
+      function normaliseNameValue(value) {
+        return normaliseBrackets(normaliseWhitespace(value));
+      }
+
+      function isValidNameValue(value) {
+        return /^[\p{L}\p{N}\s\-'.()]+$/u.test(value);
+      }
+
       function normaliseKanjiDigits(value) {
         return String(value).replace(
           /[\u3007\u96F6\u4E00\u4E8C\u4E09\u56DB\u4E94\u516D\u4E03\u516B\u4E5D]/g,
@@ -2431,7 +2445,7 @@
       }
 
       function normaliseComparable(value) {
-        return normaliseWhitespace(value).toLowerCase();
+        return normaliseNameValue(value).toLowerCase();
       }
 
       function normaliseClassComparable(value) {
@@ -2681,7 +2695,7 @@
       }
 
       function findAndConfirmCancel() {
-        var name = normaliseWhitespace(
+        var name = normaliseNameValue(
           document.getElementById("cancelName").value,
         );
         var cls = normaliseClassValue(
@@ -2868,7 +2882,7 @@
           return;
         }
 
-        var name = normaliseWhitespace(document.getElementById("inputName").value);
+        var name = normaliseNameValue(document.getElementById("inputName").value);
         var cls = normaliseClassValue(document.getElementById("inputClass").value);
         var btn = document.getElementById("submitBtn");
 
@@ -2880,7 +2894,7 @@
           showModalMessage("名前は５０文字以下で入力してください。", false);
           return;
         }
-        if (!/^[\p{L}\p{N}\s\-'.]+$/u.test(name)) {
+        if (!isValidNameValue(name)) {
           showModalMessage("名前に不正な文字が含まれています。", false);
           return;
         }

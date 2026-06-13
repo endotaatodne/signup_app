@@ -742,7 +742,7 @@ function validateNameInput_(name) {
     return { ok: false, message: "名前を入力してください。" };
   }
 
-  const normalisedName = normaliseWhitespace_(name);
+  const normalisedName = normaliseNameValue_(name);
   if (normalisedName.length > 50) {
     return {
       ok: false,
@@ -750,7 +750,7 @@ function validateNameInput_(name) {
     };
   }
 
-  if (!/^[\p{L}\p{N}\s\-'.]+$/u.test(normalisedName)) {
+  if (!isValidNameValue_(normalisedName)) {
     return {
       ok: false,
       message: "名前に不正な文字が含まれています。",
@@ -990,6 +990,20 @@ function normaliseAsciiDigits_(value) {
   });
 }
 
+function normaliseBrackets_(value) {
+  return String(value)
+    .replace(/\uFF08/g, "(")
+    .replace(/\uFF09/g, ")");
+}
+
+function normaliseNameValue_(value) {
+  return normaliseBrackets_(normaliseWhitespace_(value));
+}
+
+function isValidNameValue_(value) {
+  return /^[\p{L}\p{N}\s\-'.()]+$/u.test(value);
+}
+
 function normaliseKanjiDigits_(value) {
   return String(value).replace(
     /[\u3007\u96F6\u4E00\u4E8C\u4E09\u56DB\u4E94\u516D\u4E03\u516B\u4E5D]/g,
@@ -1036,7 +1050,7 @@ function normaliseClassValue_(value) {
 }
 
 function normaliseComparable_(value) {
-  return normaliseWhitespace_(value).toLowerCase();
+  return normaliseNameValue_(value).toLowerCase();
 }
 
 function normaliseClassComparable_(value) {

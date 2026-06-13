@@ -432,6 +432,44 @@ test("submitSignup preserves Kanji numerals in names while normalising class", (
   assert.equal(appendedRow[3], "4-2");
 });
 
+test("submitSignup normalises full-width brackets in names before storing", () => {
+  const { app, spreadsheets } = loadBackend();
+  const signupsSheet = spreadsheets[EVENT_SHEET_ID].getSheetByName("Signups");
+
+  const result = app.submitSignup(
+    "1",
+    "\u5C71\u7530\uFF08\u592A\u90CE\uFF09",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+  const signupRows = signupsSheet.getDataRange().getValues();
+  const appendedRow = signupRows[signupRows.length - 1];
+
+  assert.equal(result.success, true);
+  assert.equal(result.name, "\u5C71\u7530(\u592A\u90CE)");
+  assert.equal(appendedRow[2], "\u5C71\u7530(\u592A\u90CE)");
+});
+
+test("submitSignup treats full-width and half-width brackets as duplicate names", () => {
+  const signupRows = [
+    ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
+    ["s1", 1, "\u5C71\u7530(\u592A\u90CE)", "1-1", appRoleGeneral(), new Date()],
+  ];
+  const { app } = loadBackend({ signupRows });
+
+  const result = app.submitSignup(
+    "1",
+    "\u5C71\u7530\uFF08\u592A\u90CE\uFF09",
+    "1-1",
+    app.ROLES.classRep,
+    "spring-fete",
+  );
+
+  assert.equal(result.success, false);
+  assert.match(result.message, /同じ名前/);
+});
+
 test("submitSignup accepts names up to 50 characters", () => {
   const { app, spreadsheets } = loadBackend();
   const signupsSheet = spreadsheets[EVENT_SHEET_ID].getSheetByName("Signups");
