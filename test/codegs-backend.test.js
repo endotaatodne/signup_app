@@ -14,6 +14,31 @@ const EVENT_SHEET_ID = "eventsheetid1234567890";
 const SECOND_EVENT_SHEET_ID = "secondsheetid1234567890";
 const MASTER_SHEET_ID = "master-sheet-id";
 
+function appRoleGeneral() {
+  return "\u4E00\u822C\u4FDD\u8B77\u8005";
+}
+
+function createAdditionalEventRow({
+  id = 2,
+  date = "2026-04-20T00:00:00Z",
+  start = "1970-01-01T10:30:00Z",
+  end = "1970-01-01T11:30:00Z",
+} = {}) {
+  return [
+    id,
+    "Canteen",
+    "Morning",
+    new Date(date),
+    new Date(start),
+    new Date(end),
+    "Serve snacks",
+    "Hall",
+    2,
+    1,
+    1,
+  ];
+}
+
 function createEventRows() {
   return [
     [
@@ -407,6 +432,44 @@ test("submitSignup preserves Kanji numerals in names while normalising class", (
   assert.equal(appendedRow[3], "4-2");
 });
 
+test("submitSignup normalises full-width brackets in names before storing", () => {
+  const { app, spreadsheets } = loadBackend();
+  const signupsSheet = spreadsheets[EVENT_SHEET_ID].getSheetByName("Signups");
+
+  const result = app.submitSignup(
+    "1",
+    "\u5C71\u7530\uFF08\u592A\u90CE\uFF09",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+  const signupRows = signupsSheet.getDataRange().getValues();
+  const appendedRow = signupRows[signupRows.length - 1];
+
+  assert.equal(result.success, true);
+  assert.equal(result.name, "\u5C71\u7530(\u592A\u90CE)");
+  assert.equal(appendedRow[2], "\u5C71\u7530(\u592A\u90CE)");
+});
+
+test("submitSignup treats full-width and half-width brackets as duplicate names", () => {
+  const signupRows = [
+    ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
+    ["s1", 1, "\u5C71\u7530(\u592A\u90CE)", "1-1", appRoleGeneral(), new Date()],
+  ];
+  const { app } = loadBackend({ signupRows });
+
+  const result = app.submitSignup(
+    "1",
+    "\u5C71\u7530\uFF08\u592A\u90CE\uFF09",
+    "1-1",
+    app.ROLES.classRep,
+    "spring-fete",
+  );
+
+  assert.equal(result.success, false);
+  assert.match(result.message, /同じ名前/);
+});
+
 test("submitSignup accepts names up to 50 characters", () => {
   const { app, spreadsheets } = loadBackend();
   const signupsSheet = spreadsheets[EVENT_SHEET_ID].getSheetByName("Signups");
@@ -438,6 +501,104 @@ test("submitSignup rejects duplicate names after normalisation", () => {
 
   assert.equal(result.success, false);
   assert.match(result.message, /同じ名前/);
+});
+
+test("submitSignup rejects the same person in an overlapping time slot", () => {
+  const eventRows = createEventRows();
+  eventRows.push(createAdditionalEventRow());
+  const signupRows = [
+    ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
+    ["s1", 2, "Alice", "1-1", appRoleGeneral(), new Date()],
+  ];
+  const { app } = loadBackend({ eventRows, signupRows });
+
+  const result = app.submitSignup("1", " alice ", "1-1", app.ROLES.general, "spring-fete");
+
+  assert.equal(result.success, false);
+  assert.equal(result.code, "time_conflict");
+});
+
+test("submitSignup allows the same name in another class at the same time", () => {
+  const eventRows = createEventRows();
+  eventRows.push(createAdditionalEventRow());
+  const signupRows = [
+    ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
+    ["s1", 2, "Alice", "1-1", appRoleGeneral(), new Date()],
+  ];
+  const { app } = loadBackend({ eventRows, signupRows });
+
+  const result = app.submitSignup("1", "Alice", "1-2", app.ROLES.general, "spring-fete");
+
+  assert.equal(result.success, true);
+});
+
+test("submitSignup allows the same person in a back-to-back time slot", () => {
+  const eventRows = createEventRows();
+  eventRows.push(
+    createAdditionalEventRow({
+      start: "1970-01-01T11:00:00Z",
+      end: "1970-01-01T11:30:00Z",
+    }),
+  );
+  const signupRows = [
+    ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
+    ["s1", 2, "Alice", "1-1", appRoleGeneral(), new Date()],
+  ];
+  const { app } = loadBackend({ eventRows, signupRows });
+
+  const result = app.submitSignup("1", "Alice", "1-1", app.ROLES.general, "spring-fete");
+
+  assert.equal(result.success, true);
+});
+
+test("submitSignup allows the same person at the same time on a different date", () => {
+  const eventRows = createEventRows();
+  eventRows.push(
+    createAdditionalEventRow({
+      date: "2026-04-21T00:00:00Z",
+      start: "1970-01-01T09:30:00Z",
+      end: "1970-01-01T11:00:00Z",
+    }),
+  );
+  const signupRows = [
+    ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
+    ["s1", 2, "Alice", "1-1", appRoleGeneral(), new Date()],
+  ];
+  const { app } = loadBackend({ eventRows, signupRows });
+
+  const result = app.submitSignup("1", "Alice", "1-1", app.ROLES.general, "spring-fete");
+
+  assert.equal(result.success, true);
+});
+
+test("submitSignup applies class normalisation to time-conflict checks", () => {
+  const eventRows = createEventRows();
+  eventRows.push(createAdditionalEventRow());
+  const signupRows = [
+    ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
+    ["s1", 2, "Alice", "\uFF11\u2212\uFF11", appRoleGeneral(), new Date()],
+  ];
+  const { app } = loadBackend({ eventRows, signupRows });
+
+  const result = app.submitSignup("1", "Alice", "1-1", app.ROLES.general, "spring-fete");
+
+  assert.equal(result.success, false);
+  assert.equal(result.code, "time_conflict");
+});
+
+test("submitSignup rejects overlapping same-person signup across roles", () => {
+  const eventRows = createEventRows();
+  eventRows.push(createAdditionalEventRow());
+  const signupRows = [
+    ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
+    ["s1", 2, "Alice", "1-1", appRoleGeneral(), new Date()],
+  ];
+  const { app } = loadBackend({ eventRows, signupRows });
+
+  const result = app.submitSignup("1", "Alice", "1-1", app.ROLES.committee, "spring-fete");
+
+  assert.equal(result.success, false);
+  assert.equal(result.code, "time_conflict");
 });
 
 test("submitSignup rejects a full role slot", () => {

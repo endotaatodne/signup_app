@@ -1,3 +1,11 @@
+## v0.2.1 - 2026-06-13
+
+- Bug fix
+  - Prevents the same person from registering for overlapping volunteer slots.
+  - Keeps same-slot duplicate validation in place.
+  - Allows back-to-back slots, same-time registrations on different dates, and same names in different classes.
+  - Adds unit tests for overlapping slots, back-to-back slots, different dates, class normalization, and cross-role conflicts.
+
 ## v0.2.0 - 2026-06-09
 
 - Minor update

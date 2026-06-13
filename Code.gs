@@ -2,7 +2,7 @@
  * @fileoverview Signup App - Google Apps Script backend.
  * Serves the web app and handles all interactions with Google Sheets.
  * @author endotaatodne
- * @version 0.2.0
+ * @version 0.2.1
  */
 
 const MASTER_SHEET_ID =
@@ -42,6 +42,8 @@ const SIGNUP_HEADER_ALIASES = [
   ["role"],
   ["createdat", "timestamp"],
 ];
+
+const APP_TIME_ZONE = "Australia/Brisbane";
 
 /**
  * Entry point for the web app. Called automatically by Google Apps Script
@@ -226,6 +228,79 @@ function getGridDataForAlias(alias) {
   }
 }
 
+function getEventRange_(eventRow) {
+  const dateKey = Utilities.formatDate(
+    new Date(eventRow[3]),
+    APP_TIME_ZONE,
+    "yyyy-MM-dd",
+  );
+  const startTime = Utilities.formatDate(
+    new Date(eventRow[4]),
+    APP_TIME_ZONE,
+    "HH:mm",
+  );
+  const endTime = Utilities.formatDate(
+    new Date(eventRow[5]),
+    APP_TIME_ZONE,
+    "HH:mm",
+  );
+
+  return {
+    dateKey: dateKey,
+    startMinutes: timeStringToMinutes_(startTime),
+    endMinutes: timeStringToMinutes_(endTime),
+  };
+}
+
+function timeStringToMinutes_(time) {
+  const parts = String(time || "").split(":");
+  return Number(parts[0]) * 60 + Number(parts[1]);
+}
+
+function eventRangesOverlap_(a, b) {
+  if (a.dateKey !== b.dateKey) return false;
+
+  if (a.endMinutes <= a.startMinutes || b.endMinutes <= b.startMinutes) {
+    return a.startMinutes === b.startMinutes;
+  }
+
+  return a.startMinutes < b.endMinutes && b.startMinutes < a.endMinutes;
+}
+
+function findConcurrentSignup_(
+  eventRows,
+  signupRows,
+  signupDisplayRows,
+  eventId,
+  name,
+  cls,
+  eventRow,
+) {
+  const targetRange = getEventRange_(eventRow);
+  const normalisedName = normaliseComparable_(name);
+  const normalisedClass = normaliseClassComparable_(cls);
+  const eventById = {};
+
+  eventRows.slice(1).forEach(function (row) {
+    eventById[String(row[0])] = row;
+  });
+
+  return signupRows.slice(1).find(function (row, index) {
+    if (row[1] == eventId) return false;
+    if (normaliseComparable_(row[2]) !== normalisedName) return false;
+
+    const displayRow = signupDisplayRows[index + 1] || [];
+    const rowClass =
+      displayRow && displayRow[3] !== undefined ? displayRow[3] : row[3];
+    if (normaliseClassComparable_(rowClass) !== normalisedClass) return false;
+
+    const conflictingEvent = eventById[String(row[1])];
+    if (!conflictingEvent) return false;
+
+    return eventRangesOverlap_(targetRange, getEventRange_(conflictingEvent));
+  });
+}
+
 /**
  * Submits a new signup for a given event and role.
  * SheetId is derived server-side from the alias — never trusted from client.
@@ -329,6 +404,7 @@ function submitSignup(eventId, name, cls, role, alias) {
     }
 
     const signupRows = data.signupRows;
+    const signupDisplayRows = data.signupDisplayRows;
     // Use loose equality intentionally because stored EventID cells may be
     // typed differently by Sheets while still representing the same ID.
     const existing = signupRows.slice(1).filter((r) => r[1] == eventId);
@@ -354,6 +430,23 @@ function submitSignup(eventId, name, cls, role, alias) {
         success: false,
         message:
           "同じ名前の方がボランティアに入っています。違う名前を入力してください。",
+      };
+    }
+
+    const concurrentSignup = findConcurrentSignup_(
+      eventRows,
+      signupRows,
+      signupDisplayRows,
+      eventId,
+      name,
+      cls,
+      eventRow,
+    );
+    if (concurrentSignup) {
+      return {
+        success: false,
+        code: "time_conflict",
+        message: "同じ時間帯に別のボランティアに登録されています。",
       };
     }
 
@@ -649,7 +742,7 @@ function validateNameInput_(name) {
     return { ok: false, message: "名前を入力してください。" };
   }
 
-  const normalisedName = normaliseWhitespace_(name);
+  const normalisedName = normaliseNameValue_(name);
   if (normalisedName.length > 50) {
     return {
       ok: false,
@@ -657,7 +750,7 @@ function validateNameInput_(name) {
     };
   }
 
-  if (!/^[\p{L}\p{N}\s\-'.]+$/u.test(normalisedName)) {
+  if (!isValidNameValue_(normalisedName)) {
     return {
       ok: false,
       message: "名前に不正な文字が含まれています。",
@@ -897,6 +990,20 @@ function normaliseAsciiDigits_(value) {
   });
 }
 
+function normaliseBrackets_(value) {
+  return String(value)
+    .replace(/\uFF08/g, "(")
+    .replace(/\uFF09/g, ")");
+}
+
+function normaliseNameValue_(value) {
+  return normaliseBrackets_(normaliseWhitespace_(value));
+}
+
+function isValidNameValue_(value) {
+  return /^[\p{L}\p{N}\s\-'.()]+$/u.test(value);
+}
+
 function normaliseKanjiDigits_(value) {
   return String(value).replace(
     /[\u3007\u96F6\u4E00\u4E8C\u4E09\u56DB\u4E94\u516D\u4E03\u516B\u4E5D]/g,
@@ -943,7 +1050,7 @@ function normaliseClassValue_(value) {
 }
 
 function normaliseComparable_(value) {
-  return normaliseWhitespace_(value).toLowerCase();
+  return normaliseNameValue_(value).toLowerCase();
 }
 
 function normaliseClassComparable_(value) {

@@ -216,6 +216,9 @@ function loadClient(options = {}) {
       "formatTimeRange",
       "normaliseWhitespace",
       "normaliseAsciiDigits",
+      "normaliseBrackets",
+      "normaliseNameValue",
+      "isValidNameValue",
       "isClassTokenChar",
       "normaliseClassSeparators",
       "normaliseClassValue",
@@ -338,6 +341,16 @@ test("class normalization in index.html matches the backend contract", () => {
   assert.equal(client.normaliseClassSeparators("クラスーA"), "クラスーA");
 });
 
+test("name normalization in index.html converts full-width brackets", () => {
+  const { exports: client } = loadClient();
+
+  assert.equal(client.normaliseBrackets("Alice（parent）"), "Alice(parent)");
+  assert.equal(client.normaliseNameValue(" 山田（太郎） "), "山田(太郎)");
+  assert.equal(client.normaliseComparable("山田（太郎）"), "山田(太郎)");
+  assert.equal(client.isValidNameValue("山田(太郎)"), true);
+  assert.equal(client.isValidNameValue("山田（太郎）"), false);
+});
+
 test("showMessage renders refresh prompts with emphasis spans", () => {
   const messageNode = createElement("div");
   messageNode.style = { display: "none" };
@@ -448,6 +461,57 @@ test("submitSignup enforces the 50-character name limit client-side", () => {
   assert.equal(modalMessage.textContent, "名前は５０文字以下で入力してください。");
   assert.equal(modalMessage.className, "modal-message error");
   assert.equal(modalMessage.style.display, "block");
+});
+
+test("submitSignup normalises full-width brackets before sending to backend", () => {
+  const modalMessage = createElement("div");
+  modalMessage.style = { display: "none" };
+  const submitBtn = createElement("button");
+  let receivedSignupArgs = null;
+  const google = {
+    script: {
+      run: {
+        withSuccessHandler(handler) {
+          return {
+            withFailureHandler() {
+              return this;
+            },
+            getDeployedUrl() {
+              handler("https://example.com/app");
+              return this;
+            },
+            submitSignup(...args) {
+              receivedSignupArgs = args;
+              handler({ success: false, message: "Rejected by test." });
+              return this;
+            },
+          };
+        },
+      },
+    },
+  };
+
+  const { exports: client, context } = loadClient({
+    elements: {
+      honeypot: { ...createElement("input"), value: "" },
+      inputName: { ...createElement("input"), value: "山田（太郎）" },
+      inputClass: { ...createElement("input"), value: "1-1" },
+      submitBtn,
+      modalMessage,
+    },
+    extraGlobals: {
+      google,
+    },
+  });
+
+  context.PAGE_LOAD_TIME = Date.now() - 4000;
+  context.currentEventId = 1;
+  context.currentRole = client.ROLE_KEYS[0].label;
+
+  client.submitSignup();
+
+  assert.ok(receivedSignupArgs);
+  assert.equal(receivedSignupArgs[1], "山田(太郎)");
 });
 
 test("submitSignup refreshes grid data after a stale full-slot rejection", () => {

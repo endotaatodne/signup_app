@@ -12,6 +12,9 @@ const { exports: codeGs } = loadCodeGs(
     "validateNameInput_",
     "normaliseWhitespace_",
     "normaliseAsciiDigits_",
+    "normaliseBrackets_",
+    "normaliseNameValue_",
+    "isValidNameValue_",
     "isClassTokenChar_",
     "normaliseClassSeparators_",
     "normaliseClassValue_",
@@ -28,6 +31,9 @@ const {
   validateNameInput_,
   normaliseWhitespace_,
   normaliseAsciiDigits_,
+  normaliseBrackets_,
+  normaliseNameValue_,
+  isValidNameValue_,
   isClassTokenChar_,
   normaliseClassSeparators_,
   normaliseClassValue_,
@@ -45,6 +51,22 @@ test("normaliseAsciiDigits_ converts full-width digits without changing ASCII di
     normaliseAsciiDigits_("Year ２０２６ Class 3"),
     "Year 2026 Class 3",
   );
+});
+
+test("normaliseBrackets_ converts full-width brackets without changing half-width brackets", () => {
+  assert.equal(
+    normaliseBrackets_("Alice（parent） (helper)"),
+    "Alice(parent) (helper)",
+  );
+});
+
+test("normaliseNameValue_ trims whitespace and converts full-width brackets", () => {
+  assert.equal(normaliseNameValue_(" 山田（太郎） "), "山田(太郎)");
+});
+
+test("isValidNameValue_ accepts only canonical brackets after normalisation", () => {
+  assert.equal(isValidNameValue_("Alice(parent)"), true);
+  assert.equal(isValidNameValue_("Alice（parent）"), false);
 });
 
 test("normaliseClassValue_ standardises full-width, Kanji digits, and dash variants", () => {
@@ -65,8 +87,9 @@ test("isClassTokenChar_ stays narrow and does not treat Japanese text as a class
   assert.equal(isClassTokenChar_("ク"), false);
 });
 
-test("normaliseComparable_ remains a whitespace and case canonicalizer", () => {
+test("normaliseComparable_ canonicalizes whitespace, case, and brackets", () => {
   assert.equal(normaliseComparable_("  AbC\u3000Def "), "abc def");
+  assert.equal(normaliseComparable_("山田（太郎）"), "山田(太郎)");
 });
 
 test("validateNameInput_ preserves Kanji numerals in names", () => {
@@ -74,6 +97,11 @@ test("validateNameInput_ preserves Kanji numerals in names", () => {
 
   assert.equal(result.ok, true);
   assert.equal(result.value, "日本三郎");
+});
+
+test("validateNameInput_ allows half-width and full-width parentheses", () => {
+  assert.equal(validateNameInput_("Alice (parent)").ok, true);
+  assert.equal(validateNameInput_("山田（太郎）").value, "山田(太郎)");
 });
 
 test("normaliseClassComparable_ treats ASCII, full-width, and Kanji digits as equal", () => {
