@@ -1,6 +1,6 @@
 {
   "name": "signup-app",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "A free open source signup app built on Google Apps Script",
   "scripts": {
     "test": "node --test --test-isolation=none test/*.test.js"

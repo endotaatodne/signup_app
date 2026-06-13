@@ -69,6 +69,12 @@ function formatDate(date, format) {
     return `${day} ${month} ${year}`;
   }
 
+  if (format === "yyyy-MM-dd") {
+    const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(date.getUTCDate()).padStart(2, "0");
+    return `${date.getUTCFullYear()}-${month}-${day}`;
+  }
+
   throw new Error(`Unsupported format: ${format}`);
 }
 
