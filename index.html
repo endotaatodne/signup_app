@@ -219,8 +219,11 @@
       .count-classrep {
         color: #f57f17;
       }
-      .count-committee {
+      .count-steeringcommittee {
         color: #1565c0;
+      }
+      .count-orgcommittee {
+        color: #6a1b9a;
       }
       .slot-mixed {
         background: #f9f9f9;
@@ -231,8 +234,11 @@
       .role-row-classrep {
         background: #fffaf0;
       }
-      .role-row-committee {
+      .role-row-steeringcommittee {
         background: #eef6ff;
+      }
+      .role-row-orgcommittee {
+        background: #f6efff;
       }
       .name-role-general {
         color: #2e7d32;
@@ -240,8 +246,11 @@
       .name-role-classrep {
         color: #c77800;
       }
-      .name-role-committee {
+      .name-role-steeringcommittee {
         color: #1565c0;
+      }
+      .name-role-orgcommittee {
+        color: #6a1b9a;
       }
       /* Modal */
       .modal-overlay {
@@ -311,9 +320,13 @@
         background: #fff8e1;
         color: #f57f17;
       }
-      .role-btn-committee {
+      .role-btn-steeringcommittee {
         background: #e3f2fd;
         color: #1565c0;
+      }
+      .role-btn-orgcommittee {
+        background: #f3e5f5;
+        color: #6a1b9a;
       }
       .role-btn-label {
         font-size: 13px;
@@ -365,8 +378,11 @@
       .modal-submit-classrep {
         background: #ffa000;
       }
-      .modal-submit-committee {
+      .modal-submit-steeringcommittee {
         background: #1976d2;
+      }
+      .modal-submit-orgcommittee {
+        background: #7b1fa2;
       }
       .modal-cancel {
         width: 100%;
@@ -433,8 +449,11 @@
       .names-role-label-classrep {
         color: #f57f17;
       }
-      .names-role-label-committee {
+      .names-role-label-steeringcommittee {
         color: #1565c0;
+      }
+      .names-role-label-orgcommittee {
+        color: #6a1b9a;
       }
       .names-chips {
         display: flex;
@@ -456,9 +475,13 @@
         background: #fff6df;
         color: #c77800;
       }
-      .name-chip.name-role-committee {
+      .name-chip.name-role-steeringcommittee {
         background: #eaf3ff;
         color: #1565c0;
+      }
+      .name-chip.name-role-orgcommittee {
+        background: #f4eafd;
+        color: #6a1b9a;
       }
       .name-chip-class {
         color: #888;
@@ -719,8 +742,11 @@
       .mobile-slot-summary-item.role-classrep {
         color: #b26a00;
       }
-      .mobile-slot-summary-item.role-committee {
+      .mobile-slot-summary-item.role-steeringcommittee {
         color: #1565c0;
+      }
+      .mobile-slot-summary-item.role-orgcommittee {
+        color: #6a1b9a;
       }
       .mobile-slot-summary-item.is-full {
         color: #aaa;
@@ -860,7 +886,7 @@
       }
 
       body.compact-layout .mobile-slot-summary-item {
-        /* TEXT_SIZE: [SIGN-UP CARD] Mobile slot summary items (e.g. "General 残り3枠", "Committee Full") */
+        /* TEXT_SIZE: [SIGN-UP CARD] Mobile slot summary items (e.g. "General 残り3枠", "Steering Committee Full") */
         font-size: 23px;
         font-weight: 600;
       }
@@ -1238,8 +1264,12 @@
         background: #fff4da;
       }
 
-      .mobile-slot-summary-item.role-committee {
+      .mobile-slot-summary-item.role-steeringcommittee {
         background: #eaf3ff;
+      }
+
+      .mobile-slot-summary-item.role-orgcommittee {
+        background: #f4eafd;
       }
 
       .mobile-slot-summary-item.is-full {
@@ -1540,6 +1570,7 @@
       var ROLE_KEYS = [
         {
           key: "general",
+          classSuffix: "general",
           label: ROLES.general,
           btnClass: "role-btn-general",
           countClass: "count-general",
@@ -1549,6 +1580,7 @@
         },
         {
           key: "classRep",
+          classSuffix: "classrep",
           label: ROLES.classRep,
           btnClass: "role-btn-classrep",
           countClass: "count-classrep",
@@ -1557,13 +1589,24 @@
           nameClass: "name-role-classrep",
         },
         {
-          key: "committee",
-          label: ROLES.committee,
-          btnClass: "role-btn-committee",
-          countClass: "count-committee",
-          labelClass: "names-role-label-committee",
-          roleRowClass: "role-row-committee",
-          nameClass: "name-role-committee",
+          key: "steeringCommittee",
+          classSuffix: "steeringcommittee",
+          label: ROLES.steeringCommittee,
+          btnClass: "role-btn-steeringcommittee",
+          countClass: "count-steeringcommittee",
+          labelClass: "names-role-label-steeringcommittee",
+          roleRowClass: "role-row-steeringcommittee",
+          nameClass: "name-role-steeringcommittee",
+        },
+        {
+          key: "orgCommittee",
+          classSuffix: "orgcommittee",
+          label: ROLES.orgCommittee,
+          btnClass: "role-btn-orgcommittee",
+          countClass: "count-orgcommittee",
+          labelClass: "names-role-label-orgcommittee",
+          roleRowClass: "role-row-orgcommittee",
+          nameClass: "name-role-orgcommittee",
         },
       ];
 
@@ -2074,8 +2117,7 @@
               var remaining = s.max - s.filled;
               var item = document.createElement("span");
               item.className =
-                "mobile-slot-summary-item role-" +
-                r.key.replace("classRep", "classrep");
+                "mobile-slot-summary-item role-" + r.classSuffix;
               if (remaining <= 0) item.classList.add("is-full");
               item.textContent =
                 r.label +
@@ -2228,8 +2270,7 @@
           var remaining = s.max - s.filled;
           var item = document.createElement("span");
           item.className =
-            "mobile-slot-summary-item role-" +
-            r.key.replace("classRep", "classrep");
+            "mobile-slot-summary-item role-" + r.classSuffix;
           if (remaining <= 0) item.classList.add("is-full");
           item.textContent =
             r.label +
@@ -2605,9 +2646,7 @@
           return r.label === roleLabel;
         });
         if (roleKey) {
-          submitBtn.classList.add(
-            "modal-submit-" + roleKey.key.replace("classRep", "classrep"),
-          );
+          submitBtn.classList.add("modal-submit-" + roleKey.classSuffix);
         }
         submitBtn.textContent = SIGNUP_BTN_TEXT;
         document.getElementById("modalMessage").style.display = "none";

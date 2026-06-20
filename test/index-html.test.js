@@ -128,7 +128,8 @@ function loadClient(options = {}) {
           slots: {
             general: { max: 2, filled: 1 },
             classRep: { max: 1, filled: 1 },
-            committee: { max: 0, filled: 0 },
+            steeringCommittee: { max: 0, filled: 0 },
+            orgCommittee: { max: 1, filled: 0 },
           },
           signups: [
             { name: "Alice", cls: "1-1", role: "一般保護者" },
@@ -146,7 +147,8 @@ function loadClient(options = {}) {
           slots: {
             general: { max: 1, filled: 1 },
             classRep: { max: 0, filled: 0 },
-            committee: { max: 1, filled: 0 },
+            steeringCommittee: { max: 1, filled: 0 },
+            orgCommittee: { max: 0, filled: 0 },
           },
           signups: [],
         },
@@ -226,6 +228,7 @@ function loadClient(options = {}) {
       "normaliseClassComparable",
       "showMessage",
       "showCancelMessage",
+      "openModal",
       "findAndConfirmCancel",
       "submitSignup",
       "buildGrid",
@@ -284,7 +287,43 @@ test("getRoleMetaByLabel returns metadata for known role labels", () => {
   const { exports: client } = loadClient();
 
   assert.equal(client.getRoleMetaByLabel("一般保護者").key, "general");
+  assert.equal(
+    client.getRoleMetaByLabel("運営委員・役員").key,
+    "steeringCommittee",
+  );
+  assert.equal(
+    client.getRoleMetaByLabel("\u5B9F\u884C\u59D4\u54E1").key,
+    "orgCommittee",
+  );
   assert.equal(client.getRoleMetaByLabel("missing"), null);
+});
+
+test("openModal renders an org committee role button when slots exist", () => {
+  const roleButtons = createElement("div");
+  const { exports: client } = loadClient({
+    elements: {
+      modalTitle: createElement("div"),
+      modalSubtitle: createElement("div"),
+      namesSection: createElement("div"),
+      namesGroups: createElement("div"),
+      roleButtons,
+      modalForm: createElement("div"),
+      inputName: createElement("input"),
+      inputClass: createElement("input"),
+      modalMessage: createElement("div"),
+      modalOverlay: createElement("div"),
+    },
+  });
+
+  client.buildGridIndexes();
+  client.openModal(1);
+
+  const orgCommitteeButton = roleButtons.children.find(function (child) {
+    return child.getAttribute("data-role") === "\u5B9F\u884C\u59D4\u54E1";
+  });
+  assert.ok(orgCommitteeButton);
+  assert.equal(orgCommitteeButton.className, "role-btn role-btn-orgcommittee");
+  assert.equal(orgCommitteeButton.children[0].textContent, "\u5B9F\u884C\u59D4\u54E1");
 });
 
 test("getEffectiveWidth uses the smallest valid viewport width", () => {
@@ -307,7 +346,8 @@ test("hasAnyAvailable reports whether at least one role still has capacity", () 
     client.hasAnyAvailable({
       general: { max: 1, filled: 1 },
       classRep: { max: 1, filled: 0 },
-      committee: { max: 0, filled: 0 },
+      steeringCommittee: { max: 0, filled: 0 },
+      orgCommittee: { max: 0, filled: 0 },
     }),
     true,
   );
@@ -315,7 +355,8 @@ test("hasAnyAvailable reports whether at least one role still has capacity", () 
     client.hasAnyAvailable({
       general: { max: 1, filled: 1 },
       classRep: { max: 1, filled: 1 },
-      committee: { max: 0, filled: 0 },
+      steeringCommittee: { max: 0, filled: 0 },
+      orgCommittee: { max: 0, filled: 0 },
     }),
     false,
   );
@@ -532,7 +573,8 @@ test("submitSignup refreshes grid data after a stale full-slot rejection", () =>
         slots: {
           general: { max: 2, filled: 2 },
           classRep: { max: 1, filled: 1 },
-          committee: { max: 0, filled: 0 },
+          steeringCommittee: { max: 0, filled: 0 },
+          orgCommittee: { max: 0, filled: 0 },
         },
         signups: [],
       },
@@ -718,7 +760,8 @@ test("buildMobileAgenda groups mobile cards by activity and sorts each group by 
           slots: {
             general: { max: 1, filled: 0 },
             classRep: { max: 0, filled: 0 },
-            committee: { max: 0, filled: 0 },
+            steeringCommittee: { max: 0, filled: 0 },
+            orgCommittee: { max: 0, filled: 0 },
           },
           signups: [],
         },
@@ -733,7 +776,8 @@ test("buildMobileAgenda groups mobile cards by activity and sorts each group by 
           slots: {
             general: { max: 1, filled: 0 },
             classRep: { max: 0, filled: 0 },
-            committee: { max: 0, filled: 0 },
+            steeringCommittee: { max: 0, filled: 0 },
+            orgCommittee: { max: 0, filled: 0 },
           },
           signups: [],
         },
@@ -748,7 +792,8 @@ test("buildMobileAgenda groups mobile cards by activity and sorts each group by 
           slots: {
             general: { max: 1, filled: 0 },
             classRep: { max: 0, filled: 0 },
-            committee: { max: 0, filled: 0 },
+            steeringCommittee: { max: 0, filled: 0 },
+            orgCommittee: { max: 0, filled: 0 },
           },
           signups: [],
         },
@@ -862,7 +907,8 @@ test("buildMobileAgenda can group mobile cards by time with headings", () => {
           slots: {
             general: { max: 1, filled: 0 },
             classRep: { max: 0, filled: 0 },
-            committee: { max: 0, filled: 0 },
+            steeringCommittee: { max: 0, filled: 0 },
+            orgCommittee: { max: 0, filled: 0 },
           },
           signups: [],
         },
@@ -877,7 +923,8 @@ test("buildMobileAgenda can group mobile cards by time with headings", () => {
           slots: {
             general: { max: 1, filled: 0 },
             classRep: { max: 0, filled: 0 },
-            committee: { max: 0, filled: 0 },
+            steeringCommittee: { max: 0, filled: 0 },
+            orgCommittee: { max: 0, filled: 0 },
           },
           signups: [],
         },
@@ -892,7 +939,8 @@ test("buildMobileAgenda can group mobile cards by time with headings", () => {
           slots: {
             general: { max: 1, filled: 0 },
             classRep: { max: 0, filled: 0 },
-            committee: { max: 0, filled: 0 },
+            steeringCommittee: { max: 0, filled: 0 },
+            orgCommittee: { max: 0, filled: 0 },
           },
           signups: [],
         },

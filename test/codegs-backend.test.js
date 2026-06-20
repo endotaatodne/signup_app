@@ -36,6 +36,7 @@ function createAdditionalEventRow({
     2,
     1,
     1,
+    1,
   ];
 }
 
@@ -50,9 +51,10 @@ function createEventRows() {
       "EndTime",
       "Description",
       "Location",
-      "GeneralMax",
-      "ClassRepMax",
-      "CommitteeMax",
+      "GeneralSlots",
+      "ClassRepSlots",
+      "SteeringCommitteeSlots",
+      "OrgCommitteeSlots",
     ],
     [
       1,
@@ -64,6 +66,7 @@ function createEventRows() {
       'Guide <parents> & "students"',
       "Gym",
       2,
+      1,
       1,
       1,
     ],
@@ -183,11 +186,13 @@ test("getGridData_ uses display values for class text and computes role counts",
     ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
     ["s1", 1, "Alice", new Date("2026-04-01T00:00:00Z"), "一般保護者", new Date()],
     ["s2", 1, "Bob", "2-1", "学年委員", new Date()],
+    ["s3", 1, "Carol", "3-1", "\u5B9F\u884C\u59D4\u54E1", new Date()],
   ];
   const signupDisplayRows = [
     ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
     ["s1", "1", "Alice", "1-1", "一般保護者", "2026-04-01"],
     ["s2", "1", "Bob", "2-1", "学年委員", "2026-04-01"],
+    ["s3", "1", "Carol", "3-1", "\u5B9F\u884C\u59D4\u54E1", "2026-04-01"],
   ];
   const { app, spreadsheets } = loadBackend({ signupRows, signupDisplayRows });
 
@@ -199,6 +204,10 @@ test("getGridData_ uses display values for class text and computes role counts",
   assert.equal(event.signups[0].cls, "1-1");
   assert.equal(event.slots.general.filled, 1);
   assert.equal(event.slots.classRep.filled, 1);
+  assert.equal(event.slots.steeringCommittee.max, 1);
+  assert.equal(event.slots.steeringCommittee.filled, 0);
+  assert.equal(event.slots.orgCommittee.max, 1);
+  assert.equal(event.slots.orgCommittee.filled, 1);
   assert.equal(event.description, "Guide \\u003cparents\\u003e \\u0026 \\u0022students\\u0022");
 });
 
@@ -334,6 +343,25 @@ test("submitSignup appends a normalised signup row on success", () => {
   assert.equal(appendedRow[3], "4-2");
   assert.equal(appendedRow[4], app.ROLES.general);
   assert.equal(lock.released, true);
+});
+
+test("submitSignup accepts org committee role using OrgCommitteeSlots capacity", () => {
+  const { app, spreadsheets } = loadBackend();
+  const signupsSheet = spreadsheets[EVENT_SHEET_ID].getSheetByName("Signups");
+
+  const result = app.submitSignup(
+    "1",
+    "Carol",
+    "3-1",
+    app.ROLES.orgCommittee,
+    "spring-fete",
+  );
+  const signupRows = signupsSheet.getDataRange().getValues();
+  const appendedRow = signupRows[signupRows.length - 1];
+
+  assert.equal(result.success, true);
+  assert.equal(result.role, app.ROLES.orgCommittee);
+  assert.equal(appendedRow[4], app.ROLES.orgCommittee);
 });
 
 test("submitSignup does not release a lock that was not acquired", () => {
@@ -497,7 +525,13 @@ test("submitSignup rejects duplicate names after normalisation", () => {
   ];
   const { app } = loadBackend({ signupRows });
 
-  const result = app.submitSignup("1", " alice ", "1-2", app.ROLES.committee, "spring-fete");
+  const result = app.submitSignup(
+    "1",
+    " alice ",
+    "1-2",
+    app.ROLES.steeringCommittee,
+    "spring-fete",
+  );
 
   assert.equal(result.success, false);
   assert.match(result.message, /同じ名前/);
@@ -595,7 +629,13 @@ test("submitSignup rejects overlapping same-person signup across roles", () => {
   ];
   const { app } = loadBackend({ eventRows, signupRows });
 
-  const result = app.submitSignup("1", "Alice", "1-1", app.ROLES.committee, "spring-fete");
+  const result = app.submitSignup(
+    "1",
+    "Alice",
+    "1-1",
+    app.ROLES.steeringCommittee,
+    "spring-fete",
+  );
 
   assert.equal(result.success, false);
   assert.equal(result.code, "time_conflict");

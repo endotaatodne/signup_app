@@ -11,10 +11,10 @@ A free, open-source volunteer signup app built on Google Apps Script and Google 
 - Desktop grid view — activities across the top, time slots down the side
 - Mobile card view — switch between grouping by time and grouping by activity
 - Time ranges displayed per slot/card (e.g. 9:00 am - 10:00 am)
-- Three volunteer roles per slot — General, Class Rep, Committee (fully configurable)
+- Four volunteer roles per slot — General, Class Rep, Steering Committee, Org Committee (fully configurable)
 - Role-based slot limits — each role has its own quota
 - Roles with zero quota are hidden automatically
-- Colour-coded roles — green (General), amber (Class Rep), blue (Committee)
+- Colour-coded roles — green (General), amber (Class Rep), blue (Steering Committee), purple (Org Committee)
 - Names displayed in role colour in each grid cell
 - Users sign up with name and class — no Google account required
 - Users can cancel their own signup via the modal
@@ -91,9 +91,9 @@ https://docs.google.com/spreadsheets/d/YOUR_MASTER_SHEET_ID/edit
 
 **Events tab** — add these headers in row 1:
 
-| A       | B        | C        | D    | E         | F       | G           | H        | I            | J             | K              |
-| ------- | -------- | -------- | ---- | --------- | ------- | ----------- | -------- | ------------ | ------------- | -------------- |
-| EventID | Activity | SubTitle | Date | StartTime | EndTime | Description | Location | GeneralSlots | ClassRepSlots | CommitteeSlots |
+| A       | B        | C        | D    | E         | F       | G           | H        | I            | J             | K                      | L                 |
+| ------- | -------- | -------- | ---- | --------- | ------- | ----------- | -------- | ------------ | ------------- | ---------------------- | ----------------- |
+| EventID | Activity | SubTitle | Date | StartTime | EndTime | Description | Location | GeneralSlots | ClassRepSlots | SteeringCommitteeSlots | OrgCommitteeSlots |
 
 **Signups tab** — add these headers in row 1:
 
@@ -173,11 +173,12 @@ Open `Code.gs` and update the `ROLES` constant if you want to use different role
 const ROLES = {
   general: "General",
   classRep: "Class Rep",
-  committee: "Committee",
+  steeringCommittee: "Steering Committee",
+  orgCommittee: "Org Committee",
 };
 ```
 
-The keys (`general`, `classRep`, `committee`) must stay the same — only change the values on the right.
+The keys (`general`, `classRep`, `steeringCommittee`, `orgCommittee`) must stay the same — only change the values on the right.
 
 ### Step 9 — Push the Code
 
@@ -244,7 +245,7 @@ All signups are in the **Signups tab** of each event Sheet, with:
 - Event ID
 - Participant name
 - Participant class
-- Role (General / Class Rep / Committee)
+- Role (General / Class Rep / Steering Committee / Org Committee)
 - Timestamp
 
 ### Cancelling a Signup (Admin)
@@ -276,7 +277,8 @@ Users can cancel their own signup from the app:
 | H      | Location       | Room or location name shown in headers/cards and the modal         |
 | I      | GeneralSlots   | Max General volunteer spots (0 = not needed)                       |
 | J      | ClassRepSlots  | Max Class Rep spots (0 = not needed)                               |
-| K      | CommitteeSlots | Max Committee spots (0 = not needed)                               |
+| K      | SteeringCommitteeSlots | Max Steering Committee spots (0 = not needed)              |
+| L      | OrgCommitteeSlots | Max Org Committee spots (0 = not needed)                        |
 
 ---
 
@@ -290,11 +292,12 @@ In `Code.gs`, update the `ROLES` constant:
 const ROLES = {
   general: "Volunteer",
   classRep: "Team Leader",
-  committee: "Coordinator",
+  steeringCommittee: "Coordinator",
+  orgCommittee: "Org Committee",
 };
 ```
 
-The keys (`general`, `classRep`, `committee`) must stay the same — only change the values on the right. Changes apply everywhere automatically after redeployment.
+The keys (`general`, `classRep`, `steeringCommittee`, `orgCommittee`) must stay the same — only change the values on the right. Changes apply everywhere automatically after redeployment.
 
 ### Changing Role Colours
 
@@ -307,9 +310,12 @@ In `index.html`, find and update the role colour CSS:
 .count-classrep {
   color: #f57f17;
 } /* amber */
-.count-committee {
+.count-steeringcommittee {
   color: #1565c0;
 } /* blue  */
+.count-orgcommittee {
+  color: #6a1b9a;
+} /* purple */
 ```
 
 ### Changing the Button Text

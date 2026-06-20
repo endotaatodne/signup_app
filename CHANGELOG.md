@@ -1,3 +1,13 @@
+## v0.2.2 - 2026-06-13
+
+- Minor update
+  - Allows half-width and full-width brackets in names, normalising `（` and `）` to `(` and `)` at signup and cancellation entry points.
+  - Adds the OrgCommittee volunteer role with the label 実行委員.
+  - Adds support for the Events sheet `OrgCommitteeSlots` column.
+  - Renames the existing Committee role key and sheet column to SteeringCommittee while keeping its Japanese label unchanged.
+  - Updates frontend role styling, signup capacity checks, documentation, and tests for the fourth role.
+  - Bumps the app version to 0.2.2.
+
 ## v0.2.1 - 2026-06-13
 
 - Bug fix
