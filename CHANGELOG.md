@@ -1,3 +1,11 @@
+## v0.2.3 - 2026-06-24
+
+- Patch
+  - Narrows the time column in the desktop signup table.
+  - Expands and restyles the description column to improve readability.
+  - Increases the table's minimum width to accommodate the updated desktop layout.
+  - Bumps the app version to 0.2.3.
+
 ## v0.2.2 - 2026-06-13
 
 - Minor update
