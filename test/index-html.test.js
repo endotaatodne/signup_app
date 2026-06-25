@@ -288,7 +288,7 @@ test("getRoleMetaByLabel returns metadata for known role labels", () => {
 
   assert.equal(client.getRoleMetaByLabel("一般保護者").key, "general");
   assert.equal(
-    client.getRoleMetaByLabel("運営委員・役員").key,
+    client.getRoleMetaByLabel("役員、運営・実行委員").key,
     "steeringCommittee",
   );
   assert.equal(

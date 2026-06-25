@@ -11,7 +11,7 @@ const MASTER_SHEET_ID =
 const ROLES = {
   general: "一般保護者",
   classRep: "学年委員",
-  steeringCommittee: "運営委員・役員",
+  steeringCommittee: "役員、運営・実行委員",
   orgCommittee: "実行委員",
 };
 
