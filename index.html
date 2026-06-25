@@ -778,6 +778,214 @@
         display: none;
       }
 
+      .mobile-availability-control {
+        display: none;
+      }
+
+      body.compact-layout .mobile-availability-control {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        display: grid;
+        gap: 10px;
+        margin: -8px 14px 10px;
+        padding: 10px;
+        background: rgba(255, 255, 255, 0.96);
+        border: 1px solid #e5dfd6;
+        border-radius: 12px;
+        box-shadow: 0 4px 16px rgba(26, 26, 24, 0.08);
+      }
+
+      .mobile-filter-row {
+        display: grid;
+        gap: 8px;
+        align-items: end;
+      }
+
+      .mobile-filter-row-secondary {
+        grid-template-columns: 1fr;
+      }
+
+      .mobile-filter-field {
+        display: block;
+        min-width: 0;
+      }
+
+      .mobile-filter-label {
+        display: block;
+        margin: 0 0 6px;
+        color: #5d554d;
+        font-size: 16px;
+        font-weight: 800;
+        line-height: 1.2;
+      }
+
+      .mobile-filter-select,
+      .mobile-keyword-search {
+        min-width: 0;
+        min-height: 44px;
+        width: 100%;
+        padding: 8px 34px 8px 12px;
+        border: 1px solid #d8d1c8;
+        border-radius: 9px;
+        background: #ffffff;
+        color: #2d2926;
+        font-size: 16px;
+        font-weight: 700;
+      }
+
+      .mobile-keyword-search {
+        padding-right: 12px;
+      }
+
+      .mobile-activity-filter-pills,
+      .mobile-role-filter-pills {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 9px;
+      }
+
+      .mobile-activity-filter-pill,
+      .mobile-role-filter-pill {
+        min-height: 48px;
+        padding: 11px 16px;
+        border: 1px solid #d8d1c8;
+        border-radius: 999px;
+        background: #ffffff;
+        color: #3f3a35;
+        cursor: pointer;
+        font-size: 18px;
+        font-weight: 800;
+        line-height: 1.2;
+      }
+
+      .mobile-activity-filter-pill {
+        border-radius: 8px;
+        background: #fffdf9;
+        color: #3f3a35;
+      }
+
+      .mobile-activity-filter-pill.is-active {
+        border-color: #8f6b2f;
+        background: #5b4630;
+        color: #ffffff;
+        box-shadow: 0 2px 8px rgba(91, 70, 48, 0.16);
+      }
+
+      .mobile-activity-filter-pill.activity-accent-0.is-active {
+        border-color: #a74722;
+        background: #b94f25;
+        box-shadow: 0 2px 8px rgba(185, 79, 37, 0.18);
+      }
+
+      .mobile-activity-filter-pill.activity-accent-1.is-active {
+        border-color: #245e73;
+        background: #2b6f85;
+        box-shadow: 0 2px 8px rgba(43, 111, 133, 0.18);
+      }
+
+      .mobile-activity-filter-pill.activity-accent-2.is-active {
+        border-color: #59663a;
+        background: #687541;
+        box-shadow: 0 2px 8px rgba(104, 117, 65, 0.18);
+      }
+
+      .mobile-activity-filter-pill.activity-accent-3.is-active {
+        border-color: #9b6f1f;
+        background: #ad7d25;
+        box-shadow: 0 2px 8px rgba(173, 125, 37, 0.18);
+      }
+
+      .mobile-activity-filter-pill.activity-accent-4.is-active {
+        border-color: #68436d;
+        background: #75507a;
+        box-shadow: 0 2px 8px rgba(117, 80, 122, 0.18);
+      }
+
+      .mobile-activity-filter-pill.activity-accent-5.is-active {
+        border-color: #8a3329;
+        background: #9d3e32;
+        box-shadow: 0 2px 8px rgba(157, 62, 50, 0.18);
+      }
+
+      .mobile-role-filter-pill.is-active {
+        border-color: #3f3a35;
+        background: #3f3a35;
+        color: #ffffff;
+        box-shadow: 0 2px 8px rgba(63, 58, 53, 0.16);
+      }
+
+      .mobile-role-filter-pill.role-general.is-active {
+        border-color: #1f6b2b;
+        background: #267a32;
+        box-shadow: 0 2px 8px rgba(38, 122, 50, 0.18);
+      }
+
+      .mobile-role-filter-pill.role-classrep.is-active {
+        border-color: #9a5a00;
+        background: #b26a00;
+        box-shadow: 0 2px 8px rgba(178, 106, 0, 0.18);
+      }
+
+      .mobile-role-filter-pill.role-steeringcommittee.is-active {
+        border-color: #0f4f9a;
+        background: #155fae;
+        box-shadow: 0 2px 8px rgba(21, 95, 174, 0.18);
+      }
+
+      .mobile-role-filter-pill.role-orgcommittee.is-active {
+        border-color: #56137c;
+        background: #681c8d;
+        box-shadow: 0 2px 8px rgba(104, 28, 141, 0.18);
+      }
+
+      .mobile-role-filter-pill.role-general:not(.is-active) {
+        background: #edf7ee;
+        color: #2e7d32;
+      }
+
+      .mobile-role-filter-pill.role-classrep:not(.is-active) {
+        background: #fff4da;
+        color: #b26a00;
+      }
+
+      .mobile-role-filter-pill.role-steeringcommittee:not(.is-active) {
+        background: #eaf3ff;
+        color: #1565c0;
+      }
+
+      .mobile-role-filter-pill.role-orgcommittee:not(.is-active) {
+        background: #f4eafd;
+        color: #6a1b9a;
+      }
+
+      .mobile-time-filter {
+        border-color: #b7cdbd;
+        background: #f5fbf6;
+        color: #124326;
+      }
+
+      .mobile-time-availability-detail {
+        min-height: 20px;
+        color: #4d463f;
+        font-size: 13px;
+        font-weight: 700;
+        line-height: 1.35;
+      }
+
+      .mobile-empty-state {
+        margin: 14px 0 0;
+        padding: 18px 14px;
+        border: 1px dashed #d8d1c8;
+        border-radius: 12px;
+        background: #fffdf9;
+        color: #6b625a;
+        font-size: 16px;
+        font-weight: 700;
+        line-height: 1.45;
+        text-align: center;
+      }
+
       body.compact-layout .mobile-display-mode-control {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1393,6 +1601,15 @@
       }
 
       @media (max-width: 420px) {
+        body.compact-layout .mobile-availability-control {
+          margin-left: 10px;
+          margin-right: 10px;
+        }
+
+        .mobile-filter-row-secondary {
+          grid-template-columns: 1fr;
+        }
+
         body.compact-layout .mobile-slot-card {
           min-height: 182px;
           padding: 32px 18px 24px;
@@ -1420,6 +1637,56 @@
   </head>
   <body>
     <h1 id="pageTitle"></h1>
+    <div
+      id="mobileAvailabilityControl"
+      class="mobile-availability-control"
+      aria-label="Mobile filters"
+    >
+      <div class="mobile-filter-row mobile-filter-row-secondary">
+        <div class="mobile-filter-field">
+          <span class="mobile-filter-label">募集枠</span>
+          <div
+            id="mobileActivityFilter"
+            class="mobile-activity-filter-pills"
+            role="group"
+            aria-label="Filter by activity"
+          ></div>
+        </div>
+        <div class="mobile-filter-field">
+          <span class="mobile-filter-label">ポジション</span>
+          <div
+            id="mobileRoleAvailabilityFilter"
+            class="mobile-role-filter-pills"
+            role="group"
+            aria-label="Filter by volunteer slot type"
+          ></div>
+        </div>
+        <label class="mobile-filter-field" for="mobileKeywordSearch">
+          <span class="mobile-filter-label">検索</span>
+          <input
+            id="mobileKeywordSearch"
+            class="mobile-keyword-search"
+            type="search"
+            autocomplete="off"
+            placeholder="名前・募集内容で検索"
+            aria-label="Search volunteer names and signup details"
+          />
+        </label>
+        <label class="mobile-filter-field" for="mobileTimeAvailabilityFilter">
+          <span class="mobile-filter-label">時間帯で絞り込み</span>
+          <select
+            id="mobileTimeAvailabilityFilter"
+            class="mobile-filter-select mobile-time-filter"
+            aria-label="Filter by available time slot"
+          ></select>
+        </label>
+        <div
+          id="mobileTimeAvailabilityDetail"
+          class="mobile-time-availability-detail"
+          aria-live="polite"
+        ></div>
+      </div>
+    </div>
     <div
       id="mobileDisplayModeControl"
       class="mobile-display-mode-control"
@@ -1575,6 +1842,13 @@
       var lastCompactLayout = null;
       var MOBILE_DISPLAY_MODE_STORAGE_KEY = "signupApp.mobileDisplayMode";
       var DEFAULT_MOBILE_DISPLAY_MODE = "time";
+      var MOBILE_TIME_FILTER_ALL = "__all__";
+      var MOBILE_ROLE_FILTER_ALL = "__all__";
+      var MOBILE_ACTIVITY_FILTER_ALL = "__all__";
+      var mobileAvailableTimeFilter = MOBILE_TIME_FILTER_ALL;
+      var mobileRoleAvailabilityFilter = MOBILE_ROLE_FILTER_ALL;
+      var mobileActivityFilter = MOBILE_ACTIVITY_FILTER_ALL;
+      var mobileKeywordSearchQuery = "";
 
       var ROLE_KEYS = [
         {
@@ -1857,10 +2131,520 @@
         return document.getElementById("mobileAgenda");
       }
 
+      function getMobileTimeFilterSelect() {
+        return document.getElementById("mobileTimeAvailabilityFilter");
+      }
+
+      function getMobileActivityFilterContainer() {
+        return document.getElementById("mobileActivityFilter");
+      }
+
+      function getMobileRoleFilterSelect() {
+        return document.getElementById("mobileRoleAvailabilityFilter");
+      }
+
+      function getMobileKeywordSearchInput() {
+        return document.getElementById("mobileKeywordSearch");
+      }
+
       function hasAnyAvailable(slots) {
         return ROLE_KEYS.some(function (r) {
           return slots[r.key].max > 0 && slots[r.key].filled < slots[r.key].max;
         });
+      }
+
+      function getRoleSlot(event, roleKey) {
+        return event && event.slots ? event.slots[roleKey] || null : null;
+      }
+
+      function getRemainingForRole(event, roleKey) {
+        var slot = getRoleSlot(event, roleKey) || {};
+        var max = Number(slot.max) || 0;
+        var filled = Number(slot.filled) || 0;
+        return Math.max(0, max - filled);
+      }
+
+      function eventHasRoleSlot(event, roleKey) {
+        var slot = getRoleSlot(event, roleKey) || {};
+        return (Number(slot.max) || 0) > 0;
+      }
+
+      function eventHasAvailableRoleSlot(event, roleKey) {
+        return eventHasRoleSlot(event, roleKey) && getRemainingForRole(event, roleKey) > 0;
+      }
+
+      function getAvailableSlotCount(event, roleKey) {
+        if (!event || !event.slots) return 0;
+        if (roleKey && roleKey !== MOBILE_ROLE_FILTER_ALL) {
+          return getRemainingForRole(event, roleKey);
+        }
+        return ROLE_KEYS.reduce(function (total, r) {
+          return total + getRemainingForRole(event, r.key);
+        }, 0);
+      }
+
+      function getAvailableSlotCountForEvents(events, roleKey) {
+        return (events || []).reduce(function (total, event) {
+          return total + getAvailableSlotCount(event, roleKey);
+        }, 0);
+      }
+
+      function getFullEventCount(events, roleKey) {
+        return (events || []).filter(function (event) {
+          if (roleKey && roleKey !== MOBILE_ROLE_FILTER_ALL) {
+            return eventHasRoleSlot(event, roleKey) && !eventHasAvailableRoleSlot(event, roleKey);
+          }
+          return !hasAnyAvailable(event.slots || {});
+        }).length;
+      }
+
+      function normaliseMobileRoleFilter(value) {
+        if (!value || value === MOBILE_ROLE_FILTER_ALL) {
+          return MOBILE_ROLE_FILTER_ALL;
+        }
+        var requested = String(value);
+        return ROLE_KEYS.some(function (r) {
+          return r.key === requested;
+        })
+          ? requested
+          : MOBILE_ROLE_FILTER_ALL;
+      }
+
+      function getMobileRoleFilter() {
+        mobileRoleAvailabilityFilter = normaliseMobileRoleFilter(
+          mobileRoleAvailabilityFilter,
+        );
+        return mobileRoleAvailabilityFilter;
+      }
+
+      function normaliseMobileActivityFilter(value) {
+        if (!value || value === MOBILE_ACTIVITY_FILTER_ALL) {
+          return MOBILE_ACTIVITY_FILTER_ALL;
+        }
+        var requested = String(value);
+        var activities = (gridData && gridData.activities) || [];
+        var hasActivity = activities.indexOf(requested) !== -1;
+        if (!hasActivity && gridData && gridData.events) {
+          hasActivity = gridData.events.some(function (event) {
+            return event.activity === requested;
+          });
+        }
+        return hasActivity ? requested : MOBILE_ACTIVITY_FILTER_ALL;
+      }
+
+      function getMobileActivityFilter() {
+        mobileActivityFilter = normaliseMobileActivityFilter(
+          mobileActivityFilter,
+        );
+        return mobileActivityFilter;
+      }
+
+      function normaliseMobileKeywordSearchQuery(value) {
+        return normaliseComparable(String(value || ""));
+      }
+
+      function getMobileKeywordSearchQuery() {
+        return normaliseMobileKeywordSearchQuery(mobileKeywordSearchQuery);
+      }
+
+      function getMobileVolunteerNameQuery() {
+        return getMobileKeywordSearchQuery();
+      }
+
+      function setMobileRoleFilter(roleKey) {
+        mobileRoleAvailabilityFilter = normaliseMobileRoleFilter(roleKey);
+        mobileAvailableTimeFilter = normaliseMobileAvailableTimeFilter(
+          mobileAvailableTimeFilter,
+        );
+        updateMobileAvailabilityControl();
+        if (isCompactLayout()) {
+          buildMobileAgenda();
+        }
+      }
+
+      function setMobileActivityFilter(activity) {
+        mobileActivityFilter = normaliseMobileActivityFilter(activity);
+        mobileAvailableTimeFilter = normaliseMobileAvailableTimeFilter(
+          mobileAvailableTimeFilter,
+        );
+        updateMobileAvailabilityControl();
+        if (isCompactLayout()) {
+          buildMobileAgenda();
+        }
+      }
+
+      function setMobileKeywordSearchQuery(value) {
+        mobileKeywordSearchQuery = String(value || "");
+        mobileAvailableTimeFilter = normaliseMobileAvailableTimeFilter(
+          mobileAvailableTimeFilter,
+        );
+        updateMobileAvailabilityControl();
+        if (isCompactLayout()) {
+          buildMobileAgenda();
+        }
+      }
+
+      function setMobileVolunteerNameQuery(value) {
+        setMobileKeywordSearchQuery(value);
+      }
+
+      function eventMatchesRoleFilter(event, roleKey) {
+        if (!roleKey || roleKey === MOBILE_ROLE_FILTER_ALL) return true;
+        return eventHasRoleSlot(event, roleKey);
+      }
+
+      function eventMatchesActivityFilter(event, activity) {
+        if (!activity || activity === MOBILE_ACTIVITY_FILTER_ALL) return true;
+        return event.activity === activity;
+      }
+
+      function eventMatchesTimeFilter(event, time) {
+        if (!time || time === MOBILE_TIME_FILTER_ALL) return true;
+        return String(event.startTime || "") === String(time);
+      }
+
+      function eventMatchesKeywordSearch(event, query) {
+        if (!query) return true;
+        var eventFields = [
+          event.activity,
+          event.subtitle,
+          event.description,
+        ];
+        var matchesEventText = eventFields.some(function (value) {
+          return normaliseComparable(value || "").indexOf(query) !== -1;
+        });
+        if (matchesEventText) return true;
+
+        return (event.signups || []).some(function (signup) {
+          return normaliseComparable(signup.name || "").indexOf(query) !== -1;
+        });
+      }
+
+      function getMobileBaseFilteredEvents() {
+        var roleKey = getMobileRoleFilter();
+        var activity = getMobileActivityFilter();
+        var keywordQuery = getMobileKeywordSearchQuery();
+        return ((gridData && gridData.events) || []).filter(function (event) {
+          return (
+            eventMatchesRoleFilter(event, roleKey) &&
+            eventMatchesActivityFilter(event, activity) &&
+            eventMatchesKeywordSearch(event, keywordQuery)
+          );
+        });
+      }
+
+      function getMobileRoleFilterOptionEvents() {
+        var activity = getMobileActivityFilter();
+        var time = getMobileAvailableTimeFilter();
+        var keywordQuery = getMobileKeywordSearchQuery();
+        return ((gridData && gridData.events) || []).filter(function (event) {
+          return (
+            eventMatchesActivityFilter(event, activity) &&
+            eventMatchesTimeFilter(event, time) &&
+            eventMatchesKeywordSearch(event, keywordQuery)
+          );
+        });
+      }
+
+      function getMobileAvailableRoleOptions() {
+        var events = getMobileRoleFilterOptionEvents();
+        return ROLE_KEYS.filter(function (r) {
+          return getAvailableSlotCountForEvents(events, r.key) > 0;
+        });
+      }
+
+      function getAvailableRoleSummariesForEvents(events, roleKey) {
+        return ROLE_KEYS.filter(function (r) {
+          return !roleKey || roleKey === MOBILE_ROLE_FILTER_ALL || r.key === roleKey;
+        })
+          .map(function (r) {
+            return {
+              key: r.key,
+              label: r.label,
+              remaining: getAvailableSlotCountForEvents(events, r.key),
+            };
+          })
+          .filter(function (summary) {
+            return summary.remaining > 0;
+          });
+      }
+
+      function formatRoleAvailabilitySummary(summaries) {
+        if (!summaries || summaries.length === 0) {
+          return "空きなし";
+        }
+        return summaries
+          .map(function (summary) {
+            return summary.label + " " + formatRemainingSlots(summary.remaining);
+          })
+          .join(" / ");
+      }
+
+      function getMobileAvailableTimeOptions() {
+        var events = getMobileBaseFilteredEvents();
+        var roleKey = getMobileRoleFilter();
+        var eventGroups = Object.create(null);
+        events.forEach(function (event) {
+          var time = String(event.startTime || "");
+          if (!time) return;
+          if (!eventGroups[time]) eventGroups[time] = [];
+          eventGroups[time].push(event);
+        });
+
+        var orderedTimes = (gridData && gridData.times ? gridData.times : [])
+          .slice()
+          .filter(function (time, index, times) {
+            return times.indexOf(time) === index;
+          });
+        Object.keys(eventGroups)
+          .sort()
+          .forEach(function (time) {
+            if (orderedTimes.indexOf(time) === -1) orderedTimes.push(time);
+          });
+
+        return orderedTimes
+          .map(function (time) {
+            var matchingEvents = eventGroups[time] || [];
+            var roleSummaries = getAvailableRoleSummariesForEvents(
+              matchingEvents,
+              roleKey,
+            );
+            return {
+              time: time,
+              events: matchingEvents,
+              availableSlots: getAvailableSlotCountForEvents(
+                matchingEvents,
+                roleKey,
+              ),
+              fullEvents: getFullEventCount(matchingEvents, roleKey),
+              roleSummaries: roleSummaries,
+            };
+          })
+          .filter(function (option) {
+            return option.availableSlots > 0;
+          });
+      }
+
+      function getMobileTimeOptionLabel(option) {
+        var events = option.events || [];
+        return getMobileTimeHeadingText(option.time, events);
+      }
+
+      function normaliseMobileAvailableTimeFilter(value) {
+        if (!value || value === MOBILE_TIME_FILTER_ALL) {
+          return MOBILE_TIME_FILTER_ALL;
+        }
+        var requested = String(value);
+        var availableTimes = getMobileAvailableTimeOptions().map(function (option) {
+          return String(option.time);
+        });
+        return availableTimes.indexOf(requested) === -1
+          ? MOBILE_TIME_FILTER_ALL
+          : requested;
+      }
+
+      function getMobileAvailableTimeFilter() {
+        mobileAvailableTimeFilter = normaliseMobileAvailableTimeFilter(
+          mobileAvailableTimeFilter,
+        );
+        return mobileAvailableTimeFilter;
+      }
+
+      function setMobileAvailableTimeFilter(time) {
+        mobileAvailableTimeFilter = normaliseMobileAvailableTimeFilter(time);
+        updateMobileAvailabilityControl();
+        if (isCompactLayout()) {
+          buildMobileAgenda();
+        }
+      }
+
+      function getMobileFilteredEvents() {
+        var events = getMobileBaseFilteredEvents();
+        var selectedTime = getMobileAvailableTimeFilter();
+        if (selectedTime === MOBILE_TIME_FILTER_ALL) return events;
+        return events.filter(function (event) {
+          return String(event.startTime || "") === selectedTime;
+        });
+      }
+
+      function getOrderedValuesForEvents(events, key, preferredOrder) {
+        var values = [];
+        var seen = Object.create(null);
+        (preferredOrder || []).forEach(function (value) {
+          var hasMatchingEvent = events.some(function (event) {
+            return event[key] === value;
+          });
+          if (hasMatchingEvent && !seen[value]) {
+            seen[value] = true;
+            values.push(value);
+          }
+        });
+        events.forEach(function (event) {
+          var value = event[key];
+          if (value && !seen[value]) {
+            seen[value] = true;
+            values.push(value);
+          }
+        });
+        return values;
+      }
+
+      function getMobileFilteredTimes(events) {
+        return getOrderedValuesForEvents(
+          events,
+          "startTime",
+          (gridData && gridData.times) || [],
+        );
+      }
+
+      function getMobileFilteredActivities(events) {
+        return getOrderedValuesForEvents(
+          events,
+          "activity",
+          (gridData && gridData.activities) || [],
+        );
+      }
+
+      function updateMobileAvailabilityControl() {
+        var select = getMobileTimeFilterSelect();
+        var activityFilter = getMobileActivityFilterContainer();
+        var roleFilter = getMobileRoleFilterSelect();
+        var keywordInput = getMobileKeywordSearchInput();
+        var timeDetail = document.getElementById("mobileTimeAvailabilityDetail");
+        var activity = getMobileActivityFilter();
+        var roleKey = getMobileRoleFilter();
+        var options = getMobileAvailableTimeOptions();
+        var selectedTime = getMobileAvailableTimeFilter();
+        var availableRoleOptions = getMobileAvailableRoleOptions();
+
+        if (
+          roleKey !== MOBILE_ROLE_FILTER_ALL &&
+          !availableRoleOptions.some(function (r) {
+            return r.key === roleKey;
+          })
+        ) {
+          mobileRoleAvailabilityFilter = MOBILE_ROLE_FILTER_ALL;
+          roleKey = MOBILE_ROLE_FILTER_ALL;
+          options = getMobileAvailableTimeOptions();
+          selectedTime = getMobileAvailableTimeFilter();
+          availableRoleOptions = getMobileAvailableRoleOptions();
+        }
+
+        if (select) {
+          while (select.firstChild) {
+            select.removeChild(select.firstChild);
+          }
+
+          var allOption = document.createElement("option");
+          allOption.value = MOBILE_TIME_FILTER_ALL;
+          allOption.textContent =
+            options.length > 0
+              ? "すべての時間帯"
+              : "空きのある時間帯なし";
+          select.appendChild(allOption);
+
+          options.forEach(function (option) {
+            var optionNode = document.createElement("option");
+            optionNode.value = option.time;
+            optionNode.textContent = getMobileTimeOptionLabel(option);
+            select.appendChild(optionNode);
+          });
+
+          select.value = selectedTime;
+          select.disabled = options.length === 0;
+        }
+
+        if (activityFilter) {
+          while (activityFilter.firstChild) {
+            activityFilter.removeChild(activityFilter.firstChild);
+          }
+
+          var allActivityButton = document.createElement("button");
+          allActivityButton.type = "button";
+          allActivityButton.className =
+            "mobile-activity-filter-pill" +
+            (activity === MOBILE_ACTIVITY_FILTER_ALL ? " is-active" : "");
+          allActivityButton.setAttribute(
+            "data-mobile-activity-filter",
+            MOBILE_ACTIVITY_FILTER_ALL,
+          );
+          allActivityButton.setAttribute(
+            "aria-pressed",
+            activity === MOBILE_ACTIVITY_FILTER_ALL ? "true" : "false",
+          );
+          allActivityButton.textContent =
+            "すべての募集枠";
+          activityFilter.appendChild(allActivityButton);
+
+          ((gridData && gridData.activities) || []).forEach(function (item) {
+            var activityButton = document.createElement("button");
+            var active = activity === item;
+            activityButton.type = "button";
+            activityButton.className =
+              "mobile-activity-filter-pill " +
+              getActivityAccentClass(item) +
+              (active ? " is-active" : "");
+            activityButton.setAttribute("data-mobile-activity-filter", item);
+            activityButton.setAttribute("aria-pressed", active ? "true" : "false");
+            activityButton.textContent = item;
+            activityFilter.appendChild(activityButton);
+          });
+        }
+
+        if (roleFilter) {
+          while (roleFilter.firstChild) {
+            roleFilter.removeChild(roleFilter.firstChild);
+          }
+
+          var allRoleButton = document.createElement("button");
+          allRoleButton.type = "button";
+          allRoleButton.className =
+            "mobile-role-filter-pill" +
+            (roleKey === MOBILE_ROLE_FILTER_ALL ? " is-active" : "");
+          allRoleButton.setAttribute("data-mobile-role-filter", MOBILE_ROLE_FILTER_ALL);
+          allRoleButton.setAttribute(
+            "aria-pressed",
+            roleKey === MOBILE_ROLE_FILTER_ALL ? "true" : "false",
+          );
+          allRoleButton.textContent =
+            "すべてのポジション";
+          roleFilter.appendChild(allRoleButton);
+
+          availableRoleOptions.forEach(function (r) {
+            var roleButton = document.createElement("button");
+            var active = roleKey === r.key;
+            roleButton.type = "button";
+            roleButton.className =
+              "mobile-role-filter-pill role-" +
+              r.classSuffix +
+              (active ? " is-active" : "");
+            roleButton.setAttribute("data-mobile-role-filter", r.key);
+            roleButton.setAttribute("aria-pressed", active ? "true" : "false");
+            roleButton.textContent = r.label;
+            roleFilter.appendChild(roleButton);
+          });
+        }
+
+        if (keywordInput && keywordInput.value !== mobileKeywordSearchQuery) {
+          keywordInput.value = mobileKeywordSearchQuery;
+        }
+
+        var selectedOption = options.find(function (option) {
+          return String(option.time) === selectedTime;
+        });
+        if (timeDetail) {
+          if (selectedOption) {
+            timeDetail.textContent =
+              "この時間の空き: " +
+              formatRoleAvailabilitySummary(selectedOption.roleSummaries);
+          } else if (options.length > 0) {
+            timeDetail.textContent =
+              "時間帯を選ぶと、空き募集枠が表示されます";
+          } else {
+            timeDetail.textContent =
+              "条件に合う空き時間帯はありません";
+          }
+        }
       }
 
       function formatRemainingSlots(remaining) {
@@ -2048,7 +2832,8 @@
         }
 
         setMobileAgendaModeClass(container, "activity");
-        var activities = gridData.activities || [];
+        var filteredEvents = getMobileFilteredEvents();
+        var activities = getMobileFilteredActivities(filteredEvents);
         while (container.firstChild) {
           container.removeChild(container.firstChild);
         }
@@ -2057,8 +2842,10 @@
           var section = document.createElement("section");
           section.className = "mobile-time-group mobile-activity-group";
 
-          var matchingEvents = (gridIndexes.eventsByActivity[activity] || [])
-            .slice()
+          var matchingEvents = filteredEvents
+            .filter(function (event) {
+              return event.activity === activity;
+            })
             .sort(compareEventsByTime);
           matchingEvents.forEach(function (event) {
             var card = document.createElement("button");
@@ -2166,6 +2953,10 @@
 
           container.appendChild(section);
         });
+
+        if (!container.firstChild) {
+          renderMobileEmptyState(container);
+        }
       }
 
       function setMobileAgendaModeClass(container, mode) {
@@ -2178,6 +2969,14 @@
           " mobile-display-by-" +
           normaliseMobileDisplayMode(mode)
         ).trim();
+      }
+
+      function renderMobileEmptyState(container) {
+        var empty = document.createElement("div");
+        empty.className = "mobile-empty-state";
+        empty.textContent =
+          "条件に合う募集枠がありません";
+        container.appendChild(empty);
       }
 
       function compareEventsByActivityOrder(a, b) {
@@ -2334,10 +3133,13 @@
           container.removeChild(container.firstChild);
         }
 
-        var times = gridData.times || [];
+        var filteredEvents = getMobileFilteredEvents();
+        var times = getMobileFilteredTimes(filteredEvents);
         times.forEach(function (time) {
-          var matchingEvents = (gridIndexes.eventsByTime[time] || [])
-            .slice()
+          var matchingEvents = filteredEvents
+            .filter(function (event) {
+              return event.startTime === time;
+            })
             .sort(compareEventsByActivityOrder);
           if (matchingEvents.length === 0) return;
 
@@ -2355,9 +3157,14 @@
 
           container.appendChild(section);
         });
+
+        if (!container.firstChild) {
+          renderMobileEmptyState(container);
+        }
       }
 
       function buildMobileAgenda() {
+        updateMobileAvailabilityControl();
         if (getMobileDisplayMode() === "time") {
           buildMobileAgendaByTime();
         } else {
@@ -3085,9 +3892,40 @@
           if (!btn) return;
           setMobileDisplayMode(btn.getAttribute("data-mobile-display-mode"));
         });
+      document
+        .getElementById("mobileTimeAvailabilityFilter")
+        .addEventListener("change", function (e) {
+          setMobileAvailableTimeFilter(e.target.value);
+        });
+      document
+        .getElementById("mobileActivityFilter")
+        .addEventListener("click", function (e) {
+          var btn =
+            e.target && e.target.closest
+              ? e.target.closest("[data-mobile-activity-filter]")
+              : null;
+          if (!btn) return;
+          setMobileActivityFilter(btn.getAttribute("data-mobile-activity-filter"));
+        });
+      document
+        .getElementById("mobileRoleAvailabilityFilter")
+        .addEventListener("click", function (e) {
+          var btn =
+            e.target && e.target.closest
+              ? e.target.closest("[data-mobile-role-filter]")
+              : null;
+          if (!btn) return;
+          setMobileRoleFilter(btn.getAttribute("data-mobile-role-filter"));
+        });
+      document
+        .getElementById("mobileKeywordSearch")
+        .addEventListener("input", function (e) {
+          setMobileKeywordSearchQuery(e.target.value);
+        });
 
       document.getElementById("pageTitle").textContent = PAGE_TITLE;
       updateMobileDisplayModeControl();
+      updateMobileAvailabilityControl();
 
       google.script.run
         .withSuccessHandler(function (url) {
