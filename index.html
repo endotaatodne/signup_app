@@ -1090,20 +1090,56 @@
         line-height: 1.35;
       }
 
-      .mobile-overview-badge {
+      .mobile-overview-role-chips {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 5px;
         min-width: 58px;
-        padding: 8px 10px;
+      }
+
+      .mobile-overview-role-chip-label {
+        color: #5d554d;
+        font-size: 11px;
+        font-weight: 900;
+        line-height: 1.1;
+        white-space: nowrap;
+      }
+
+      .mobile-overview-role-chip {
+        min-height: 26px;
+        padding: 5px 9px;
         border-radius: 999px;
         background: #edf7ee;
         color: #166534;
-        font-size: 14px;
+        font-size: 13px;
         font-weight: 900;
         line-height: 1.2;
         text-align: center;
         white-space: nowrap;
       }
 
-      .mobile-overview-badge.is-full {
+      .mobile-overview-role-chip.role-general {
+        background: #edf7ee;
+        color: #2e7d32;
+      }
+
+      .mobile-overview-role-chip.role-classrep {
+        background: #fff4da;
+        color: #b26a00;
+      }
+
+      .mobile-overview-role-chip.role-steeringcommittee {
+        background: #eaf3ff;
+        color: #1565c0;
+      }
+
+      .mobile-overview-role-chip.role-orgcommittee {
+        background: #f4eafd;
+        color: #6a1b9a;
+      }
+
+      .mobile-overview-role-chip.is-full {
         background: #fff0ee;
         color: #b42318;
       }
@@ -1784,7 +1820,7 @@
         data-mobile-display-mode="signup"
         aria-pressed="false"
       >
-        申し込み
+        さがす
       </button>
       <button
         id="mobileDisplayModeActivity"
@@ -3383,18 +3419,31 @@
               text.appendChild(meta);
             }
 
-            var remaining = getAvailableSlotCount(event);
-            var badge = document.createElement("div");
-            badge.className = "mobile-overview-badge";
-            if (remaining > 0) {
-              badge.textContent = formatRemainingSlots(remaining);
+            var roleChips = document.createElement("div");
+            roleChips.className = "mobile-overview-role-chips";
+            ROLE_KEYS.forEach(function (r) {
+              var remaining = getRemainingForRole(event, r.key);
+              if (remaining <= 0) return;
+              var chip = document.createElement("span");
+              chip.className =
+                "mobile-overview-role-chip role-" + r.classSuffix;
+              chip.textContent = r.label + " " + remaining;
+              roleChips.appendChild(chip);
+            });
+            if (roleChips.firstChild) {
+              var roleChipLabel = document.createElement("span");
+              roleChipLabel.className = "mobile-overview-role-chip-label";
+              roleChipLabel.textContent = "募集中";
+              roleChips.insertBefore(roleChipLabel, roleChips.firstChild);
             } else {
-              badge.classList.add("is-full");
-              badge.textContent = "Full";
+              var fullChip = document.createElement("span");
+              fullChip.className = "mobile-overview-role-chip is-full";
+              fullChip.textContent = "Full";
+              roleChips.appendChild(fullChip);
             }
 
             item.appendChild(text);
-            item.appendChild(badge);
+            item.appendChild(roleChips);
             items.appendChild(item);
           });
 
