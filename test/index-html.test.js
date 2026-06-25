@@ -249,6 +249,7 @@ function loadClient(options = {}) {
       "buildMobileAgenda",
       "buildMobileAgendaByActivity",
       "buildMobileAgendaByTime",
+      "buildMobileDayOverview",
       "renderResponsiveView",
     ],
     {
@@ -1200,11 +1201,11 @@ test("buildMobileAgenda groups mobile signup names by role", () => {
   });
 
   client.buildGridIndexes();
-  client.setMobileDisplayMode("activity");
+  client.setMobileDisplayMode("signup");
   client.buildMobileAgenda();
 
   const firstSection = mobileNode.children[0];
-  const firstCard = firstSection.children[0];
+  const firstCard = firstSection.children[1];
   const summary = firstCard.children[1];
   const namesList = firstCard.children[2];
 
@@ -1225,8 +1226,9 @@ test("buildMobileAgenda groups mobile signup names by role", () => {
   assert.equal(namesList.children[1].children[1].textContent, "Bob");
 });
 
-test("buildMobileAgenda groups mobile cards by activity and sorts each group by time", () => {
+test("buildMobileDayOverview renders a time-based day timeline", () => {
   const mobileNode = createElement("div");
+  mobileNode.className = "mobile-agenda";
   mobileNode.style = {};
   const { exports: client } = loadClient({
     gridData: {
@@ -1289,40 +1291,27 @@ test("buildMobileAgenda groups mobile cards by activity and sorts each group by 
   });
 
   client.buildGridIndexes();
-  client.setMobileDisplayMode("activity");
+  client.setMobileDisplayMode("overview");
   client.buildMobileAgenda();
 
-  function getTitleWrap(card) {
-    return card.children[0].children[0];
-  }
+  const timeline = mobileNode.children[0];
+  const firstTimeBlock = timeline.children[0];
+  const secondTimeBlock = timeline.children[1];
+  const firstItem = firstTimeBlock.children[1].children[0];
+  const secondItem = secondTimeBlock.children[1].children[0];
 
-  const bakeSaleSection = mobileNode.children[0];
-  const gamesSection = mobileNode.children[1];
-  const firstBakeSaleCard = bakeSaleSection.children[0];
-  const secondBakeSaleCard = bakeSaleSection.children[1];
-  const firstGamesCard = gamesSection.children[0];
-
-  assert.equal(mobileNode.children.length, 2);
-  assert.equal(bakeSaleSection.children.length, 2);
-  assert.equal(
-    getTitleWrap(firstBakeSaleCard).children[0].textContent,
-    "Bake Sale",
-  );
-  assert.equal(
-    getTitleWrap(firstBakeSaleCard).children[1].textContent,
-    "9:30 am - 10:00 am",
-  );
-  assert.equal(
-    getTitleWrap(secondBakeSaleCard).children[1].textContent,
-    "11:00 am - 11:30 am",
-  );
-  assert.equal(
-    getTitleWrap(firstGamesCard).children[0].textContent,
-    "Games",
-  );
+  assert.equal(mobileNode.className, "mobile-agenda mobile-display-by-overview");
+  assert.equal(timeline.className, "mobile-overview-timeline");
+  assert.equal(timeline.children.length, 3);
+  assert.equal(firstTimeBlock.children[0].textContent, "9:30 am - 10:00 am");
+  assert.equal(firstItem.className.includes("mobile-overview-item"), true);
+  assert.equal(firstItem.children[0].children[0].textContent, "Bake Sale");
+  assert.equal(firstItem.children[1].className, "mobile-overview-badge");
+  assert.equal(secondTimeBlock.children[0].textContent, "10:00 am - 10:30 am");
+  assert.equal(secondItem.children[0].children[0].textContent, "Games");
 });
 
-test("mobile display mode restores saved preference and updates the control", () => {
+test("mobile display mode maps the old activity preference to overview", () => {
   const activityBtn = createElement("button");
   const timeBtn = createElement("button");
   const storage = createLocalStorage({
@@ -1339,14 +1328,14 @@ test("mobile display mode restores saved preference and updates the control", ()
     },
   });
 
-  assert.equal(client.getMobileDisplayMode(), "activity");
+  assert.equal(client.getMobileDisplayMode(), "overview");
   assert.equal(activityBtn.getAttribute("aria-pressed"), "true");
   assert.equal(timeBtn.getAttribute("aria-pressed"), "false");
   assert.equal(activityBtn.classList.has("active"), true);
   assert.equal(timeBtn.classList.has("active"), false);
 });
 
-test("mobile display mode defaults to time when no preference is saved", () => {
+test("mobile display mode defaults to signup when no preference is saved", () => {
   const activityBtn = createElement("button");
   const timeBtn = createElement("button");
 
@@ -1360,7 +1349,7 @@ test("mobile display mode defaults to time when no preference is saved", () => {
     },
   });
 
-  assert.equal(client.getMobileDisplayMode(), "time");
+  assert.equal(client.getMobileDisplayMode(), "signup");
   assert.equal(activityBtn.getAttribute("aria-pressed"), "false");
   assert.equal(timeBtn.getAttribute("aria-pressed"), "true");
   assert.equal(activityBtn.classList.has("active"), false);
@@ -1453,8 +1442,8 @@ test("buildMobileAgenda can group mobile cards by time with headings", () => {
   const firstCard = firstTimeSection.children[1];
   const secondCard = firstTimeSection.children[2];
 
-  assert.equal(storage.getItem("signupApp.mobileDisplayMode"), "time");
-  assert.equal(mobileNode.className, "mobile-agenda mobile-display-by-time");
+  assert.equal(storage.getItem("signupApp.mobileDisplayMode"), "signup");
+  assert.equal(mobileNode.className, "mobile-agenda mobile-display-by-signup");
   assert.equal(mobileNode.children.length, 2);
   assert.equal(firstTimeSection.children[0].className, "mobile-time-heading");
   assert.equal(firstTimeSection.children[0].textContent, "9:30 am - 10:00 am");

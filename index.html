@@ -973,6 +973,104 @@
         line-height: 1.35;
       }
 
+      .mobile-overview-timeline {
+        display: grid;
+        gap: 18px;
+      }
+
+      .mobile-overview-time-block {
+        display: grid;
+        grid-template-columns: 96px minmax(0, 1fr);
+        gap: 12px;
+        align-items: start;
+      }
+
+      .mobile-overview-time {
+        position: sticky;
+        top: 8px;
+        color: #37312b;
+        font-size: 18px;
+        font-weight: 900;
+        line-height: 1.2;
+      }
+
+      .mobile-overview-items {
+        display: grid;
+        gap: 10px;
+      }
+
+      .mobile-overview-item {
+        width: 100%;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 10px;
+        align-items: center;
+        text-align: left;
+        border: 1px solid #e3ddd5;
+        border-left: 7px solid #d9a441;
+        border-radius: 10px;
+        background: #ffffff;
+        padding: 12px 12px 11px;
+        color: #2d2926;
+        box-shadow: 0 3px 12px rgba(26, 26, 24, 0.06);
+      }
+
+      .mobile-overview-item.activity-accent-0 {
+        border-left-color: #e87b45;
+      }
+
+      .mobile-overview-item.activity-accent-1 {
+        border-left-color: #3b82a0;
+      }
+
+      .mobile-overview-item.activity-accent-2 {
+        border-left-color: #8a9a5b;
+      }
+
+      .mobile-overview-item.activity-accent-3 {
+        border-left-color: #d9a441;
+      }
+
+      .mobile-overview-item.activity-accent-4 {
+        border-left-color: #9b6f9f;
+      }
+
+      .mobile-overview-item.activity-accent-5 {
+        border-left-color: #c05a47;
+      }
+
+      .mobile-overview-title {
+        font-size: 19px;
+        font-weight: 900;
+        line-height: 1.25;
+      }
+
+      .mobile-overview-meta {
+        margin-top: 3px;
+        color: #6b625a;
+        font-size: 14px;
+        font-weight: 700;
+        line-height: 1.35;
+      }
+
+      .mobile-overview-badge {
+        min-width: 58px;
+        padding: 8px 10px;
+        border-radius: 999px;
+        background: #edf7ee;
+        color: #166534;
+        font-size: 14px;
+        font-weight: 900;
+        line-height: 1.2;
+        text-align: center;
+        white-space: nowrap;
+      }
+
+      .mobile-overview-badge.is-full {
+        background: #fff0ee;
+        color: #b42318;
+      }
+
       .mobile-empty-state {
         margin: 14px 0 0;
         padding: 18px 14px;
@@ -1564,7 +1662,7 @@
         line-height: 1.3;
       }
 
-      body.compact-layout .mobile-agenda.mobile-display-by-time
+      body.compact-layout .mobile-agenda.mobile-display-by-signup
         .mobile-time-heading {
         display: block;
         margin: 0 2px 12px;
@@ -1574,7 +1672,7 @@
         line-height: 1.25;
       }
 
-      body.compact-layout .mobile-agenda.mobile-display-by-time
+      body.compact-layout .mobile-agenda.mobile-display-by-signup
         .mobile-slot-time {
         color: #4b5563;
         font-weight: 600;
@@ -1638,6 +1736,30 @@
   <body>
     <h1 id="pageTitle"></h1>
     <div
+      id="mobileDisplayModeControl"
+      class="mobile-display-mode-control"
+      aria-label="Mobile display mode"
+    >
+      <button
+        id="mobileDisplayModeTime"
+        class="mobile-display-mode-btn"
+        type="button"
+        data-mobile-display-mode="signup"
+        aria-pressed="false"
+      >
+        申し込み
+      </button>
+      <button
+        id="mobileDisplayModeActivity"
+        class="mobile-display-mode-btn"
+        type="button"
+        data-mobile-display-mode="overview"
+        aria-pressed="false"
+      >
+        1日の流れ
+      </button>
+    </div>
+    <div
       id="mobileAvailabilityControl"
       class="mobile-availability-control"
       aria-label="Mobile filters"
@@ -1686,30 +1808,6 @@
           aria-live="polite"
         ></div>
       </div>
-    </div>
-    <div
-      id="mobileDisplayModeControl"
-      class="mobile-display-mode-control"
-      aria-label="Mobile display mode"
-    >
-      <button
-        id="mobileDisplayModeTime"
-        class="mobile-display-mode-btn"
-        type="button"
-        data-mobile-display-mode="time"
-        aria-pressed="false"
-      >
-        募集時間でまとめて表示
-      </button>
-      <button
-        id="mobileDisplayModeActivity"
-        class="mobile-display-mode-btn"
-        type="button"
-        data-mobile-display-mode="activity"
-        aria-pressed="false"
-      >
-        募集枠でまとめて表示
-      </button>
     </div>
     <div class="grid-wrapper" id="desktopGridWrapper">
       <table id="grid"></table>
@@ -1841,7 +1939,7 @@
       var resizeTimer = null;
       var lastCompactLayout = null;
       var MOBILE_DISPLAY_MODE_STORAGE_KEY = "signupApp.mobileDisplayMode";
-      var DEFAULT_MOBILE_DISPLAY_MODE = "time";
+      var DEFAULT_MOBILE_DISPLAY_MODE = "signup";
       var MOBILE_TIME_FILTER_ALL = "__all__";
       var MOBILE_ROLE_FILTER_ALL = "__all__";
       var MOBILE_ACTIVITY_FILTER_ALL = "__all__";
@@ -1912,7 +2010,9 @@
       }
 
       function normaliseMobileDisplayMode(mode) {
-        if (mode === "time" || mode === "activity") return mode;
+        if (mode === "signup" || mode === "overview") return mode;
+        if (mode === "time") return "signup";
+        if (mode === "activity") return "overview";
         return DEFAULT_MOBILE_DISPLAY_MODE;
       }
 
@@ -1945,8 +2045,8 @@
       function updateMobileDisplayModeControl() {
         var activeMode = getMobileDisplayMode();
         [
-          { id: "mobileDisplayModeActivity", mode: "activity" },
-          { id: "mobileDisplayModeTime", mode: "time" },
+          { id: "mobileDisplayModeTime", mode: "signup" },
+          { id: "mobileDisplayModeActivity", mode: "overview" },
         ].forEach(function (item) {
           var btn = document.getElementById(item.id);
           if (!btn) return;
@@ -2961,7 +3061,7 @@
 
       function setMobileAgendaModeClass(container, mode) {
         var baseClass = String(container.className || "")
-          .replace(/\bmobile-display-by-(activity|time)\b/g, "")
+          .replace(/\bmobile-display-by-(activity|time|signup|overview)\b/g, "")
           .replace(/\s+/g, " ")
           .trim();
         container.className = (
@@ -3128,7 +3228,7 @@
           return;
         }
 
-        setMobileAgendaModeClass(container, "time");
+        setMobileAgendaModeClass(container, "signup");
         while (container.firstChild) {
           container.removeChild(container.firstChild);
         }
@@ -3163,12 +3263,115 @@
         }
       }
 
+      function getOverviewEventMeta(event) {
+        return [event.location, event.subtitle, event.description]
+          .filter(function (value) {
+            return value && String(value).trim() !== "";
+          })
+          .join(" / ");
+      }
+
+      function buildMobileDayOverview() {
+        if (!gridData || !gridData.events) {
+          setTimeout(buildMobileAgenda, 200);
+          return;
+        }
+        var container = getMobileAgenda();
+        if (!container) {
+          setTimeout(buildMobileAgenda, 200);
+          return;
+        }
+
+        setMobileAgendaModeClass(container, "overview");
+        while (container.firstChild) {
+          container.removeChild(container.firstChild);
+        }
+
+        var timeline = document.createElement("div");
+        timeline.className = "mobile-overview-timeline";
+        var events = (gridData.events || []).slice();
+        var times = getOrderedValuesForEvents(
+          events,
+          "startTime",
+          (gridData && gridData.times) || [],
+        );
+
+        times.forEach(function (time) {
+          var matchingEvents = events
+            .filter(function (event) {
+              return event.startTime === time;
+            })
+            .sort(compareEventsByActivityOrder);
+          if (matchingEvents.length === 0) return;
+
+          var block = document.createElement("section");
+          block.className = "mobile-overview-time-block";
+
+          var timeLabel = document.createElement("div");
+          timeLabel.className = "mobile-overview-time";
+          timeLabel.textContent = getMobileTimeHeadingText(time, matchingEvents);
+          block.appendChild(timeLabel);
+
+          var items = document.createElement("div");
+          items.className = "mobile-overview-items";
+          matchingEvents.forEach(function (event) {
+            var item = document.createElement("button");
+            item.className =
+              "mobile-overview-item " + getActivityAccentClass(event.activity);
+            item.type = "button";
+            item.setAttribute("data-eventid", event.eventId);
+
+            var text = document.createElement("div");
+            var title = document.createElement("div");
+            title.className = "mobile-overview-title";
+            title.textContent = event.activity;
+            text.appendChild(title);
+
+            var metaText = getOverviewEventMeta(event);
+            if (metaText) {
+              var meta = document.createElement("div");
+              meta.className = "mobile-overview-meta";
+              meta.textContent = metaText;
+              text.appendChild(meta);
+            }
+
+            var remaining = getAvailableSlotCount(event);
+            var badge = document.createElement("div");
+            badge.className = "mobile-overview-badge";
+            if (remaining > 0) {
+              badge.textContent = formatRemainingSlots(remaining);
+            } else {
+              badge.classList.add("is-full");
+              badge.textContent = "Full";
+            }
+
+            item.appendChild(text);
+            item.appendChild(badge);
+            items.appendChild(item);
+          });
+
+          block.appendChild(items);
+          timeline.appendChild(block);
+        });
+
+        if (timeline.firstChild) {
+          container.appendChild(timeline);
+        } else {
+          renderMobileEmptyState(container);
+        }
+      }
+
       function buildMobileAgenda() {
-        updateMobileAvailabilityControl();
-        if (getMobileDisplayMode() === "time") {
+        var filters = document.getElementById("mobileAvailabilityControl");
+        var activeMode = getMobileDisplayMode();
+        if (filters) {
+          filters.style.display = activeMode === "signup" ? "" : "none";
+        }
+        if (activeMode === "signup") {
+          updateMobileAvailabilityControl();
           buildMobileAgendaByTime();
         } else {
-          buildMobileAgendaByActivity();
+          buildMobileDayOverview();
         }
       }
 
