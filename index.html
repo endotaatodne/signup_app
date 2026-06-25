@@ -3421,21 +3421,24 @@
 
             var roleChips = document.createElement("div");
             roleChips.className = "mobile-overview-role-chips";
+            var hasOpenRole = false;
             ROLE_KEYS.forEach(function (r) {
               var remaining = getRemainingForRole(event, r.key);
               if (remaining <= 0) return;
+              if (!hasOpenRole) {
+                var roleChipLabel = document.createElement("span");
+                roleChipLabel.className = "mobile-overview-role-chip-label";
+                roleChipLabel.textContent = "募集中";
+                roleChips.appendChild(roleChipLabel);
+                hasOpenRole = true;
+              }
               var chip = document.createElement("span");
               chip.className =
                 "mobile-overview-role-chip role-" + r.classSuffix;
               chip.textContent = r.label + " " + remaining;
               roleChips.appendChild(chip);
             });
-            if (roleChips.firstChild) {
-              var roleChipLabel = document.createElement("span");
-              roleChipLabel.className = "mobile-overview-role-chip-label";
-              roleChipLabel.textContent = "募集中";
-              roleChips.insertBefore(roleChipLabel, roleChips.firstChild);
-            } else {
+            if (!hasOpenRole) {
               var fullChip = document.createElement("span");
               fullChip.className = "mobile-overview-role-chip is-full";
               fullChip.textContent = "Full";

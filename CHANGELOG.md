@@ -1,3 +1,14 @@
+## v0.2.4 - 2026-06-26
+
+- Patch
+  - Renames the mobile primary tab to さがす and adds a separate まとめ summary tab for the day overview.
+  - Adds mobile activity, role, available-time, and keyword filters for finding open signup slots.
+  - Adds activity filter pills to the mobile summary tab.
+  - Updates the mobile summary timeline to show role-coloured 募集中 availability chips instead of a single total remaining-slots badge.
+  - Updates the Steering Committee role wording to 役員、運営・実行委員.
+  - Expands frontend tests for mobile filtering, display modes, and summary rendering.
+  - Bumps the app version to 0.2.4.
+
 ## v0.2.3 - 2026-06-24
 
 - Patch

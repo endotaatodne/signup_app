@@ -1306,7 +1306,16 @@ test("buildMobileDayOverview renders a time-based day timeline", () => {
   assert.equal(firstTimeBlock.children[0].textContent, "9:30 am - 10:00 am");
   assert.equal(firstItem.className.includes("mobile-overview-item"), true);
   assert.equal(firstItem.children[0].children[0].textContent, "Bake Sale");
-  assert.equal(firstItem.children[1].className, "mobile-overview-badge");
+  assert.equal(firstItem.children[1].className, "mobile-overview-role-chips");
+  assert.equal(firstItem.children[1].children[0].textContent, "\u52DF\u96C6\u4E2D");
+  assert.equal(
+    firstItem.children[1].children[1].className,
+    "mobile-overview-role-chip role-general",
+  );
+  assert.equal(
+    firstItem.children[1].children[1].textContent,
+    client.ROLE_KEYS[0].label + " 1",
+  );
   assert.equal(secondTimeBlock.children[0].textContent, "10:00 am - 10:30 am");
   assert.equal(secondItem.children[0].children[0].textContent, "Games");
 });

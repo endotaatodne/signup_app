@@ -9,7 +9,9 @@ A free, open-source volunteer signup app built on Google Apps Script and Google 
 ## Features
 
 - Desktop grid view — activities across the top, time slots down the side
-- Mobile card view — switch between grouping by time and grouping by activity
+- Mobile view — switch between a searchable さがす tab and a compact まとめ day-summary tab
+- Mobile filters for activity, role, available time, and keyword search
+- Mobile summary timeline with role-coloured 募集中 chips for remaining open slots
 - Time ranges displayed per slot/card (e.g. 9:00 am - 10:00 am)
 - Four volunteer roles per slot — General, Class Rep, Steering Committee, Org Committee (fully configurable)
 - Role-based slot limits — each role has its own quota
@@ -27,7 +29,7 @@ A free, open-source volunteer signup app built on Google Apps Script and Google 
 - Hint text shown on slots with existing signups
 - Page title driven dynamically by the Google Sheet name
 - Multiple events supported via a URL parameter — no redeployment needed
-- Works on mobile — display preference is remembered, with signup and cancellation via a clean modal popup
+- Works on mobile — tab preference is remembered, with signup and cancellation via a clean modal popup
 - Fully Unicode-compatible — supports any language
 - Data stored in Google Sheets — easy to view and manage
 - Free to run — no hosting costs beyond a Google account
