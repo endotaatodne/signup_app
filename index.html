@@ -823,15 +823,16 @@
       .mobile-filter-select,
       .mobile-keyword-search {
         min-width: 0;
-        min-height: 44px;
+        min-height: 40px;
         width: 100%;
-        padding: 8px 34px 8px 12px;
+        padding: 6px 34px 6px 12px;
         border: 1px solid #d8d1c8;
         border-radius: 9px;
         background: #ffffff;
         color: #2d2926;
         font-size: 16px;
         font-weight: 700;
+        line-height: 1.2;
       }
 
       .mobile-keyword-search {
@@ -854,9 +855,45 @@
         background: #ffffff;
         color: #3f3a35;
         cursor: pointer;
-        font-size: 18px;
+        font-size: 19px;
         font-weight: 800;
         line-height: 1.2;
+      }
+
+      body.compact-layout .mobile-availability-control.is-signup-mode
+        .mobile-activity-filter-field {
+        order: 1;
+      }
+
+      body.compact-layout .mobile-availability-control.is-signup-mode
+        .mobile-role-filter-field {
+        order: 2;
+      }
+
+      body.compact-layout .mobile-availability-control.is-signup-mode
+        .mobile-time-filter-field {
+        order: 3;
+      }
+
+      body.compact-layout .mobile-availability-control.is-signup-mode
+        .mobile-keyword-filter-field {
+        order: 4;
+      }
+
+      body.compact-layout .mobile-availability-control.is-signup-mode
+        .mobile-time-availability-detail {
+        order: 5;
+      }
+
+      body.compact-layout .mobile-availability-control.is-overview-mode
+        .mobile-role-filter-field,
+      body.compact-layout .mobile-availability-control.is-overview-mode
+        .mobile-time-filter-field,
+      body.compact-layout .mobile-availability-control.is-overview-mode
+        .mobile-keyword-filter-field,
+      body.compact-layout .mobile-availability-control.is-overview-mode
+        .mobile-time-availability-detail {
+        display: none;
       }
 
       .mobile-activity-filter-pill {
@@ -1765,7 +1802,7 @@
       aria-label="Mobile filters"
     >
       <div class="mobile-filter-row mobile-filter-row-secondary">
-        <div class="mobile-filter-field">
+        <div class="mobile-filter-field mobile-activity-filter-field">
           <span class="mobile-filter-label">募集枠</span>
           <div
             id="mobileActivityFilter"
@@ -1774,7 +1811,7 @@
             aria-label="Filter by activity"
           ></div>
         </div>
-        <div class="mobile-filter-field">
+        <div class="mobile-filter-field mobile-role-filter-field">
           <span class="mobile-filter-label">ポジション</span>
           <div
             id="mobileRoleAvailabilityFilter"
@@ -1783,7 +1820,10 @@
             aria-label="Filter by volunteer slot type"
           ></div>
         </div>
-        <label class="mobile-filter-field" for="mobileKeywordSearch">
+        <label
+          class="mobile-filter-field mobile-keyword-filter-field"
+          for="mobileKeywordSearch"
+        >
           <span class="mobile-filter-label">検索</span>
           <input
             id="mobileKeywordSearch"
@@ -1794,7 +1834,10 @@
             aria-label="Search volunteer names and signup details"
           />
         </label>
-        <label class="mobile-filter-field" for="mobileTimeAvailabilityFilter">
+        <label
+          class="mobile-filter-field mobile-time-filter-field"
+          for="mobileTimeAvailabilityFilter"
+        >
           <span class="mobile-filter-label">時間帯で絞り込み</span>
           <select
             id="mobileTimeAvailabilityFilter"
@@ -3289,7 +3332,12 @@
 
         var timeline = document.createElement("div");
         timeline.className = "mobile-overview-timeline";
-        var events = (gridData.events || []).slice();
+        var activity = getMobileActivityFilter();
+        var events = (gridData.events || [])
+          .filter(function (event) {
+            return eventMatchesActivityFilter(event, activity);
+          })
+          .slice();
         var times = getOrderedValuesForEvents(
           events,
           "startTime",
@@ -3365,10 +3413,12 @@
         var filters = document.getElementById("mobileAvailabilityControl");
         var activeMode = getMobileDisplayMode();
         if (filters) {
-          filters.style.display = activeMode === "signup" ? "" : "none";
+          filters.style.display = "";
+          filters.classList.toggle("is-signup-mode", activeMode === "signup");
+          filters.classList.toggle("is-overview-mode", activeMode === "overview");
         }
+        updateMobileAvailabilityControl();
         if (activeMode === "signup") {
-          updateMobileAvailabilityControl();
           buildMobileAgendaByTime();
         } else {
           buildMobileDayOverview();
