@@ -86,6 +86,8 @@ function createDocument(elements = {}) {
       }
       return fallbackElements[id];
     },
+    addEventListener() {},
+    removeEventListener() {},
     querySelector(selector) {
       if (elements[selector]) return elements[selector];
       if (!fallbackElements[selector]) {

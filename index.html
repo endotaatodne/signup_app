@@ -4462,12 +4462,14 @@
         });
       document
         .getElementById("mobileTimeAvailabilityToggle")
-        .addEventListener("click", function () {
+        .addEventListener("click", function (e) {
+          if (e.stopPropagation) e.stopPropagation();
           setMobileTimeFilterDropdownOpen(!mobileTimeFilterDropdownOpen);
         });
       document
         .getElementById("mobileTimeAvailabilityFilter")
         .addEventListener("click", function (e) {
+          if (e.stopPropagation) e.stopPropagation();
           var btn =
             e.target && e.target.closest
               ? e.target.closest("[data-mobile-time-filter]")
@@ -4475,6 +4477,25 @@
           if (!btn || btn.disabled) return;
           setMobileAvailableTimeFilter(btn.getAttribute("data-mobile-time-filter"));
         });
+      document.addEventListener("click", function (e) {
+        if (!mobileTimeFilterDropdownOpen) return;
+        var target = e.target;
+        var timeToggle = document.getElementById("mobileTimeAvailabilityToggle");
+        var timeFilter = document.getElementById("mobileTimeAvailabilityFilter");
+        var insideToggle =
+          timeToggle &&
+          target &&
+          target.closest &&
+          target.closest("#mobileTimeAvailabilityToggle");
+        var insideFilter =
+          timeFilter &&
+          target &&
+          target.closest &&
+          target.closest("#mobileTimeAvailabilityFilter");
+        if (!insideToggle && !insideFilter) {
+          setMobileTimeFilterDropdownOpen(false);
+        }
+      });
       document
         .getElementById("mobileActivityFilter")
         .addEventListener("click", function (e) {
