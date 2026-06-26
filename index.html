@@ -996,10 +996,118 @@
         color: #6a1b9a;
       }
 
-      .mobile-time-filter {
+      .mobile-time-filter-dropdown {
+        position: relative;
+      }
+
+      .mobile-time-filter-field .mobile-filter-label {
+        font-size: 18px;
+      }
+
+      .mobile-time-filter-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        min-height: 50px;
+        padding: 10px 34px 10px 14px;
+        text-align: left;
         border-color: #b7cdbd;
         background: #f5fbf6;
         color: #124326;
+        cursor: pointer;
+        font-size: 18px;
+        line-height: 1.2;
+      }
+
+      .mobile-time-filter-toggle::after {
+        content: "▾";
+        flex-shrink: 0;
+        color: #446b51;
+        font-size: 15px;
+        line-height: 1;
+      }
+
+      .mobile-time-filter-toggle.is-open::after {
+        content: "▴";
+      }
+
+      .mobile-time-filter-toggle:disabled {
+        cursor: not-allowed;
+        opacity: 0.55;
+      }
+
+      .mobile-time-filter-menu {
+        position: absolute;
+        top: calc(100% + 6px);
+        left: 0;
+        right: 0;
+        z-index: 18;
+        display: grid;
+        gap: 4px;
+        max-height: 260px;
+        overflow-y: auto;
+        padding: 6px;
+        border: 1px solid #b7cdbd;
+        border-radius: 10px;
+        background: #ffffff;
+        box-shadow: 0 8px 24px rgba(26, 26, 24, 0.16);
+      }
+
+      .mobile-time-filter-menu[hidden] {
+        display: none;
+      }
+
+      .mobile-time-filter-option {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 24px minmax(0, 1fr);
+        gap: 10px;
+        align-items: center;
+        min-height: 46px;
+        padding: 10px;
+        border: 0;
+        border-radius: 7px;
+        background: #ffffff;
+        color: #124326;
+        cursor: pointer;
+        font-size: 17px;
+        font-weight: 800;
+        line-height: 1.2;
+        text-align: left;
+      }
+
+      .mobile-time-filter-option:hover,
+      .mobile-time-filter-option.is-active {
+        background: #f0f8f2;
+      }
+
+      .mobile-time-filter-option.is-active {
+        color: #1f6b2b;
+      }
+
+      .mobile-time-filter-check {
+        width: 20px;
+        height: 20px;
+        display: inline-grid;
+        place-items: center;
+        border: 2px solid #9fbaa6;
+        border-radius: 5px;
+        color: #ffffff;
+        font-size: 13px;
+        font-weight: 900;
+        line-height: 1;
+      }
+
+      .mobile-time-filter-option.is-active .mobile-time-filter-check {
+        border-color: #267a32;
+        background: #267a32;
+      }
+
+      .mobile-time-filter-option-label {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
       .mobile-time-availability-detail {
@@ -1870,17 +1978,25 @@
             aria-label="Search volunteer names and signup details"
           />
         </label>
-        <label
-          class="mobile-filter-field mobile-time-filter-field"
-          for="mobileTimeAvailabilityFilter"
-        >
+        <div class="mobile-filter-field mobile-time-filter-field">
           <span class="mobile-filter-label">時間帯で絞り込み</span>
-          <select
-            id="mobileTimeAvailabilityFilter"
-            class="mobile-filter-select mobile-time-filter"
-            aria-label="Filter by available time slot"
-          ></select>
-        </label>
+          <div class="mobile-time-filter-dropdown">
+            <button
+              id="mobileTimeAvailabilityToggle"
+              class="mobile-filter-select mobile-time-filter-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="mobileTimeAvailabilityFilter"
+            ></button>
+            <div
+              id="mobileTimeAvailabilityFilter"
+              class="mobile-time-filter-menu"
+              role="group"
+              aria-label="Filter by available time slots"
+              hidden
+            ></div>
+          </div>
+        </div>
         <div
           id="mobileTimeAvailabilityDetail"
           class="mobile-time-availability-detail"
@@ -2022,10 +2138,11 @@
       var MOBILE_TIME_FILTER_ALL = "__all__";
       var MOBILE_ROLE_FILTER_ALL = "__all__";
       var MOBILE_ACTIVITY_FILTER_ALL = "__all__";
-      var mobileAvailableTimeFilter = MOBILE_TIME_FILTER_ALL;
+      var mobileAvailableTimeFilter = [];
       var mobileRoleAvailabilityFilter = MOBILE_ROLE_FILTER_ALL;
       var mobileActivityFilter = MOBILE_ACTIVITY_FILTER_ALL;
       var mobileKeywordSearchQuery = "";
+      var mobileTimeFilterDropdownOpen = false;
 
       var ROLE_KEYS = [
         {
@@ -2314,6 +2431,10 @@
         return document.getElementById("mobileTimeAvailabilityFilter");
       }
 
+      function getMobileTimeFilterToggle() {
+        return document.getElementById("mobileTimeAvailabilityToggle");
+      }
+
       function getMobileActivityFilterContainer() {
         return document.getElementById("mobileActivityFilter");
       }
@@ -2478,6 +2599,10 @@
       }
 
       function eventMatchesTimeFilter(event, time) {
+        if (Array.isArray(time)) {
+          if (time.length === 0) return true;
+          return time.indexOf(String(event.startTime || "")) !== -1;
+        }
         if (!time || time === MOBILE_TIME_FILTER_ALL) return true;
         return String(event.startTime || "") === String(time);
       }
@@ -2514,12 +2639,12 @@
 
       function getMobileRoleFilterOptionEvents() {
         var activity = getMobileActivityFilter();
-        var time = getMobileAvailableTimeFilter();
+        var times = getMobileAvailableTimeFilters();
         var keywordQuery = getMobileKeywordSearchQuery();
         return ((gridData && gridData.events) || []).filter(function (event) {
           return (
             eventMatchesActivityFilter(event, activity) &&
-            eventMatchesTimeFilter(event, time) &&
+            eventMatchesTimeFilter(event, times) &&
             eventMatchesKeywordSearch(event, keywordQuery)
           );
         });
@@ -2609,28 +2734,80 @@
         return getMobileTimeHeadingText(option.time, events);
       }
 
-      function normaliseMobileAvailableTimeFilter(value) {
-        if (!value || value === MOBILE_TIME_FILTER_ALL) {
-          return MOBILE_TIME_FILTER_ALL;
+      function getMobileSelectedTimeLabel(selectedTimes, options) {
+        if (!options || options.length === 0) return "空き時間なし";
+        if (!selectedTimes || selectedTimes.length === 0) {
+          return "すべての時間帯";
         }
-        var requested = String(value);
+        if (selectedTimes.length === 1) {
+          var selectedOption = options.find(function (option) {
+            return String(option.time) === selectedTimes[0];
+          });
+          return selectedOption
+            ? getMobileTimeOptionLabel(selectedOption)
+            : "すべての時間帯";
+        }
+        return selectedTimes.length + "つの時間帯を選択中";
+      }
+
+      function setMobileTimeFilterDropdownOpen(open) {
+        mobileTimeFilterDropdownOpen = !!open;
+        updateMobileAvailabilityControl();
+      }
+
+      function normaliseMobileAvailableTimeFilter(value) {
+        var requestedValues = [];
+        if (Array.isArray(value)) {
+          requestedValues = value;
+        } else if (value && value !== MOBILE_TIME_FILTER_ALL) {
+          requestedValues = [value];
+        }
         var availableTimes = getMobileAvailableTimeOptions().map(function (option) {
           return String(option.time);
         });
-        return availableTimes.indexOf(requested) === -1
-          ? MOBILE_TIME_FILTER_ALL
-          : requested;
+        var selected = [];
+        requestedValues.forEach(function (item) {
+          var requested = String(item);
+          if (
+            availableTimes.indexOf(requested) !== -1 &&
+            selected.indexOf(requested) === -1
+          ) {
+            selected.push(requested);
+          }
+        });
+        return selected;
       }
 
-      function getMobileAvailableTimeFilter() {
+      function getMobileAvailableTimeFilters() {
         mobileAvailableTimeFilter = normaliseMobileAvailableTimeFilter(
           mobileAvailableTimeFilter,
         );
-        return mobileAvailableTimeFilter;
+        return mobileAvailableTimeFilter.slice();
+      }
+
+      function getMobileAvailableTimeFilter() {
+        return getMobileAvailableTimeFilters();
       }
 
       function setMobileAvailableTimeFilter(time) {
-        mobileAvailableTimeFilter = normaliseMobileAvailableTimeFilter(time);
+        if (Array.isArray(time)) {
+          mobileAvailableTimeFilter = normaliseMobileAvailableTimeFilter(time);
+        } else {
+          var requested = String(time || "");
+          if (!requested || requested === MOBILE_TIME_FILTER_ALL) {
+            mobileAvailableTimeFilter = [];
+          } else {
+            var selectedTimes = getMobileAvailableTimeFilters();
+            var selectedIndex = selectedTimes.indexOf(requested);
+            if (selectedIndex === -1) {
+              selectedTimes.push(requested);
+            } else {
+              selectedTimes.splice(selectedIndex, 1);
+            }
+            mobileAvailableTimeFilter =
+              normaliseMobileAvailableTimeFilter(selectedTimes);
+          }
+        }
         updateMobileAvailabilityControl();
         if (isCompactLayout()) {
           buildMobileAgenda();
@@ -2639,10 +2816,10 @@
 
       function getMobileFilteredEvents() {
         var events = getMobileBaseFilteredEvents();
-        var selectedTime = getMobileAvailableTimeFilter();
-        if (selectedTime === MOBILE_TIME_FILTER_ALL) return events;
+        var selectedTimes = getMobileAvailableTimeFilters();
+        if (selectedTimes.length === 0) return events;
         return events.filter(function (event) {
-          return String(event.startTime || "") === selectedTime;
+          return selectedTimes.indexOf(String(event.startTime || "")) !== -1;
         });
       }
 
@@ -2685,7 +2862,8 @@
       }
 
       function updateMobileAvailabilityControl() {
-        var select = getMobileTimeFilterSelect();
+        var timeFilter = getMobileTimeFilterSelect();
+        var timeToggle = getMobileTimeFilterToggle();
         var activityFilter = getMobileActivityFilterContainer();
         var roleFilter = getMobileRoleFilterSelect();
         var keywordInput = getMobileKeywordSearchInput();
@@ -2693,7 +2871,7 @@
         var activity = getMobileActivityFilter();
         var roleKey = getMobileRoleFilter();
         var options = getMobileAvailableTimeOptions();
-        var selectedTime = getMobileAvailableTimeFilter();
+        var selectedTimes = getMobileAvailableTimeFilters();
         var availableRoleOptions = getMobileAvailableRoleOptions();
 
         if (
@@ -2705,32 +2883,77 @@
           mobileRoleAvailabilityFilter = MOBILE_ROLE_FILTER_ALL;
           roleKey = MOBILE_ROLE_FILTER_ALL;
           options = getMobileAvailableTimeOptions();
-          selectedTime = getMobileAvailableTimeFilter();
+          selectedTimes = getMobileAvailableTimeFilters();
           availableRoleOptions = getMobileAvailableRoleOptions();
         }
 
-        if (select) {
-          while (select.firstChild) {
-            select.removeChild(select.firstChild);
+        if (timeToggle) {
+          if (options.length === 0) {
+            mobileTimeFilterDropdownOpen = false;
           }
+          timeToggle.className =
+            "mobile-filter-select mobile-time-filter-toggle" +
+            (mobileTimeFilterDropdownOpen ? " is-open" : "");
+          timeToggle.textContent = getMobileSelectedTimeLabel(
+            selectedTimes,
+            options,
+          );
+          timeToggle.disabled = options.length === 0;
+          timeToggle.setAttribute(
+            "aria-expanded",
+            mobileTimeFilterDropdownOpen ? "true" : "false",
+          );
+        }
 
-          var allOption = document.createElement("option");
-          allOption.value = MOBILE_TIME_FILTER_ALL;
-          allOption.textContent =
-            options.length > 0
-              ? "すべての時間帯"
-              : "空きのある時間帯なし";
-          select.appendChild(allOption);
+        if (timeFilter) {
+          while (timeFilter.firstChild) {
+            timeFilter.removeChild(timeFilter.firstChild);
+          }
+          timeFilter.hidden = !mobileTimeFilterDropdownOpen || options.length === 0;
+
+          var allTimeButton = document.createElement("button");
+          allTimeButton.type = "button";
+          allTimeButton.className =
+            "mobile-time-filter-option" +
+            (selectedTimes.length === 0 ? " is-active" : "");
+          allTimeButton.setAttribute(
+            "data-mobile-time-filter",
+            MOBILE_TIME_FILTER_ALL,
+          );
+          allTimeButton.setAttribute(
+            "aria-pressed",
+            selectedTimes.length === 0 ? "true" : "false",
+          );
+          var allTimeCheck = document.createElement("span");
+          allTimeCheck.className = "mobile-time-filter-check";
+          allTimeCheck.textContent = selectedTimes.length === 0 ? "✓" : "";
+          allTimeButton.appendChild(allTimeCheck);
+
+          var allTimeLabel = document.createElement("span");
+          allTimeLabel.className = "mobile-time-filter-option-label";
+          allTimeLabel.textContent = "すべての時間帯";
+          allTimeButton.appendChild(allTimeLabel);
+          timeFilter.appendChild(allTimeButton);
 
           options.forEach(function (option) {
-            var optionNode = document.createElement("option");
-            optionNode.value = option.time;
-            optionNode.textContent = getMobileTimeOptionLabel(option);
-            select.appendChild(optionNode);
-          });
+            var active = selectedTimes.indexOf(String(option.time)) !== -1;
+            var timeButton = document.createElement("button");
+            timeButton.type = "button";
+            timeButton.className =
+              "mobile-time-filter-option" + (active ? " is-active" : "");
+            timeButton.setAttribute("data-mobile-time-filter", option.time);
+            timeButton.setAttribute("aria-pressed", active ? "true" : "false");
+            var timeCheck = document.createElement("span");
+            timeCheck.className = "mobile-time-filter-check";
+            timeCheck.textContent = active ? "✓" : "";
+            timeButton.appendChild(timeCheck);
 
-          select.value = selectedTime;
-          select.disabled = options.length === 0;
+            var timeLabel = document.createElement("span");
+            timeLabel.className = "mobile-time-filter-option-label";
+            timeLabel.textContent = getMobileTimeOptionLabel(option);
+            timeButton.appendChild(timeLabel);
+            timeFilter.appendChild(timeButton);
+          });
         }
 
         if (activityFilter) {
@@ -2808,17 +3031,27 @@
           keywordInput.value = mobileKeywordSearchQuery;
         }
 
-        var selectedOption = options.find(function (option) {
-          return String(option.time) === selectedTime;
+        var selectedOptions = options.filter(function (option) {
+          return selectedTimes.indexOf(String(option.time)) !== -1;
         });
         if (timeDetail) {
-          if (selectedOption) {
+          if (selectedOptions.length === 1) {
             timeDetail.textContent =
               "この時間の空き: " +
-              formatRoleAvailabilitySummary(selectedOption.roleSummaries);
-          } else if (options.length > 0) {
+              formatRoleAvailabilitySummary(selectedOptions[0].roleSummaries);
+          } else if (selectedOptions.length > 1) {
+            var selectedEvents = [];
+            selectedOptions.forEach(function (option) {
+              selectedEvents = selectedEvents.concat(option.events || []);
+            });
             timeDetail.textContent =
-              "時間帯を選ぶと、空き募集枠が表示されます";
+              selectedOptions.length +
+              "つの時間帯の空き: " +
+              formatRoleAvailabilitySummary(
+                getAvailableRoleSummariesForEvents(selectedEvents, roleKey),
+              );
+          } else if (options.length > 0) {
+            timeDetail.textContent = "すべての空き時間帯を表示中";
           } else {
             timeDetail.textContent =
               "条件に合う空き時間帯はありません";
@@ -3464,6 +3697,9 @@
       function buildMobileAgenda() {
         var filters = document.getElementById("mobileAvailabilityControl");
         var activeMode = getMobileDisplayMode();
+        if (activeMode !== "signup") {
+          mobileTimeFilterDropdownOpen = false;
+        }
         if (filters) {
           filters.style.display = "";
           filters.classList.toggle("is-signup-mode", activeMode === "signup");
@@ -4198,9 +4434,19 @@
           setMobileDisplayMode(btn.getAttribute("data-mobile-display-mode"));
         });
       document
+        .getElementById("mobileTimeAvailabilityToggle")
+        .addEventListener("click", function () {
+          setMobileTimeFilterDropdownOpen(!mobileTimeFilterDropdownOpen);
+        });
+      document
         .getElementById("mobileTimeAvailabilityFilter")
-        .addEventListener("change", function (e) {
-          setMobileAvailableTimeFilter(e.target.value);
+        .addEventListener("click", function (e) {
+          var btn =
+            e.target && e.target.closest
+              ? e.target.closest("[data-mobile-time-filter]")
+              : null;
+          if (!btn || btn.disabled) return;
+          setMobileAvailableTimeFilter(btn.getAttribute("data-mobile-time-filter"));
         });
       document
         .getElementById("mobileActivityFilter")
