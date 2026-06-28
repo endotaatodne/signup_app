@@ -5,10 +5,31 @@ const assert = require("node:assert/strict");
 
 const { loadIndexHtml } = require("../test-support/load-index-html");
 
+function elementMatchesSelector(element, selector) {
+  if (!element || !selector) return false;
+  if (selector.startsWith("#")) {
+    const id = selector.slice(1);
+    return element.id === id || element.getAttribute?.("id") === id;
+  }
+
+  const attributeMatch = selector.match(/^\[([^\]=]+)(?:="([^"]*)")?\]$/);
+  if (attributeMatch) {
+    const value = element.getAttribute?.(attributeMatch[1]);
+    return attributeMatch[2] === undefined
+      ? value !== null
+      : value === attributeMatch[2];
+  }
+
+  return false;
+}
+
 function createElement(tagName) {
   const attributes = {};
+  const listeners = {};
   return {
     tagName,
+    id: "",
+    parentNode: null,
     className: "",
     textContent: "",
     innerHTML: "",
@@ -22,24 +43,44 @@ function createElement(tagName) {
     },
     setAttribute(name, value) {
       attributes[name] = String(value);
+      if (name === "id") this.id = String(value);
     },
     getAttribute(name) {
       return Object.prototype.hasOwnProperty.call(attributes, name)
         ? attributes[name]
         : null;
     },
-    addEventListener() {},
-    removeEventListener() {},
-    closest() {
+    addEventListener(type, handler) {
+      if (!listeners[type]) listeners[type] = [];
+      listeners[type].push(handler);
+    },
+    removeEventListener(type, handler) {
+      if (!listeners[type]) return;
+      listeners[type] = listeners[type].filter((item) => item !== handler);
+    },
+    dispatchEvent(event) {
+      const eventWithTarget = { target: this, ...event };
+      (listeners[eventWithTarget.type] || []).forEach((handler) =>
+        handler(eventWithTarget),
+      );
+    },
+    closest(selector) {
+      let current = this;
+      while (current) {
+        if (elementMatchesSelector(current, selector)) return current;
+        current = current.parentNode || null;
+      }
       return null;
     },
     appendChild(child) {
+      child.parentNode = this;
       this.children.push(child);
       return child;
     },
     removeChild(child) {
       const index = this.children.indexOf(child);
       if (index >= 0) this.children.splice(index, 1);
+      if (child.parentNode === this) child.parentNode = null;
       return child;
     },
     focus() {},
@@ -70,6 +111,13 @@ function createClassList() {
 
 function createDocument(elements = {}) {
   const fallbackElements = {};
+  const listeners = {};
+  function withElementId(id, element) {
+    if (element?.setAttribute) element.setAttribute("id", id);
+    else if (element) element.id = id;
+    return element;
+  }
+
   return {
     elements,
     body: {
@@ -80,16 +128,26 @@ function createDocument(elements = {}) {
       clientWidth: 0,
     },
     getElementById(id) {
-      if (elements[id]) return elements[id];
+      if (elements[id]) return withElementId(id, elements[id]);
       if (!fallbackElements[id]) {
         fallbackElements[id] = createElement("div");
       }
-      return fallbackElements[id];
+      return withElementId(id, fallbackElements[id]);
     },
-    addEventListener() {},
-    removeEventListener() {},
+    addEventListener(type, handler) {
+      if (!listeners[type]) listeners[type] = [];
+      listeners[type].push(handler);
+    },
+    removeEventListener(type, handler) {
+      if (!listeners[type]) return;
+      listeners[type] = listeners[type].filter((item) => item !== handler);
+    },
+    dispatchEvent(event) {
+      (listeners[event.type] || []).forEach((handler) => handler(event));
+    },
     querySelector(selector) {
       if (elements[selector]) return elements[selector];
+      if (selector.startsWith("#")) return this.getElementById(selector.slice(1));
       if (!fallbackElements[selector]) {
         fallbackElements[selector] = createElement("div");
       }
@@ -554,7 +612,7 @@ test("mobile available time filter supports multiple selected time slots", () =>
   const timeFilter = createElement("div");
   const timeToggle = createElement("button");
   const detail = createElement("div");
-  const { exports: client } = loadClient({
+  const { exports: client, context } = loadClient({
     gridData: {
       activities: ["Gate", "Shop", "Cleanup"],
       times: ["09:00", "10:00", "11:00"],
@@ -644,6 +702,22 @@ test("mobile available time filter supports multiple selected time slots", () =>
   assert.equal(timeToggle.getAttribute("aria-expanded"), "true");
   assert.equal(timeToggle.className.includes("is-open"), true);
 
+  context.document.dispatchEvent({
+    type: "click",
+    target: timeFilter.children[1].children[1],
+  });
+  assert.equal(timeFilter.hidden, false);
+  assert.equal(timeToggle.getAttribute("aria-expanded"), "true");
+
+  context.document.dispatchEvent({
+    type: "click",
+    target: createElement("div"),
+  });
+  assert.equal(timeFilter.hidden, true);
+  assert.equal(timeToggle.getAttribute("aria-expanded"), "false");
+  assert.equal(timeToggle.className.includes("is-open"), false);
+
+  client.setMobileTimeFilterDropdownOpen(true);
   client.setMobileAvailableTimeFilter("__all__");
   assert.deepEqual(Array.from(client.getMobileAvailableTimeFilters()), []);
   assert.equal(timeFilter.children[0].className.includes("is-active"), true);
@@ -1295,6 +1369,26 @@ test("mobile role filter active pills keep their role colour families", () => {
   assert.match(
     htmlSource,
     /\.mobile-role-filter-pill\.role-orgcommittee\.is-active\s*{[\s\S]*?background:\s*#681c8d;/,
+  );
+});
+
+test("mobile tab and filter controls stay sticky in compact layout", () => {
+  const htmlSource = fs.readFileSync(
+    path.resolve(__dirname, "..", "index.html"),
+    "utf8",
+  );
+
+  assert.match(
+    htmlSource,
+    /body\.compact-layout \.mobile-display-mode-control\s*{[\s\S]*?position:\s*sticky;[\s\S]*?top:\s*0;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.compact-layout \.mobile-availability-control\s*{[\s\S]*?position:\s*sticky;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.compact-layout \.mobile-availability-control\s*{[\s\S]*?top:\s*80px;/,
   );
 });
 

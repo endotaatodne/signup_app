@@ -2,7 +2,8 @@
 
 - Patch
   - Renames the mobile primary tab to さがす and adds a separate まとめ summary tab for the day overview.
-  - Adds mobile activity, role, available-time, and keyword filters for finding open signup slots.
+  - Adds mobile activity, role, multi-select available-time, and keyword filters for finding open signup slots.
+  - Keeps the mobile tab switcher and filter controls sticky while scrolling.
   - Adds activity filter pills to the mobile summary tab.
   - Updates the mobile summary timeline to show role-coloured 募集中 availability chips instead of a single total remaining-slots badge.
   - Updates the Steering Committee role wording to 役員、運営・実行委員.
