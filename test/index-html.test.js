@@ -72,6 +72,14 @@ function createElement(tagName) {
       }
       return null;
     },
+    contains(node) {
+      let current = node;
+      while (current) {
+        if (current === this) return true;
+        current = current.parentNode || null;
+      }
+      return false;
+    },
     appendChild(child) {
       child.parentNode = this;
       this.children.push(child);
@@ -538,6 +546,22 @@ test("mobile availability control lists activity pills and open time slots", () 
   assert.equal(
     timeFilter.children[2].getAttribute("data-mobile-time-filter"),
     "11:00",
+  );
+});
+
+test("mobile filters render directly without collapsed summary state", () => {
+  const htmlSource = fs.readFileSync(
+    path.resolve(__dirname, "..", "index.html"),
+    "utf8",
+  );
+
+  assert.doesNotMatch(htmlSource, /mobileFilterSummaryBar/);
+  assert.doesNotMatch(htmlSource, /mobileFilterSummaryText/);
+  assert.doesNotMatch(htmlSource, /is-filters-collapsed/);
+  assert.doesNotMatch(htmlSource, /is-filters-expanded/);
+  assert.match(
+    htmlSource,
+    /id="mobileAvailabilityControl"[\s\S]*class="mobile-filter-row mobile-filter-row-secondary"[\s\S]*id="mobileActivityFilter"[\s\S]*id="mobileRoleAvailabilityFilter"[\s\S]*id="mobileKeywordSearch"[\s\S]*id="mobileTimeAvailabilityToggle"/,
   );
 });
 
@@ -1348,6 +1372,27 @@ test("desktop grid typography overrides are scoped to desktop layout", () => {
   );
 });
 
+test("desktop title and grid header stick to viewport scroll", () => {
+  const htmlSource = fs.readFileSync(
+    path.resolve(__dirname, "..", "index.html"),
+    "utf8",
+  );
+
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout #pageTitle\s*{[\s\S]*?position:\s*sticky;[\s\S]*?top:\s*0;[\s\S]*?z-index:\s*20;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout \.grid-wrapper,\s*body\.desktop-layout #grid\s*{[\s\S]*?overflow-x:\s*visible;[\s\S]*?overflow-y:\s*visible;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout #grid thead th\s*{[\s\S]*?position:\s*sticky;[\s\S]*?top:\s*var\(--desktop-title-sticky-offset,\s*0px\);[\s\S]*?z-index:\s*5;/,
+  );
+  assert.doesNotMatch(htmlSource, /body\.compact-layout \.grid-wrapper/);
+});
+
 test("mobile role filter active pills keep their role colour families", () => {
   const htmlSource = fs.readFileSync(
     path.resolve(__dirname, "..", "index.html"),
@@ -1389,6 +1434,30 @@ test("mobile tab and filter controls stay sticky in compact layout", () => {
   assert.match(
     htmlSource,
     /body\.compact-layout \.mobile-availability-control\s*{[\s\S]*?top:\s*80px;/,
+  );
+});
+
+test("mobile sticky controls use opaque backing so cards do not show through", () => {
+  const htmlSource = fs.readFileSync(
+    path.resolve(__dirname, "..", "index.html"),
+    "utf8",
+  );
+
+  assert.match(
+    htmlSource,
+    /body\.compact-layout \.mobile-availability-control\s*{[\s\S]*?isolation:\s*isolate;[\s\S]*?background:\s*#faf8f5;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.compact-layout \.mobile-availability-control::before\s*{[\s\S]*?right:\s*-14px;[\s\S]*?left:\s*-14px;[\s\S]*?background:\s*#f5f2ee;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.compact-layout \.mobile-display-mode-control\s*{[\s\S]*?position:\s*sticky;[\s\S]*?isolation:\s*isolate;[\s\S]*?background:\s*#efebe5;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.compact-layout \.mobile-display-mode-control::before\s*{[\s\S]*?right:\s*-14px;[\s\S]*?left:\s*-14px;[\s\S]*?background:\s*#efebe5;/,
   );
 });
 
@@ -1538,6 +1607,8 @@ test("buildMobileDayOverview renders a time-based day timeline", () => {
   assert.equal(timeline.children.length, 3);
   assert.equal(firstTimeBlock.children[0].textContent, "9:30 am - 10:00 am");
   assert.equal(firstItem.className.includes("mobile-overview-item"), true);
+  assert.equal(firstItem.className.includes("activity-accent-0"), true);
+  assert.equal(secondItem.className.includes("activity-accent-1"), true);
   assert.equal(firstItem.children[0].children[0].textContent, "Bake Sale");
   assert.equal(firstItem.children[1].className, "mobile-overview-role-chips");
   assert.equal(firstItem.children[1].children[0].textContent, "\u52DF\u96C6\u4E2D");
@@ -1551,6 +1622,22 @@ test("buildMobileDayOverview renders a time-based day timeline", () => {
   );
   assert.equal(secondTimeBlock.children[0].textContent, "10:00 am - 10:30 am");
   assert.equal(secondItem.children[0].children[0].textContent, "Games");
+});
+
+test("mobile day overview keeps activity accent colours in compact layout", () => {
+  const htmlSource = fs.readFileSync(
+    path.resolve(__dirname, "..", "index.html"),
+    "utf8",
+  );
+
+  assert.match(
+    htmlSource,
+    /body\.compact-layout \.mobile-overview-item\.activity-accent-0\s*{[\s\S]*?border-left-color:\s*#e87b45;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.compact-layout \.mobile-overview-item\.activity-accent-1\s*{[\s\S]*?border-left-color:\s*#3b82a0;/,
+  );
 });
 
 test("mobile display mode maps the old activity preference to overview", () => {

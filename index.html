@@ -182,6 +182,27 @@
         line-height: 1.2;
         white-space: nowrap;
       }
+      body.desktop-layout #pageTitle {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        margin: -20px -20px 1.2rem;
+        padding: 18px 20px 14px;
+        background: rgba(248, 251, 255, 0.97);
+        border-bottom: 1px solid #dfe7f1;
+        box-shadow: 0 2px 10px rgba(26, 26, 24, 0.06);
+      }
+      body.desktop-layout .grid-wrapper,
+      body.desktop-layout #grid {
+        overflow-x: visible;
+        overflow-y: visible;
+      }
+      body.desktop-layout #grid thead th {
+        position: sticky;
+        top: var(--desktop-title-sticky-offset, 0px);
+        z-index: 5;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+      }
       body.desktop-layout th {
         font-size: 17px;
         line-height: 1.25;
@@ -790,10 +811,23 @@
         gap: 10px;
         margin: -8px 14px 14px;
         padding: 9px 10px 10px;
-        background: rgba(250, 248, 245, 0.92);
+        isolation: isolate;
+        background: #faf8f5;
         border: 1px solid #ede6dc;
         border-radius: 12px;
         box-shadow: 0 2px 8px rgba(26, 26, 24, 0.05);
+      }
+
+      body.compact-layout .mobile-availability-control::before {
+        content: "";
+        position: absolute;
+        top: -12px;
+        right: -14px;
+        bottom: -18px;
+        left: -14px;
+        z-index: -1;
+        background: #f5f2ee;
+        pointer-events: none;
       }
 
       .mobile-filter-row {
@@ -1835,11 +1869,24 @@
         z-index: 22;
         margin-top: 0;
         margin-bottom: 0;
-        background: rgba(239, 235, 229, 0.94);
+        isolation: isolate;
+        background: #efebe5;
         border-radius: 0;
         border-left: 0;
         border-right: 0;
         box-shadow: 0 2px 8px rgba(26, 26, 24, 0.05);
+      }
+
+      body.compact-layout .mobile-display-mode-control::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        right: -14px;
+        bottom: 0;
+        left: -14px;
+        z-index: -1;
+        background: #efebe5;
+        pointer-events: none;
       }
 
       body.compact-layout .mobile-display-mode-btn.active {
@@ -1918,6 +1965,30 @@
         border-radius: 12px;
         padding: 16px 14px 15px;
         box-shadow: 0 10px 24px rgba(26, 26, 24, 0.1);
+      }
+
+      body.compact-layout .mobile-overview-item.activity-accent-0 {
+        border-left-color: #e87b45;
+      }
+
+      body.compact-layout .mobile-overview-item.activity-accent-1 {
+        border-left-color: #3b82a0;
+      }
+
+      body.compact-layout .mobile-overview-item.activity-accent-2 {
+        border-left-color: #8a9a5b;
+      }
+
+      body.compact-layout .mobile-overview-item.activity-accent-3 {
+        border-left-color: #d9a441;
+      }
+
+      body.compact-layout .mobile-overview-item.activity-accent-4 {
+        border-left-color: #9b6f9f;
+      }
+
+      body.compact-layout .mobile-overview-item.activity-accent-5 {
+        border-left-color: #c05a47;
       }
 
       body.compact-layout .mobile-overview-title {
@@ -2395,6 +2466,35 @@
             label.classList.add("role-fit-fallback");
           }
         });
+      }
+
+      function updateDesktopStickyTitleOffset() {
+        var offset = "0px";
+        if (!isCompactLayout()) {
+          var title = document.getElementById("pageTitle");
+          if (title) {
+            var titleHeight = 0;
+            if (title.getBoundingClientRect) {
+              var titleRect = title.getBoundingClientRect();
+              titleHeight = titleRect && titleRect.height ? titleRect.height : 0;
+            }
+            if (!titleHeight && title.offsetHeight) {
+              titleHeight = title.offsetHeight;
+            }
+            if (titleHeight) {
+              offset = Math.ceil(titleHeight) + "px";
+            }
+          }
+        }
+
+        var rootStyle =
+          document.documentElement && document.documentElement.style;
+        if (!rootStyle) return;
+        if (rootStyle.setProperty) {
+          rootStyle.setProperty("--desktop-title-sticky-offset", offset);
+        } else {
+          rootStyle["--desktop-title-sticky-offset"] = offset;
+        }
       }
 
       function buildGridIndexes() {
@@ -3804,6 +3904,7 @@
 
         document.body.classList.toggle("compact-layout", compact);
         document.body.classList.toggle("desktop-layout", !compact);
+        updateDesktopStickyTitleOffset();
 
         if (!layoutChanged) {
           if (!compact) fitDesktopRolePillText();
@@ -4541,13 +4642,15 @@
         var insideToggle =
           timeToggle &&
           target &&
-          target.closest &&
-          target.closest("#mobileTimeAvailabilityToggle");
+          ((timeToggle.contains && timeToggle.contains(target)) ||
+            (target.closest &&
+              target.closest("#mobileTimeAvailabilityToggle")));
         var insideFilter =
           timeFilter &&
           target &&
-          target.closest &&
-          target.closest("#mobileTimeAvailabilityFilter");
+          ((timeFilter.contains && timeFilter.contains(target)) ||
+            (target.closest &&
+              target.closest("#mobileTimeAvailabilityFilter")));
         if (!insideToggle && !insideFilter) {
           setMobileTimeFilterDropdownOpen(false);
         }
