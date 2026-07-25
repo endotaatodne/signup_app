@@ -1017,8 +1017,22 @@ function normaliseBrackets_(value) {
     .replace(/\uFF09/g, ")");
 }
 
+function hasJapaneseNameCharacters_(value) {
+  return /[\u3005\u3006\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF\uFF66-\uFF9F]/.test(
+    String(value),
+  );
+}
+
+function normaliseNameSpacing_(value) {
+  const normalisedValue = normaliseWhitespace_(value);
+  if (hasJapaneseNameCharacters_(normalisedValue)) {
+    return normalisedValue.replace(/[\s\u3000]+/g, "");
+  }
+  return normalisedValue;
+}
+
 function normaliseNameValue_(value) {
-  return normaliseBrackets_(normaliseWhitespace_(value));
+  return normaliseNameSpacing_(normaliseBrackets_(value));
 }
 
 function isValidNameValue_(value) {

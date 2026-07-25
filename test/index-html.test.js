@@ -1085,6 +1085,10 @@ test("name normalization in index.html converts full-width brackets", () => {
 
   assert.equal(client.normaliseBrackets("Alice（parent）"), "Alice(parent)");
   assert.equal(client.normaliseNameValue(" 山田（太郎） "), "山田(太郎)");
+  assert.equal(client.normaliseNameValue(" 山田 太郎 "), "山田太郎");
+  assert.equal(client.normaliseNameValue("山田\u3000太郎"), "山田太郎");
+  assert.equal(client.normaliseNameValue("山田\u2002太郎"), "山田太郎");
+  assert.equal(client.normaliseNameValue(" John  Smith "), "John Smith");
   assert.equal(client.normaliseComparable("山田（太郎）"), "山田(太郎)");
   assert.equal(client.isValidNameValue("山田(太郎)"), true);
   assert.equal(client.isValidNameValue("山田（太郎）"), false);
@@ -1155,6 +1159,37 @@ test("index.html leaves name length enforcement to validation while keeping clas
   assert.match(cancelClassBlock, /maxlength="10"/);
 });
 
+test("signup and cancellation forms ask users not to space Japanese names", () => {
+  const htmlSource = fs.readFileSync(
+    path.resolve(__dirname, "..", "index.html"),
+    "utf8",
+  );
+  const noteText =
+    "日本語のお名前は、姓と名の間にスペースを入れずに入力してください。";
+
+  assert.match(
+    htmlSource,
+    new RegExp(
+      'id="modalForm"[\\s\\S]*id="inputName"[\\s\\S]*id="signupNameNote"[\\s\\S]*' +
+        noteText +
+        '[\\s\\S]*id="inputClass"',
+    ),
+  );
+  assert.match(
+    htmlSource,
+    new RegExp(
+      'id="cancelForm"[\\s\\S]*id="cancelName"[\\s\\S]*id="cancelNameNote"[\\s\\S]*' +
+        noteText +
+        '[\\s\\S]*id="cancelClass"',
+    ),
+  );
+  assert.match(htmlSource, /\.name-input-note\s*{[\s\S]*?font-size:\s*12px;/);
+  assert.match(
+    htmlSource,
+    /body\.compact-layout \.name-input-note\s*{[\s\S]*?font-size:\s*18px;/,
+  );
+});
+
 test("findAndConfirmCancel enforces the 50-character name limit client-side", () => {
   const cancelMessage = createElement("div");
   cancelMessage.style = { display: "none" };
@@ -1202,7 +1237,7 @@ test("submitSignup enforces the 50-character name limit client-side", () => {
   assert.equal(modalMessage.style.display, "block");
 });
 
-test("submitSignup normalises full-width brackets before sending to backend", () => {
+test("submitSignup normalises Japanese spacing and brackets before sending to backend", () => {
   const modalMessage = createElement("div");
   modalMessage.style = { display: "none" };
   const submitBtn = createElement("button");
@@ -1233,7 +1268,7 @@ test("submitSignup normalises full-width brackets before sending to backend", ()
   const { exports: client, context } = loadClient({
     elements: {
       honeypot: { ...createElement("input"), value: "" },
-      inputName: { ...createElement("input"), value: "山田（太郎）" },
+      inputName: { ...createElement("input"), value: "山田　（太郎）" },
       inputClass: { ...createElement("input"), value: "1-1" },
       submitBtn,
       modalMessage,

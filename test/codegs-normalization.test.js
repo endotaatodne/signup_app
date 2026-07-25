@@ -64,6 +64,13 @@ test("normaliseNameValue_ trims whitespace and converts full-width brackets", ()
   assert.equal(normaliseNameValue_(" 山田（太郎） "), "山田(太郎)");
 });
 
+test("normaliseNameValue_ removes spaces from Japanese names only", () => {
+  assert.equal(normaliseNameValue_(" 山田 太郎 "), "山田太郎");
+  assert.equal(normaliseNameValue_("山田\u3000太郎"), "山田太郎");
+  assert.equal(normaliseNameValue_("山田\u2002太郎"), "山田太郎");
+  assert.equal(normaliseNameValue_(" John  Smith "), "John Smith");
+});
+
 test("isValidNameValue_ accepts only canonical brackets after normalisation", () => {
   assert.equal(isValidNameValue_("Alice(parent)"), true);
   assert.equal(isValidNameValue_("Alice（parent）"), false);
@@ -90,6 +97,7 @@ test("isClassTokenChar_ stays narrow and does not treat Japanese text as a class
 test("normaliseComparable_ canonicalizes whitespace, case, and brackets", () => {
   assert.equal(normaliseComparable_("  AbC\u3000Def "), "abc def");
   assert.equal(normaliseComparable_("山田（太郎）"), "山田(太郎)");
+  assert.equal(normaliseComparable_("山田 太郎"), "山田太郎");
 });
 
 test("validateNameInput_ preserves Kanji numerals in names", () => {

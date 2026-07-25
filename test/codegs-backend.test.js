@@ -460,6 +460,25 @@ test("submitSignup preserves Kanji numerals in names while normalising class", (
   assert.equal(appendedRow[3], "4-2");
 });
 
+test("submitSignup removes spaces from Japanese names before storing", () => {
+  const { app, spreadsheets } = loadBackend();
+  const signupsSheet = spreadsheets[EVENT_SHEET_ID].getSheetByName("Signups");
+
+  const result = app.submitSignup(
+    "1",
+    "\u5C71\u7530\u3000\u592A\u90CE",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+  const signupRows = signupsSheet.getDataRange().getValues();
+  const appendedRow = signupRows[signupRows.length - 1];
+
+  assert.equal(result.success, true);
+  assert.equal(result.name, "\u5C71\u7530\u592A\u90CE");
+  assert.equal(appendedRow[2], "\u5C71\u7530\u592A\u90CE");
+});
+
 test("submitSignup normalises full-width brackets in names before storing", () => {
   const { app, spreadsheets } = loadBackend();
   const signupsSheet = spreadsheets[EVENT_SHEET_ID].getSheetByName("Signups");
@@ -673,6 +692,26 @@ test("cancelSignup matches normalised class values and deletes the correct row",
   assert.equal(result.success, true);
   assert.deepEqual(signupsSheet.__state.deletedRows, [2]);
   assert.equal(lock.released, true);
+});
+
+test("cancelSignup matches Japanese names with or without spaces", () => {
+  const signupRows = [
+    ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
+    ["s1", 1, "\u5C71\u7530\u592A\u90CE", "1-1", appRoleGeneral(), new Date()],
+  ];
+  const { app, spreadsheets } = loadBackend({ signupRows });
+  const signupsSheet = spreadsheets[EVENT_SHEET_ID].getSheetByName("Signups");
+
+  const result = app.cancelSignup(
+    "1",
+    "\u5C71\u7530 \u592A\u90CE",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+
+  assert.equal(result.success, true);
+  assert.deepEqual(signupsSheet.__state.deletedRows, [2]);
 });
 
 test("cancelSignup does not release a lock that was not acquired", () => {
