@@ -22,254 +22,7 @@
         color: #222;
       }
 
-      /* Grid */
-      .grid-wrapper {
-        overflow-x: auto;
-      }
-      table {
-        border-collapse: collapse;
-        width: 100%;
-        min-width: 560px;
-        background: white;
-        border-radius: 10px;
-        overflow: hidden;
-        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
-        table-layout: fixed;
-      }
-      th {
-        background: #f0f0f0;
-        padding: 10px 14px;
-        font-size: 13px;
-        font-weight: 600;
-        text-align: center;
-        border: 1px solid #e0e0e0;
-        position: sticky;
-        top: 0;
-        z-index: 2;
-      }
-      th.time-header {
-        text-align: left;
-        width: 100px;
-        min-width: 100px;
-      }
-      th.desc-header {
-        width: 220px;
-        min-width: 180px;
-        text-align: left;
-      }
-      td {
-        padding: 8px 10px;
-        border: 1px solid #e0e0e0;
-        vertical-align: top;
-      }
-      td.time-cell {
-        font-size: 12px;
-        font-weight: 600;
-        color: #666;
-        white-space: normal;
-        background: #fafafa;
-        width: 68px;
-        min-width: 80px;
-        word-break: break-word;
-        position: sticky;
-        left: 0;
-        z-index: 1;
-      }
-      td.desc-cell {
-        font-size: 12px;
-        font-weight: 500;
-        color: #36312d;
-        max-width: 220px;
-        width: 220px;
-        word-wrap: break-word;
-        overflow-wrap: break-word;
-        white-space: normal;
-        background: #fffdf9;
-        border-left: 3px solid #d9a441;
-        line-height: 1.45;
-      }
-
-      .slot {
-        border-radius: 6px;
-        padding: 7px 9px;
-        cursor: pointer;
-      }
-      .slot:hover {
-        opacity: 0.85;
-      }
-      .slot-empty {
-        background: none;
-        cursor: default;
-      }
-      .slot-all-full {
-        background: #f0f0f0;
-        cursor: pointer;
-      }
-
-      .role-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 10px;
-        margin-bottom: 5px;
-        padding: 4px 10px;
-        border-radius: 999px;
-        background: #ffffff;
-        border: 1px solid rgba(0, 0, 0, 0.06);
-      }
-      .role-row:last-child {
-        margin-bottom: 0;
-      }
-      .role-label {
-        font-size: 10px;
-        color: #444;
-        font-weight: 600;
-      }
-      .role-count {
-        font-size: 10px;
-        font-weight: 600;
-        white-space: nowrap;
-      }
-      .role-divider {
-        border: none;
-        border-top: 1px solid rgba(0, 0, 0, 0.08);
-        margin: 4px 0;
-      }
-      .slot-names {
-        font-size: 10px;
-        margin-top: 4px;
-        padding-top: 4px;
-        border-top: 1px solid rgba(0, 0, 0, 0.08);
-        line-height: 1.6;
-      }
-      .slot-name-group {
-        margin-top: 2px;
-      }
-      .slot-name-group:first-child {
-        margin-top: 0;
-      }
-      .slot-name-role-label {
-        display: inline-block;
-        margin-right: 6px;
-        font-size: 10px;
-        font-weight: 600;
-      }
-      .role-row.is-full {
-        background: #e7e7e7;
-        border-color: rgba(0, 0, 0, 0.08);
-      }
-      .role-row.is-full .role-label,
-      .role-row.is-full .role-count {
-        color: #6f6f6f;
-      }
-
-      body.desktop-layout .role-row {
-        flex-direction: column;
-        justify-content: center;
-        gap: 3px;
-        margin-bottom: 7px;
-        padding: 8px 6px;
-        min-width: 0;
-        text-align: center;
-      }
-      body.desktop-layout .role-label,
-      body.desktop-layout .role-count {
-        display: block;
-        max-width: 100%;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        font-size: 17px;
-        line-height: 1.2;
-        white-space: nowrap;
-      }
-      body.desktop-layout #pageTitle {
-        position: sticky;
-        top: 0;
-        z-index: 20;
-        margin: -20px -20px 1.2rem;
-        padding: 18px 20px 14px;
-        background: rgba(248, 251, 255, 0.97);
-        border-bottom: 1px solid #dfe7f1;
-        box-shadow: 0 2px 10px rgba(26, 26, 24, 0.06);
-      }
-      body.desktop-layout .grid-wrapper,
-      body.desktop-layout #grid {
-        overflow-x: visible;
-        overflow-y: visible;
-      }
-      body.desktop-layout #grid thead th {
-        position: sticky;
-        top: var(--desktop-title-sticky-offset, 0px);
-        z-index: 5;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
-      }
-      body.desktop-layout th {
-        font-size: 17px;
-        line-height: 1.25;
-      }
-      body.desktop-layout .activity-title {
-        font-size: 18px;
-        line-height: 1.25;
-      }
-      body.desktop-layout .activity-subtitle {
-        font-size: 15px;
-        line-height: 1.3;
-      }
-      body.desktop-layout td.time-cell {
-        font-size: 14px;
-        line-height: 1.35;
-      }
-      body.desktop-layout td.desc-cell {
-        font-size: 16px;
-        line-height: 1.5;
-      }
-      body.desktop-layout .slot-names {
-        font-size: 12px;
-      }
-      body.desktop-layout .modal .role-buttons {
-        gap: 10px;
-      }
-      body.desktop-layout .modal .role-btn {
-        padding: 14px 18px;
-      }
-      body.desktop-layout .modal .role-btn-label {
-        font-size: 20px;
-        line-height: 1.2;
-      }
-      body.desktop-layout .modal .role-btn-count {
-        font-size: 16px;
-        line-height: 1.3;
-        margin-top: 3px;
-      }
-
       /* Role colours */
-      .count-general {
-        color: #2e7d32;
-      }
-      .count-classrep {
-        color: #f57f17;
-      }
-      .count-steeringcommittee {
-        color: #1565c0;
-      }
-      .count-orgcommittee {
-        color: #6a1b9a;
-      }
-      .slot-mixed {
-        background: #f9f9f9;
-      }
-      .role-row-general {
-        background: #f3fbf4;
-      }
-      .role-row-classrep {
-        background: #fffaf0;
-      }
-      .role-row-steeringcommittee {
-        background: #eef6ff;
-      }
-      .role-row-orgcommittee {
-        background: #f6efff;
-      }
       .name-role-general {
         color: #2e7d32;
       }
@@ -545,14 +298,6 @@
       .mobile-slot-name-list {
         font-weight: 600;
       }
-      /* Hint text */
-      .slot-hint {
-        font-size: 10px;
-        color: #aaa;
-        margin-top: 4px;
-        font-style: italic;
-      }
-
       /* Cancel tab */
       .modal-tabs {
         display: flex;
@@ -1466,7 +1211,7 @@
         border-radius: 14px;
       }
 
-      /* Grey-out when full (mirrors desktop slot-all-full) */
+      /* Grey-out when full */
       body.compact-layout .mobile-slot-card.is-full {
         background: #f0f0f0;
         border-color: #d0d0d0;
@@ -1802,7 +1547,6 @@
       }
 
       /* Card-focused visual refresh inspired by the equipment manager app. */
-      .slot:not(.slot-empty),
       .mobile-slot-card {
         position: relative;
         overflow: hidden;
@@ -1812,7 +1556,6 @@
         box-shadow: 0 1px 2px rgba(26, 26, 24, 0.04);
       }
 
-      .slot:not(.slot-empty)::before,
       .mobile-slot-card::before {
         content: "";
         position: absolute;
@@ -1847,50 +1590,9 @@
         background: #c05a47;
       }
 
-      .slot:not(.slot-empty) {
-        padding: 12px 10px 9px;
-        transition:
-          transform 0.15s ease,
-          box-shadow 0.15s ease,
-          border-color 0.15s ease,
-          opacity 0.15s ease;
-      }
-
-      .slot:not(.slot-empty):hover {
-        border-color: #d8d1c8;
-        box-shadow: 0 8px 24px rgba(26, 26, 24, 0.1);
-        opacity: 1;
-        transform: translateY(-2px);
-      }
-
-      .slot-all-full,
       .mobile-slot-card.is-full {
         background: #f1efeb;
         border-color: #ded8d0;
-      }
-
-      .role-row {
-        border-color: rgba(26, 26, 24, 0.08);
-        border-radius: 7px;
-      }
-
-      body.desktop-layout .role-row {
-        align-items: stretch;
-        min-height: 0;
-      }
-
-      body.desktop-layout .role-label,
-      body.desktop-layout .role-count {
-        overflow: hidden;
-        text-overflow: clip;
-        white-space: nowrap;
-        overflow-wrap: normal;
-      }
-
-      body.desktop-layout .role-label.role-fit-fallback,
-      body.desktop-layout .role-count.role-fit-fallback {
-        white-space: normal;
-        overflow-wrap: anywhere;
       }
 
       .mobile-slot-card {
@@ -2202,102 +1904,572 @@
           font-size: 17px;
         }
       }
+
+
+      body.desktop-layout .modal-overlay.active {
+        padding: 34px;
+        background: rgba(40, 34, 29, 0.52);
+        backdrop-filter: blur(5px);
+      }
+
+      body.desktop-layout .modal {
+        width: min(720px, 92vw);
+        max-width: 720px;
+        max-height: 88vh;
+        padding: 30px;
+        overflow-y: auto;
+        border: 1px solid #e0d8cf;
+        border-radius: 18px;
+        box-shadow: 0 28px 80px rgba(31, 26, 22, 0.28);
+      }
+
+      body.desktop-layout .modal-title {
+        color: #211d1a;
+        font-size: 27px;
+        font-weight: 900;
+        line-height: 1.2;
+      }
+
+      body.desktop-layout .modal-subtitle {
+        margin-top: 6px;
+        margin-bottom: 18px;
+        color: #766d63;
+        font-size: 15px;
+        font-weight: 600;
+        line-height: 1.5;
+      }
+
+      body.desktop-layout .modal-tabs {
+        gap: 6px;
+        margin-bottom: 20px;
+        padding: 5px;
+        border: 1px solid #ded7ce;
+        border-radius: 12px;
+        background: #eee9e2;
+      }
+
+      body.desktop-layout .modal-tab {
+        min-height: 46px;
+        margin: 0;
+        padding: 10px 14px;
+        border: 0;
+        border-radius: 8px;
+        font-size: 15px;
+        font-weight: 900;
+      }
+
+      body.desktop-layout .modal-tab.active-signup {
+        border: 0;
+        background: #ffffff;
+        color: #267a32;
+        box-shadow: 0 2px 8px rgba(52, 43, 34, 0.09);
+      }
+
+      body.desktop-layout .modal-tab.active-cancel {
+        border: 0;
+        background: #ffffff;
+        color: #b42318;
+        box-shadow: 0 2px 8px rgba(52, 43, 34, 0.09);
+      }
+
+      body.desktop-layout .modal-helper {
+        margin-bottom: 12px;
+        color: #5e564f;
+        font-size: 18px;
+        font-weight: 800;
+      }
+
+      body.desktop-layout .modal .role-buttons {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      body.desktop-layout .modal .role-btn {
+        min-height: 72px;
+        padding: 14px 16px;
+        border-radius: 11px;
+      }
+
+      body.desktop-layout .modal .role-btn-label {
+        font-size: 18px;
+      }
+
+      body.desktop-layout .modal .role-btn-count {
+        font-size: 14px;
+      }
+
+      body.desktop-layout .modal-full-message {
+        grid-column: 1 / -1;
+      }
+
+      body.desktop-layout .names-section {
+        max-height: 155px;
+        margin-bottom: 16px;
+        padding: 12px;
+        overflow-y: auto;
+        border: 1px solid #e6dfd7;
+        border-radius: 11px;
+        background: #faf8f5;
+        scrollbar-gutter: stable;
+      }
+
+      body.desktop-layout .cancel-signup-list {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        max-height: 340px;
+        gap: 9px;
+      }
+
+      body.desktop-layout .modal input,
+      body.desktop-layout .modal select,
+      body.desktop-layout .modal textarea {
+        min-height: 48px;
+        font-size: 16px;
+      }
+
+      /* ===== Unified card schedule on desktop ===== */
+      .schedule-controls {
+        display: contents;
+      }
+
+      .desktop-schedule-stats {
+        display: none;
+      }
+
+      body.desktop-layout {
+        padding: 0 32px 56px;
+        background: #f5f2ee;
+        color: #2d2926;
+      }
+
+      body.desktop-layout #pageTitle {
+        position: sticky;
+        top: 0;
+        z-index: 30;
+        min-height: 84px;
+        margin: 0 -32px;
+        padding: 20px 32px 18px;
+        border-bottom: 1px solid #e4ddd4;
+        background: rgba(255, 255, 255, 0.96);
+        color: #211d1a;
+        font-size: clamp(28px, 2.4vw, 38px);
+        font-weight: 900;
+        letter-spacing: -0.025em;
+        line-height: 1.2;
+        text-align: left;
+        backdrop-filter: blur(12px);
+        box-shadow: 0 4px 18px rgba(52, 43, 34, 0.06);
+      }
+
+      .schedule-shell {
+        width: 100%;
+        margin: 0 auto;
+      }
+
+      body.desktop-layout .schedule-shell {
+        max-width: 1520px;
+      }
+
+      body.desktop-layout .schedule-controls {
+        position: sticky;
+        top: 84px;
+        z-index: 20;
+        display: grid;
+        grid-template-columns: minmax(300px, 420px) minmax(0, 1fr);
+        gap: 12px 18px;
+        margin-bottom: 26px;
+        padding: 14px 0 16px;
+        border-bottom: 1px solid #ded7ce;
+        background: #f5f2ee;
+        box-shadow: 0 12px 24px rgba(52, 43, 34, 0.08);
+      }
+
+      body.desktop-layout .mobile-display-mode-control {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        width: 100%;
+        gap: 6px;
+        margin: 0;
+        padding: 5px;
+        border: 1px solid #ddd5cb;
+        border-radius: 13px;
+        background: #e7e1d8;
+      }
+
+      body.desktop-layout .mobile-display-mode-btn {
+        min-height: 48px;
+        padding: 10px 16px;
+        border-radius: 9px;
+        font-size: 17px;
+      }
+
+      body.desktop-layout .desktop-schedule-stats {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      body.desktop-layout .desktop-stat {
+        min-width: 0;
+        padding: 10px 13px;
+        border: 1px solid #e2dbd2;
+        border-radius: 11px;
+        background: rgba(255, 255, 255, 0.92);
+        box-shadow: 0 3px 10px rgba(52, 43, 34, 0.05);
+        text-align: right;
+      }
+
+      body.desktop-layout .desktop-stat-value {
+        display: block;
+        color: #211d1a;
+        font-size: 23px;
+        font-weight: 900;
+        line-height: 1;
+      }
+
+      body.desktop-layout .desktop-stat-label {
+        display: block;
+        margin-top: 5px;
+        color: #766d63;
+        font-size: 11px;
+        font-weight: 800;
+        line-height: 1.2;
+      }
+
+      body.desktop-layout .mobile-availability-control {
+        grid-column: 1 / -1;
+        display: block;
+        margin: 0;
+        padding: 14px;
+        border: 1px solid #ded7ce;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.9);
+        box-shadow: 0 8px 24px rgba(52, 43, 34, 0.07);
+      }
+
+      body.desktop-layout .mobile-filter-row-secondary {
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+        gap: 14px 18px;
+      }
+
+      body.desktop-layout .mobile-activity-filter-field {
+        grid-column: 1 / span 7;
+      }
+
+      body.desktop-layout .mobile-role-filter-field {
+        grid-column: 8 / -1;
+      }
+
+      body.desktop-layout .mobile-keyword-filter-field {
+        grid-column: 1 / span 7;
+      }
+
+      body.desktop-layout .mobile-time-filter-field {
+        grid-column: 8 / -1;
+      }
+
+      body.desktop-layout .mobile-time-availability-detail {
+        grid-column: 1 / -1;
+      }
+
+      body.desktop-layout
+        .mobile-availability-control.is-overview-mode
+        .mobile-role-filter-field,
+      body.desktop-layout
+        .mobile-availability-control.is-overview-mode
+        .mobile-time-filter-field,
+      body.desktop-layout
+        .mobile-availability-control.is-overview-mode
+        .mobile-keyword-filter-field,
+      body.desktop-layout
+        .mobile-availability-control.is-overview-mode
+        .mobile-time-availability-detail {
+        display: none;
+      }
+
+      body.desktop-layout
+        .mobile-availability-control.is-overview-mode
+        .mobile-activity-filter-field {
+        grid-column: 1 / -1;
+      }
+
+      body.desktop-layout .mobile-filter-label,
+      body.desktop-layout .mobile-time-filter-field .mobile-filter-label {
+        margin-bottom: 7px;
+        font-size: 13px;
+      }
+
+      body.desktop-layout .mobile-activity-filter-pills,
+      body.desktop-layout .mobile-role-filter-pills {
+        flex-wrap: wrap;
+        gap: 7px;
+        min-width: 0;
+      }
+
+      body.desktop-layout .mobile-activity-filter-field,
+      body.desktop-layout .mobile-role-filter-field {
+        display: grid;
+        grid-template-columns: max-content minmax(0, 1fr);
+        gap: 10px;
+        align-items: center;
+      }
+
+      body.desktop-layout .mobile-activity-filter-field .mobile-filter-label,
+      body.desktop-layout .mobile-role-filter-field .mobile-filter-label {
+        margin: 0;
+        white-space: nowrap;
+      }
+
+      body.desktop-layout .mobile-activity-filter-pill,
+      body.desktop-layout .mobile-role-filter-pill {
+        flex: 0 0 auto;
+        min-height: 40px;
+        padding: 8px 13px;
+        font-size: 14px;
+        white-space: nowrap;
+      }
+
+      body.desktop-layout .mobile-filter-select,
+      body.desktop-layout .mobile-keyword-search {
+        min-height: 44px;
+        font-size: 15px;
+      }
+
+      body.desktop-layout .mobile-time-filter-toggle {
+        min-height: 44px;
+        padding: 9px 34px 9px 13px;
+        font-size: 15px;
+      }
+
+      body.desktop-layout .mobile-time-filter-menu {
+        max-height: 320px;
+      }
+
+      body.desktop-layout .mobile-time-filter-option {
+        min-height: 42px;
+        font-size: 14px;
+      }
+
+      body.desktop-layout .mobile-agenda {
+        display: block !important;
+        padding: 0 0 42px;
+      }
+
+      body.desktop-layout .mobile-time-group {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+        align-items: stretch;
+        margin-bottom: 32px;
+      }
+
+      body.desktop-layout .mobile-time-heading {
+        grid-column: 1 / -1;
+        margin: 0 0 -2px;
+        padding-bottom: 9px;
+        border-bottom: 1px solid #ddd5cb;
+        color: #37312b;
+        font-size: 22px;
+        font-weight: 900;
+      }
+
+      body.desktop-layout .mobile-slot-card {
+        height: 100%;
+        min-height: 230px;
+        margin: 0;
+        padding: 26px 22px 20px;
+        border-radius: 14px;
+        box-shadow: 0 5px 18px rgba(52, 43, 34, 0.08);
+      }
+
+      body.desktop-layout .mobile-slot-card:focus-visible,
+      body.desktop-layout .mobile-overview-item:focus-visible {
+        outline: 3px solid #8b6840;
+        outline-offset: 3px;
+      }
+
+      body.desktop-layout .mobile-slot-title {
+        font-size: 24px;
+      }
+
+      body.desktop-layout .mobile-slot-time {
+        font-size: 16px;
+      }
+
+      body.desktop-layout .mobile-slot-meta,
+      body.desktop-layout .mobile-slot-desc {
+        font-size: 15px;
+      }
+
+      body.desktop-layout .mobile-slot-names {
+        max-height: 132px;
+        overflow-y: auto;
+        padding-right: 5px;
+        font-size: 13px;
+        scrollbar-gutter: stable;
+      }
+
+      body.desktop-layout .mobile-slot-role-label,
+      body.desktop-layout .mobile-slot-name-list {
+        font-size: 13px;
+      }
+
+      body.desktop-layout .mobile-overview-timeline {
+        gap: 24px;
+      }
+
+      body.desktop-layout .mobile-overview-time-block {
+        grid-template-columns: 118px minmax(0, 1fr);
+        gap: 18px;
+      }
+
+      body.desktop-layout .mobile-overview-time {
+        top: 92px;
+        font-size: 18px;
+      }
+
+      body.desktop-layout .mobile-overview-items {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      body.desktop-layout .mobile-overview-item {
+        min-height: 112px;
+        cursor: pointer;
+        transition:
+          transform 0.15s ease,
+          box-shadow 0.15s ease,
+          border-color 0.15s ease;
+      }
+
+      body.desktop-layout .mobile-overview-item:hover {
+        border-color: #cfc5ba;
+        box-shadow: 0 10px 24px rgba(52, 43, 34, 0.12);
+        transform: translateY(-2px);
+      }
+
+      @media (min-width: 1280px) {
+        body.desktop-layout .mobile-time-group,
+        body.desktop-layout .mobile-overview-items {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+      }
     </style>
   </head>
   <body>
     <h1 id="pageTitle"></h1>
-    <div
-      id="mobileDisplayModeControl"
-      class="mobile-display-mode-control"
-      aria-label="Mobile display mode"
-    >
-      <button
-        id="mobileDisplayModeTime"
-        class="mobile-display-mode-btn"
-        type="button"
-        data-mobile-display-mode="signup"
-        aria-pressed="false"
-      >
-        さがす
-      </button>
-      <button
-        id="mobileDisplayModeActivity"
-        class="mobile-display-mode-btn"
-        type="button"
-        data-mobile-display-mode="overview"
-        aria-pressed="false"
-      >
-        まとめ
-      </button>
-    </div>
-    <div
-      id="mobileAvailabilityControl"
-      class="mobile-availability-control"
-      aria-label="Mobile filters"
-    >
-      <div class="mobile-filter-row mobile-filter-row-secondary">
-        <div class="mobile-filter-field mobile-activity-filter-field">
-          <span class="mobile-filter-label">募集枠</span>
-          <div
-            id="mobileActivityFilter"
-            class="mobile-activity-filter-pills"
-            role="group"
-            aria-label="Filter by activity"
-          ></div>
-        </div>
-        <div class="mobile-filter-field mobile-role-filter-field">
-          <span class="mobile-filter-label">ポジション</span>
-          <div
-            id="mobileRoleAvailabilityFilter"
-            class="mobile-role-filter-pills"
-            role="group"
-            aria-label="Filter by volunteer slot type"
-          ></div>
-        </div>
-        <label
-          class="mobile-filter-field mobile-keyword-filter-field"
-          for="mobileKeywordSearch"
+    <main class="schedule-shell">
+      <div class="schedule-controls">
+        <div
+          id="mobileDisplayModeControl"
+          class="mobile-display-mode-control"
+          aria-label="表示方法"
         >
-          <span class="mobile-filter-label">検索</span>
-          <input
-            id="mobileKeywordSearch"
-            class="mobile-keyword-search"
-            type="search"
-            autocomplete="off"
-            placeholder="名前・募集内容で検索"
-            aria-label="Search volunteer names and signup details"
-          />
-        </label>
-        <div class="mobile-filter-field mobile-time-filter-field">
-          <span class="mobile-filter-label">時間帯で絞り込み</span>
-          <div class="mobile-time-filter-dropdown">
-            <button
-              id="mobileTimeAvailabilityToggle"
-              class="mobile-filter-select mobile-time-filter-toggle"
-              type="button"
-              aria-expanded="false"
-              aria-controls="mobileTimeAvailabilityFilter"
-            ></button>
-            <div
-              id="mobileTimeAvailabilityFilter"
-              class="mobile-time-filter-menu"
-              role="group"
-              aria-label="Filter by available time slots"
-              hidden
-            ></div>
+          <button
+            id="mobileDisplayModeTime"
+            class="mobile-display-mode-btn"
+            type="button"
+            data-mobile-display-mode="signup"
+            aria-pressed="false"
+          >
+            さがす
+          </button>
+          <button
+            id="mobileDisplayModeActivity"
+            class="mobile-display-mode-btn"
+            type="button"
+            data-mobile-display-mode="overview"
+            aria-pressed="false"
+          >
+            まとめ
+          </button>
+        </div>
+        <div
+          class="desktop-schedule-stats"
+          aria-label="募集状況"
+          aria-live="polite"
+        >
+          <div class="desktop-stat">
+            <strong class="desktop-stat-value" id="desktopAvailableCount">0</strong>
+            <span class="desktop-stat-label">空き枠</span>
+          </div>
+          <div class="desktop-stat">
+            <strong class="desktop-stat-value" id="desktopOpenRoleCount">0</strong>
+            <span class="desktop-stat-label">募集中のポジション</span>
+          </div>
+          <div class="desktop-stat">
+            <strong class="desktop-stat-value" id="desktopSignupCount">0</strong>
+            <span class="desktop-stat-label">現在の登録</span>
           </div>
         </div>
         <div
-          id="mobileTimeAvailabilityDetail"
-          class="mobile-time-availability-detail"
-          aria-live="polite"
-        ></div>
+          id="mobileAvailabilityControl"
+          class="mobile-availability-control"
+          aria-label="募集枠の絞り込み"
+        >
+          <div class="mobile-filter-row mobile-filter-row-secondary">
+            <div class="mobile-filter-field mobile-activity-filter-field">
+              <span class="mobile-filter-label">募集枠</span>
+              <div
+                id="mobileActivityFilter"
+                class="mobile-activity-filter-pills"
+                role="group"
+                aria-label="Filter by activity"
+              ></div>
+            </div>
+            <div class="mobile-filter-field mobile-role-filter-field">
+              <span class="mobile-filter-label">ポジション</span>
+              <div
+                id="mobileRoleAvailabilityFilter"
+                class="mobile-role-filter-pills"
+                role="group"
+                aria-label="Filter by volunteer slot type"
+              ></div>
+            </div>
+            <label
+              class="mobile-filter-field mobile-keyword-filter-field"
+              for="mobileKeywordSearch"
+            >
+              <span class="mobile-filter-label">検索</span>
+              <input
+                id="mobileKeywordSearch"
+                class="mobile-keyword-search"
+                type="search"
+                autocomplete="off"
+                placeholder="名前・募集内容で検索"
+                aria-label="Search volunteer names and signup details"
+              />
+            </label>
+            <div class="mobile-filter-field mobile-time-filter-field">
+              <span class="mobile-filter-label">時間帯で絞り込み</span>
+              <div class="mobile-time-filter-dropdown">
+                <button
+                  id="mobileTimeAvailabilityToggle"
+                  class="mobile-filter-select mobile-time-filter-toggle"
+                  type="button"
+                  aria-expanded="false"
+                  aria-controls="mobileTimeAvailabilityFilter"
+                ></button>
+                <div
+                  id="mobileTimeAvailabilityFilter"
+                  class="mobile-time-filter-menu"
+                  role="group"
+                  aria-label="Filter by available time slots"
+                  hidden
+                ></div>
+              </div>
+            </div>
+            <div
+              id="mobileTimeAvailabilityDetail"
+              class="mobile-time-availability-detail"
+              aria-live="polite"
+            ></div>
+          </div>
+        </div>
       </div>
-    </div>
-    <div class="grid-wrapper" id="desktopGridWrapper">
-      <table id="grid"></table>
-    </div>
-    <div id="mobileAgenda" class="mobile-agenda" style="display: none"></div>
+      <div id="mobileAgenda" class="mobile-agenda"></div>
+    </main>
 
     <div class="modal-overlay" id="modalOverlay">
       <div class="modal">
@@ -2419,7 +2591,6 @@
       var currentCancelSignup = null;
       var currentCancelOption = null;
       var resizeTimer = null;
-      var lastCompactLayout = null;
       var MOBILE_DISPLAY_MODE_STORAGE_KEY = "signupApp.mobileDisplayMode";
       var DEFAULT_MOBILE_DISPLAY_MODE = "signup";
       var MOBILE_TIME_FILTER_ALL = "__all__";
@@ -2437,9 +2608,7 @@
           classSuffix: "general",
           label: ROLES.general,
           btnClass: "role-btn-general",
-          countClass: "count-general",
           labelClass: "names-role-label-general",
-          roleRowClass: "role-row-general",
           nameClass: "name-role-general",
         },
         {
@@ -2447,9 +2616,7 @@
           classSuffix: "classrep",
           label: ROLES.classRep,
           btnClass: "role-btn-classrep",
-          countClass: "count-classrep",
           labelClass: "names-role-label-classrep",
-          roleRowClass: "role-row-classrep",
           nameClass: "name-role-classrep",
         },
         {
@@ -2457,9 +2624,7 @@
           classSuffix: "steeringcommittee",
           label: ROLES.steeringCommittee,
           btnClass: "role-btn-steeringcommittee",
-          countClass: "count-steeringcommittee",
           labelClass: "names-role-label-steeringcommittee",
-          roleRowClass: "role-row-steeringcommittee",
           nameClass: "name-role-steeringcommittee",
         },
         {
@@ -2467,9 +2632,7 @@
           classSuffix: "orgcommittee",
           label: ROLES.orgCommittee,
           btnClass: "role-btn-orgcommittee",
-          countClass: "count-orgcommittee",
           labelClass: "names-role-label-orgcommittee",
-          roleRowClass: "role-row-orgcommittee",
           nameClass: "name-role-orgcommittee",
         },
       ];
@@ -2480,10 +2643,6 @@
       }, {});
       var gridIndexes = null;
       var mobileDisplayMode = getStoredMobileDisplayMode();
-
-      function getEventLookupKey(activity, startTime) {
-        return activity + "\u0000" + startTime;
-      }
 
       function getActivityAccentClass(activity) {
         var activities = (gridData && gridData.activities) || [];
@@ -2551,83 +2710,7 @@
         mobileDisplayMode = nextMode;
         saveMobileDisplayMode(nextMode);
         updateMobileDisplayModeControl();
-        if (isCompactLayout()) {
-          buildMobileAgenda();
-        }
-      }
-
-      function fitDesktopRolePillText() {
-        if (isCompactLayout() || !window.getComputedStyle) return;
-
-        var wrapper = getDesktopGridWrapper();
-        if (!wrapper || !wrapper.querySelectorAll) return;
-
-        var labels = wrapper.querySelectorAll(".role-label, .role-count");
-        Array.prototype.forEach.call(labels, function (label) {
-          if (!label.style || !label.classList) return;
-
-          label.classList.remove("role-fit-fallback");
-          label.style.fontSize = "";
-
-          var availableWidth = label.clientWidth;
-          var neededWidth = label.scrollWidth;
-          if (!availableWidth || !neededWidth || neededWidth <= availableWidth + 1) {
-            return;
-          }
-
-          var computedSize = parseFloat(window.getComputedStyle(label).fontSize);
-          if (!computedSize) return;
-
-          var minSize = label.className.indexOf("role-count") >= 0 ? 11 : 12;
-          var fittedSize = Math.max(
-            minSize,
-            Math.floor(((availableWidth - 2) / neededWidth) * computedSize * 10) /
-              10,
-          );
-
-          label.style.fontSize = fittedSize + "px";
-
-          while (
-            label.scrollWidth > label.clientWidth + 1 &&
-            fittedSize > minSize
-          ) {
-            fittedSize = Math.max(minSize, fittedSize - 0.5);
-            label.style.fontSize = fittedSize + "px";
-          }
-
-          if (label.scrollWidth > label.clientWidth + 1) {
-            label.classList.add("role-fit-fallback");
-          }
-        });
-      }
-
-      function updateDesktopStickyTitleOffset() {
-        var offset = "0px";
-        if (!isCompactLayout()) {
-          var title = document.getElementById("pageTitle");
-          if (title) {
-            var titleHeight = 0;
-            if (title.getBoundingClientRect) {
-              var titleRect = title.getBoundingClientRect();
-              titleHeight = titleRect && titleRect.height ? titleRect.height : 0;
-            }
-            if (!titleHeight && title.offsetHeight) {
-              titleHeight = title.offsetHeight;
-            }
-            if (titleHeight) {
-              offset = Math.ceil(titleHeight) + "px";
-            }
-          }
-        }
-
-        var rootStyle =
-          document.documentElement && document.documentElement.style;
-        if (!rootStyle) return;
-        if (rootStyle.setProperty) {
-          rootStyle.setProperty("--desktop-title-sticky-offset", offset);
-        } else {
-          rootStyle["--desktop-title-sticky-offset"] = offset;
-        }
+        buildMobileAgenda();
       }
 
       function clearElement(element) {
@@ -2640,36 +2723,10 @@
         var events = (gridData && gridData.events) || [];
         var indexes = {
           eventById: Object.create(null),
-          firstEventByActivity: Object.create(null),
-          firstEventByTime: Object.create(null),
-          eventsByActivity: Object.create(null),
-          eventsByTime: Object.create(null),
-          eventByActivityAndTime: Object.create(null),
         };
 
         events.forEach(function (event) {
           indexes.eventById[String(event.eventId)] = event;
-
-          if (!indexes.firstEventByActivity[event.activity]) {
-            indexes.firstEventByActivity[event.activity] = event;
-          }
-
-          if (!indexes.eventsByActivity[event.activity]) {
-            indexes.eventsByActivity[event.activity] = [];
-          }
-          indexes.eventsByActivity[event.activity].push(event);
-
-          if (!indexes.firstEventByTime[event.startTime]) {
-            indexes.firstEventByTime[event.startTime] = event;
-          }
-
-          if (!indexes.eventsByTime[event.startTime]) {
-            indexes.eventsByTime[event.startTime] = [];
-          }
-          indexes.eventsByTime[event.startTime].push(event);
-          indexes.eventByActivityAndTime[
-            getEventLookupKey(event.activity, event.startTime)
-          ] = event;
 
           event.signupsByRole = ROLE_KEYS.reduce(function (roleMap, roleMeta) {
             roleMap[roleMeta.label] = [];
@@ -2739,10 +2796,6 @@
 
       function isCompactLayout() {
         return getEffectiveWidth() <= 900;
-      }
-
-      function getDesktopGridWrapper() {
-        return document.getElementById("desktopGridWrapper");
       }
 
       function getMobileAgenda() {
@@ -2879,9 +2932,7 @@
           mobileAvailableTimeFilter,
         );
         updateMobileAvailabilityControl();
-        if (isCompactLayout()) {
-          buildMobileAgenda();
-        }
+        buildMobileAgenda();
       }
 
       function setMobileActivityFilter(activity) {
@@ -2890,9 +2941,7 @@
           mobileAvailableTimeFilter,
         );
         updateMobileAvailabilityControl();
-        if (isCompactLayout()) {
-          buildMobileAgenda();
-        }
+        buildMobileAgenda();
       }
 
       function setMobileKeywordSearchQuery(value) {
@@ -2901,9 +2950,7 @@
           mobileAvailableTimeFilter,
         );
         updateMobileAvailabilityControl();
-        if (isCompactLayout()) {
-          buildMobileAgenda();
-        }
+        buildMobileAgenda();
       }
 
       function setMobileVolunteerNameQuery(value) {
@@ -3131,9 +3178,7 @@
           }
         }
         updateMobileAvailabilityControl();
-        if (isCompactLayout()) {
-          buildMobileAgenda();
-        }
+        buildMobileAgenda();
       }
 
       function getMobileFilteredEvents() {
@@ -3381,316 +3426,34 @@
         }
       }
 
+      function updateDesktopScheduleSummary() {
+        var availableCount = 0;
+        var openRoleCount = 0;
+        var signupCount = 0;
+
+        ((gridData && gridData.events) || []).forEach(function (event) {
+          signupCount += (event.signups || []).length;
+          ROLE_KEYS.forEach(function (roleMeta) {
+            var slot = (event.slots && event.slots[roleMeta.key]) || {};
+            var remaining = Math.max(
+              0,
+              Number(slot.max || 0) - Number(slot.filled || 0),
+            );
+            availableCount += remaining;
+            if (remaining > 0) openRoleCount += 1;
+          });
+        });
+
+        var availableNode = document.getElementById("desktopAvailableCount");
+        var openRoleNode = document.getElementById("desktopOpenRoleCount");
+        var signupNode = document.getElementById("desktopSignupCount");
+        if (availableNode) availableNode.textContent = availableCount;
+        if (openRoleNode) openRoleNode.textContent = openRoleCount;
+        if (signupNode) signupNode.textContent = signupCount;
+      }
+
       function formatRemainingSlots(remaining) {
         return "残り" + remaining + "枠";
-      }
-
-      function buildGrid() {
-        if (!gridData || !gridData.events) {
-          setTimeout(buildGrid, 200);
-          return;
-        }
-        var table = document.getElementById("grid");
-        if (!table) {
-          setTimeout(buildGrid, 200);
-          return;
-        }
-
-        var times = gridData.times;
-        var activities = gridData.activities;
-        // Build header
-        var thead = document.createElement("thead");
-        var headerRow = document.createElement("tr");
-
-        var timeHeader = document.createElement("th");
-        timeHeader.className = "time-header";
-        timeHeader.textContent = "Time";
-        timeHeader.style.zIndex = "3";
-        headerRow.appendChild(timeHeader);
-
-        var descHeader = document.createElement("th");
-        descHeader.className = "desc-header";
-        descHeader.textContent = "";
-        headerRow.appendChild(descHeader);
-
-        activities.forEach(function (a) {
-          var th = document.createElement("th");
-          var event = gridIndexes.firstEventByActivity[a];
-          var actDiv = document.createElement("div");
-          actDiv.className = "activity-title";
-          actDiv.style.fontWeight = "600";
-          actDiv.textContent = a;
-          th.appendChild(actDiv);
-          if (event && event.subtitle) {
-            var personDiv = document.createElement("div");
-            personDiv.className = "activity-subtitle";
-            personDiv.style.cssText = "font-weight:400;color:#888;margin-top:2px;";
-            personDiv.textContent = event.subtitle;
-            th.appendChild(personDiv);
-          }
-          if (event && event.location) {
-            var locationDiv = document.createElement("div");
-            locationDiv.className = "activity-location";
-            locationDiv.style.cssText =
-              "font-weight:400;color:#999;margin-top:3px;font-size:0.88em;";
-            locationDiv.textContent = event.location;
-            th.appendChild(locationDiv);
-          }
-          headerRow.appendChild(th);
-        });
-        thead.appendChild(headerRow);
-
-        // Build body
-        var tbody = document.createElement("tbody");
-
-        times.forEach(function (time) {
-          var tr = document.createElement("tr");
-          var matchedEvent = gridIndexes.firstEventByTime[time];
-
-          var timeTd = document.createElement("td");
-          timeTd.className = "time-cell";
-          timeTd.textContent = formatTimeRange(
-            time,
-            matchedEvent ? matchedEvent.endTime : "",
-          );
-          tr.appendChild(timeTd);
-
-          var descTd = document.createElement("td");
-          descTd.className = "desc-cell";
-          descTd.textContent = matchedEvent ? matchedEvent.description : "";
-          tr.appendChild(descTd);
-
-          activities.forEach(function (activity) {
-            var td = document.createElement("td");
-            var event =
-              gridIndexes.eventByActivityAndTime[
-                getEventLookupKey(activity, time)
-              ];
-
-              if (!event) {
-                var emptyDiv = document.createElement("div");
-                emptyDiv.className = "slot slot-empty";
-                td.appendChild(emptyDiv);
-              } else {
-                var slotDiv = document.createElement("div");
-                var available = hasAnyAvailable(event.slots);
-                slotDiv.className =
-                  (available ? "slot slot-mixed" : "slot slot-all-full") +
-                  " " +
-                  getActivityAccentClass(activity);
-                slotDiv.setAttribute("data-eventid", event.eventId);
-                ROLE_KEYS.forEach(function (r, idx) {
-                  var s = event.slots[r.key];
-                  if (s.max === 0) return;
-                  if (idx > 0) {
-                    var divider = document.createElement("hr");
-                    divider.className = "role-divider";
-                    slotDiv.appendChild(divider);
-                  }
-                  var roleRow = document.createElement("div");
-                  roleRow.className = "role-row " + r.roleRowClass;
-                  var roleLabel = document.createElement("span");
-                  roleLabel.className = "role-label " + r.countClass;
-                  roleLabel.textContent = r.label;
-                  var roleCount = document.createElement("span");
-                  roleCount.className = "role-count " + r.countClass;
-                  var remaining = s.max - s.filled;
-                  if (remaining <= 0) {
-                    roleRow.classList.add("is-full");
-                  }
-                  roleCount.textContent =
-                    remaining <= 0 ? "Full" : formatRemainingSlots(remaining);
-                  roleRow.appendChild(roleLabel);
-                  roleRow.appendChild(roleCount);
-                  slotDiv.appendChild(roleRow);
-                });
-
-                if (event.signups.length > 0) {
-                  var namesDiv = document.createElement("div");
-                  namesDiv.className = "slot-names";
-                  ROLE_KEYS.forEach(function (r) {
-                    var roleSignups = event.signupsByRole[r.label] || [];
-                    if (roleSignups.length === 0) return;
-                    var nameGroup = document.createElement("div");
-                    nameGroup.className = "slot-name-group";
-                    var roleSpan = document.createElement("span");
-                    roleSpan.className =
-                      "slot-name-role-label " + r.countClass + " " + r.nameClass;
-                    roleSpan.textContent = r.label + ":";
-                    nameGroup.appendChild(roleSpan);
-                    var namesSpan = document.createElement("span");
-                    namesSpan.className = r.countClass + " " + r.nameClass;
-                    namesSpan.textContent = roleSignups
-                      .map(function (s) {
-                        return s.name;
-                      })
-                      .join(", ");
-                    nameGroup.appendChild(namesSpan);
-                    namesDiv.appendChild(nameGroup);
-                  });
-                  slotDiv.appendChild(namesDiv);
-                }
-
-                var hintDiv = document.createElement("div");
-                hintDiv.className = "slot-hint";
-                hintDiv.textContent =
-                  event.signups.length > 0
-                    ? "登録、またはキャンセルする"
-                    : "クリックして登録";
-                slotDiv.appendChild(hintDiv);
-
-                td.appendChild(slotDiv);
-              }
-            tr.appendChild(td);
-          });
-          tbody.appendChild(tr);
-        });
-
-        while (table.firstChild) {
-          table.removeChild(table.firstChild);
-        }
-        table.appendChild(thead);
-        table.appendChild(tbody);
-        fitDesktopRolePillText();
-      }
-
-      function buildMobileAgendaByActivity() {
-        if (!gridData || !gridData.events) {
-          setTimeout(buildMobileAgenda, 200);
-          return;
-        }
-        var container = getMobileAgenda();
-        if (!container) {
-          setTimeout(buildMobileAgenda, 200);
-          return;
-        }
-
-        setMobileAgendaModeClass(container, "activity");
-        var filteredEvents = getMobileFilteredEvents();
-        var activities = getMobileFilteredActivities(filteredEvents);
-        while (container.firstChild) {
-          container.removeChild(container.firstChild);
-        }
-
-        activities.forEach(function (activity) {
-          var section = document.createElement("section");
-          section.className = "mobile-time-group mobile-activity-group";
-
-          var matchingEvents = filteredEvents
-            .filter(function (event) {
-              return event.activity === activity;
-            })
-            .sort(compareEventsByTime);
-          matchingEvents.forEach(function (event) {
-            var card = document.createElement("button");
-            card.className =
-              "mobile-slot-card " + getActivityAccentClass(event.activity);
-            card.type = "button";
-            card.setAttribute("data-eventid", event.eventId);
-
-            var header = document.createElement("div");
-            header.className = "mobile-slot-header";
-
-            var titleWrap = document.createElement("div");
-
-            var title = document.createElement("div");
-            title.className = "mobile-slot-title";
-            title.textContent = event.activity;
-            titleWrap.appendChild(title);
-
-            var timeLine = document.createElement("div");
-            timeLine.className = "mobile-slot-time";
-            timeLine.textContent = event.endTime
-              ? formatTimeRange(event.startTime, event.endTime)
-              : formatTime(event.startTime);
-            titleWrap.appendChild(timeLine);
-
-            var meta = document.createElement("div");
-            meta.className = "mobile-slot-meta";
-            meta.textContent = event.location || "";
-            titleWrap.appendChild(meta);
-
-            if (event.subtitle && event.subtitle.trim() !== "") {
-              var subtitle = document.createElement("div");
-              subtitle.className = "mobile-slot-meta";
-              subtitle.textContent = event.subtitle;
-              titleWrap.appendChild(subtitle);
-            }
-
-            if (event.description && event.description.trim() !== "") {
-              var desc = document.createElement("div");
-              desc.className = "mobile-slot-desc";
-              desc.textContent = event.description;
-              titleWrap.appendChild(desc);
-            }
-
-            var badge = document.createElement("div");
-            badge.className = "mobile-slot-badge";
-            var available = hasAnyAvailable(event.slots);
-            badge.textContent = available ? "" : "Full";
-            if (!available) {
-              badge.classList.add("is-full");
-              card.classList.add("is-full");
-            }
-
-            header.appendChild(titleWrap);
-            header.appendChild(badge);
-            card.appendChild(header);
-
-            var summary = document.createElement("div");
-            summary.className = "mobile-slot-summary";
-            ROLE_KEYS.forEach(function (r) {
-              var s = event.slots[r.key];
-              if (s.max === 0) return;
-              var remaining = s.max - s.filled;
-              var item = document.createElement("span");
-              item.className =
-                "mobile-slot-summary-item role-" + r.classSuffix;
-              if (remaining <= 0) item.classList.add("is-full");
-              item.textContent =
-                r.label +
-                " " +
-                (remaining <= 0 ? "Full" : formatRemainingSlots(remaining));
-              summary.appendChild(item);
-            });
-            card.appendChild(summary);
-
-            if (event.signups && event.signups.length > 0) {
-              var namesList = document.createElement("div");
-              namesList.className = "mobile-slot-names";
-              ROLE_KEYS.forEach(function (r) {
-                var roleSignups = event.signupsByRole[r.label] || [];
-                if (roleSignups.length === 0) return;
-                var group = document.createElement("div");
-                group.className = "mobile-slot-name-group";
-
-                var roleLabel = document.createElement("span");
-                roleLabel.className = "mobile-slot-role-label " + r.nameClass;
-                roleLabel.textContent = r.label + ":";
-                group.appendChild(roleLabel);
-
-                var namesSpan = document.createElement("span");
-                namesSpan.className = "mobile-slot-name-list " + r.nameClass;
-                namesSpan.textContent = roleSignups
-                  .map(function (signup) {
-                    return signup.name;
-                  })
-                  .join(", ");
-                group.appendChild(namesSpan);
-
-                namesList.appendChild(group);
-              });
-              card.appendChild(namesList);
-            }
-            section.appendChild(card);
-          });
-
-          container.appendChild(section);
-        });
-
-        if (!container.firstChild) {
-          renderMobileEmptyState(container);
-        }
       }
 
       function setMobileAgendaModeClass(container, mode) {
@@ -4017,6 +3780,7 @@
       }
 
       function buildMobileAgenda() {
+        updateDesktopScheduleSummary();
         var filters = document.getElementById("mobileAvailabilityControl");
         var activeMode = getMobileDisplayMode();
         if (activeMode !== "signup") {
@@ -4036,31 +3800,9 @@
       }
 
       function renderResponsiveView() {
-        var desktop = getDesktopGridWrapper();
-        var mobile = getMobileAgenda();
         var compact = isCompactLayout();
-        var layoutChanged = compact !== lastCompactLayout;
-
         document.body.classList.toggle("compact-layout", compact);
         document.body.classList.toggle("desktop-layout", !compact);
-        updateDesktopStickyTitleOffset();
-
-        if (!layoutChanged) {
-          if (!compact) fitDesktopRolePillText();
-          return;
-        }
-
-        lastCompactLayout = compact;
-
-        if (compact) {
-          if (desktop) desktop.style.display = "none";
-          if (mobile) mobile.style.display = "block";
-          buildMobileAgenda();
-        } else {
-          if (mobile) mobile.style.display = "none";
-          if (desktop) desktop.style.display = "block";
-          buildGrid();
-        }
       }
       function formatTime(time) {
         if (!time) return "";
@@ -4614,11 +4356,7 @@
       }
 
       function rebuildCurrentView() {
-        if (isCompactLayout()) {
-          buildMobileAgenda();
-        } else {
-          buildGrid();
-        }
+        buildMobileAgenda();
       }
 
       function shouldRefreshAfterSubmitRejection(result) {
@@ -4716,11 +4454,7 @@
                 });
                 if (roleKey) event.slots[roleKey.key].filled++;
               }
-              if (isCompactLayout()) {
-                buildMobileAgenda();
-              } else {
-                buildGrid();
-              }
+              buildMobileAgenda();
               setTimeout(closeModal, 1500);
             } else {
               btn.disabled = false;
@@ -4804,14 +4538,6 @@
           if (e.key === "Enter") submitSignup();
         });
 
-      document
-        .querySelector(".grid-wrapper")
-        .addEventListener("click", function (e) {
-          var slot = e.target.closest("[data-eventid]");
-          if (slot) {
-            openModal(slot.getAttribute("data-eventid"));
-          }
-        });
       document
         .getElementById("mobileAgenda")
         .addEventListener("click", function (e) {
@@ -4910,6 +4636,7 @@
 
       buildGridIndexes();
       renderResponsiveView();
+      buildMobileAgenda();
       window.addEventListener("resize", function () {
         window.clearTimeout(resizeTimer);
         resizeTimer = window.setTimeout(function () {

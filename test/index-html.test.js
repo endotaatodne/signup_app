@@ -272,7 +272,6 @@ function loadClient(options = {}) {
       "ROLE_META_BY_LABEL",
       "gridData",
       "b64decode",
-      "getEventLookupKey",
       "buildGridIndexes",
       "getEventById",
       "getRoleMetaByLabel",
@@ -298,6 +297,7 @@ function loadClient(options = {}) {
       "setMobileVolunteerNameQuery",
       "getMobileFilteredEvents",
       "updateMobileAvailabilityControl",
+      "updateDesktopScheduleSummary",
       "formatTime",
       "formatTimeRange",
       "normaliseWhitespace",
@@ -320,9 +320,7 @@ function loadClient(options = {}) {
       "findAndConfirmCancel",
       "confirmCancel",
       "submitSignup",
-      "buildGrid",
       "buildMobileAgenda",
-      "buildMobileAgendaByActivity",
       "buildMobileAgendaByTime",
       "buildMobileDayOverview",
       "renderResponsiveView",
@@ -358,17 +356,13 @@ test("server template data is injected only as quoted base64 values", () => {
   assert.match(htmlSource, /var PAGE_TITLE = b64decode\("<\?!= title \?>"\);/);
 });
 
-test("buildGridIndexes creates lookups and groups signups by role", () => {
-  const { exports: client, context } = loadClient();
+test("buildGridIndexes creates the event lookup and groups signups by role", () => {
+  const { exports: client } = loadClient();
 
   client.buildGridIndexes();
 
   const firstEvent = client.getEventById(1);
   assert.equal(firstEvent.activity, "Hall Monitor");
-  assert.equal(
-    context.gridIndexes.eventByActivityAndTime["Hall Monitor\u000009:30"].eventId,
-    1,
-  );
   assert.equal(firstEvent.signupsByRole["一般保護者"].length, 1);
   assert.equal(firstEvent.signupsByRole["学年委員"].length, 1);
 });
@@ -753,7 +747,7 @@ test("mobile available time filter supports multiple selected time slots", () =>
   assert.equal(timeToggle.textContent, "\u3059\u3079\u3066\u306E\u6642\u9593\u5E2F");
 });
 
-test("mobile activity filter uses distinct pills and narrows the agenda", () => {
+test("activity filter refreshes the shared card renderer at desktop width", () => {
   const mobileNode = createElement("div");
   mobileNode.className = "mobile-agenda";
   mobileNode.style = {};
@@ -809,7 +803,6 @@ test("mobile activity filter uses distinct pills and narrows the agenda", () => 
 
   client.buildGridIndexes();
   client.setMobileActivityFilter("Cleanup");
-  client.buildMobileAgenda();
 
   const onlySection = mobileNode.children[0];
   const onlyCard = onlySection.children[1];
@@ -1611,7 +1604,7 @@ test("submitSignup refreshes grid data after a stale full-slot rejection", () =>
   assert.equal(roleButtons.children[0].children[1].textContent, "Full");
 });
 
-test("desktop grid typography overrides are scoped to desktop layout", () => {
+test("desktop reuses the responsive filters and card schedule", () => {
   const htmlSource = fs.readFileSync(
     path.resolve(__dirname, "..", "index.html"),
     "utf8",
@@ -1619,45 +1612,84 @@ test("desktop grid typography overrides are scoped to desktop layout", () => {
 
   assert.match(
     htmlSource,
-    /body\.desktop-layout td\.time-cell\s*{[\s\S]*?font-size:\s*16px;/,
+    /body\.desktop-layout\s*{[\s\S]*?background:\s*#f5f2ee;/,
   );
   assert.match(
     htmlSource,
-    /body\.desktop-layout td\.desc-cell\s*{[\s\S]*?font-size:\s*15px;/,
+    /\.schedule-controls\s*{[\s\S]*?display:\s*contents;/,
   );
   assert.match(
     htmlSource,
-    /body\.desktop-layout \.activity-title\s*{[\s\S]*?font-size:\s*18px;/,
+    /\.desktop-schedule-stats\s*{[\s\S]*?display:\s*none;/,
   );
   assert.match(
     htmlSource,
-    /body\.desktop-layout \.activity-subtitle\s*{[\s\S]*?font-size:\s*15px;/,
+    /body\.desktop-layout \.desktop-schedule-stats\s*{[\s\S]*?display:\s*grid;/,
   );
-  assert.doesNotMatch(
+  assert.match(
     htmlSource,
-    /body\.compact-layout [^{]*(?:td\.time-cell|td\.desc-cell|\.activity-title|\.activity-subtitle)/,
+    /body\.desktop-layout \.mobile-availability-control\s*{[\s\S]*?display:\s*block;[\s\S]*?border-radius:\s*16px;/,
   );
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout \.schedule-controls\s*{[\s\S]*?position:\s*sticky;[\s\S]*?top:\s*84px;[\s\S]*?z-index:\s*20;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout \.mobile-activity-filter-field\s*{[\s\S]*?grid-column:\s*1\s*\/\s*span 7;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout \.mobile-role-filter-field\s*{[\s\S]*?grid-column:\s*8\s*\/\s*-1;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout \.mobile-activity-filter-pills,[\s\S]*?body\.desktop-layout \.mobile-role-filter-pills\s*{[\s\S]*?flex-wrap:\s*wrap;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout \.mobile-activity-filter-pill,[\s\S]*?body\.desktop-layout \.mobile-role-filter-pill\s*{[\s\S]*?flex:\s*0 0 auto;[\s\S]*?white-space:\s*nowrap;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout \.mobile-time-group\s*{[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/,
+  );
+  assert.match(
+    htmlSource,
+    /@media \(min-width:\s*1280px\)\s*{[\s\S]*?body\.desktop-layout \.mobile-time-group,[\s\S]*?grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\);/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout \.modal \.role-buttons\s*{[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/,
+  );
+  assert.match(htmlSource, /<main class="schedule-shell">/);
+  assert.match(htmlSource, /id="mobileAvailabilityControl"/);
+  assert.match(htmlSource, /id="mobileAgenda" class="mobile-agenda"/);
+  assert.match(htmlSource, /id="desktopAvailableCount"/);
+  assert.match(htmlSource, /id="desktopOpenRoleCount"/);
+  assert.match(htmlSource, /id="desktopSignupCount"/);
+  assert.doesNotMatch(htmlSource, /id="desktopScheduleView"/);
+  assert.doesNotMatch(htmlSource, /id="grid"/);
+  assert.doesNotMatch(htmlSource, /function buildGrid\(\)/);
 });
 
-test("desktop title and grid header stick to viewport scroll", () => {
-  const htmlSource = fs.readFileSync(
-    path.resolve(__dirname, "..", "index.html"),
-    "utf8",
-  );
+test("desktop schedule summary counts open slots, roles, and registrations", () => {
+  const availableCount = createElement("strong");
+  const openRoleCount = createElement("strong");
+  const signupCount = createElement("strong");
+  const { exports: client } = loadClient({
+    elements: {
+      desktopAvailableCount: availableCount,
+      desktopOpenRoleCount: openRoleCount,
+      desktopSignupCount: signupCount,
+    },
+  });
 
-  assert.match(
-    htmlSource,
-    /body\.desktop-layout #pageTitle\s*{[\s\S]*?position:\s*sticky;[\s\S]*?top:\s*0;[\s\S]*?z-index:\s*20;/,
-  );
-  assert.match(
-    htmlSource,
-    /body\.desktop-layout \.grid-wrapper,\s*body\.desktop-layout #grid\s*{[\s\S]*?overflow-x:\s*visible;[\s\S]*?overflow-y:\s*visible;/,
-  );
-  assert.match(
-    htmlSource,
-    /body\.desktop-layout #grid thead th\s*{[\s\S]*?position:\s*sticky;[\s\S]*?top:\s*var\(--desktop-title-sticky-offset,\s*0px\);[\s\S]*?z-index:\s*5;/,
-  );
-  assert.doesNotMatch(htmlSource, /body\.compact-layout \.grid-wrapper/);
+  client.updateDesktopScheduleSummary();
+
+  assert.equal(availableCount.textContent, 3);
+  assert.equal(openRoleCount.textContent, 3);
+  assert.equal(signupCount.textContent, 2);
 });
 
 test("mobile role filter active pills keep their role colour families", () => {
@@ -1728,37 +1760,6 @@ test("mobile sticky controls use opaque backing so cards do not show through", (
   );
 });
 
-test("buildGrid renders desktop header text with CSS classes", () => {
-  const table = createElement("table");
-  const { exports: client } = loadClient({
-    elements: {
-      grid: table,
-    },
-  });
-
-  client.buildGridIndexes();
-  client.buildGrid();
-
-  const headerRow = table.children[0].children[0];
-  const firstActivityHeader = headerRow.children[2];
-  const title = firstActivityHeader.children[0];
-  const subtitle = firstActivityHeader.children[1];
-  const location = firstActivityHeader.children[2];
-
-  assert.equal(title.className, "activity-title");
-  assert.equal(title.textContent, "Hall Monitor");
-  assert.equal(title.style.fontWeight, "600");
-  assert.equal(title.style.cssText || "", "");
-  assert.equal(subtitle.className, "activity-subtitle");
-  assert.equal(subtitle.textContent, "Morning");
-  assert.equal(subtitle.style.cssText, "font-weight:400;color:#888;margin-top:2px;");
-  assert.equal(location.className, "activity-location");
-  assert.equal(location.textContent, "Gym");
-  assert.equal(
-    location.style.cssText,
-    "font-weight:400;color:#999;margin-top:3px;font-size:0.88em;",
-  );
-});
 
 test("buildMobileAgenda groups mobile signup names by role", () => {
   const mobileNode = createElement("div");
@@ -2051,17 +2052,8 @@ test("buildMobileAgenda can group mobile cards by time with headings", () => {
   assert.equal(secondTimeSection.children[0].textContent, "10:00 am - 10:30 am");
 });
 
-test("renderResponsiveView toggles layout classes and target visibility", () => {
-  const desktopNode = createElement("div");
-  desktopNode.style = {};
-  const mobileNode = createElement("div");
-  mobileNode.style = {};
-
+test("renderResponsiveView only changes responsive classes for the shared view", () => {
   const { exports: client, context } = loadClient({
-    elements: {
-      desktopGridWrapper: desktopNode,
-      mobileAgenda: mobileNode,
-    },
     windowOverrides: {
       innerWidth: 800,
       screen: { width: 820 },
@@ -2069,21 +2061,16 @@ test("renderResponsiveView toggles layout classes and target visibility", () => 
     },
   });
 
-  let mobileBuilds = 0;
-  let gridBuilds = 0;
-  context.buildMobileAgenda = function () {
-    mobileBuilds += 1;
-  };
-  context.buildGrid = function () {
-    gridBuilds += 1;
-  };
-  context.lastCompactLayout = null;
-
   client.renderResponsiveView();
 
-  assert.equal(desktopNode.style.display, "none");
-  assert.equal(mobileNode.style.display, "block");
-  assert.equal(mobileBuilds, 1);
-  assert.equal(gridBuilds, 0);
   assert.equal(context.document.body.classList.has("compact-layout"), true);
+  assert.equal(context.document.body.classList.has("desktop-layout"), false);
+
+  context.window.innerWidth = 1200;
+  context.window.screen.width = 1280;
+  context.window.visualViewport.width = 1100;
+  client.renderResponsiveView();
+
+  assert.equal(context.document.body.classList.has("compact-layout"), false);
+  assert.equal(context.document.body.classList.has("desktop-layout"), true);
 });
