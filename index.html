@@ -589,16 +589,55 @@
       .cancel-form.visible {
         display: block;
       }
-      .cancel-select {
+      .cancel-helper {
+        margin-bottom: 8px;
+        color: #666;
+        font-size: 14px;
+        line-height: 1.5;
+      }
+      .cancel-signup-list {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        max-height: 260px;
+        margin-bottom: 10px;
+        overflow-y: auto;
+      }
+      .cancel-signup-option {
         width: 100%;
         padding: 10px 12px;
-        font-size: 14px;
         border: 1px solid #ddd;
-        border-radius: 7px;
-        margin-bottom: 10px;
+        border-radius: 8px;
         background: white;
         color: #333;
-        outline: none;
+        cursor: pointer;
+        text-align: left;
+      }
+      .cancel-signup-option:hover {
+        border-color: #c62828;
+        background: #fff8f7;
+      }
+      .cancel-signup-option:disabled {
+        cursor: wait;
+        opacity: 0.65;
+      }
+      .cancel-signup-option.selected {
+        border: 2px solid #c62828;
+        background: #fdecea;
+        padding: 9px 11px;
+      }
+      .cancel-signup-name {
+        display: block;
+        font-size: 15px;
+        font-weight: 700;
+        line-height: 1.35;
+      }
+      .cancel-signup-details {
+        display: block;
+        margin-top: 2px;
+        color: #666;
+        font-size: 12px;
+        line-height: 1.4;
       }
       .cancel-submit {
         width: 100%;
@@ -1557,6 +1596,39 @@
         font-size: 20px;
       }
 
+      body.compact-layout .cancel-helper {
+        font-size: 22px;
+        margin-bottom: 12px;
+      }
+
+      body.compact-layout .cancel-signup-list {
+        gap: 10px;
+        max-height: 42vh;
+        margin-bottom: 14px;
+      }
+
+      body.compact-layout .cancel-signup-option {
+        min-height: 70px;
+        padding: 13px 16px;
+        border-radius: 12px;
+      }
+
+      body.compact-layout .cancel-signup-option.selected {
+        padding: 12px 15px;
+      }
+
+      body.compact-layout .cancel-signup-name {
+        font-size: 27px;
+      }
+
+      body.compact-layout .cancel-signup-details {
+        font-size: 20px;
+      }
+
+      body.compact-layout #confirmText {
+        font-size: 24px;
+      }
+
       /* TEXT_SIZE: [POP-UP] Mobile full-capacity message */
       body.compact-layout .modal-full-message {
         font-size: 28px;
@@ -2223,20 +2295,15 @@
         </div>
 
         <div class="cancel-form" id="cancelForm">
-          <select class="cancel-select" id="cancelRole">
-            <option value="">登録したポジションを選んでください</option>
-          </select>
-          <input
-            type="text"
-            id="cancelName"
-            placeholder="保護者名"
-          />
-          <input
-            type="text"
-            id="cancelClass"
-            placeholder="クラス"
-            maxlength="10"
-          />
+          <div class="cancel-helper">
+            キャンセルする登録を選んでください。
+          </div>
+          <div
+            class="cancel-signup-list"
+            id="cancelSignupList"
+            role="group"
+            aria-label="キャンセルする登録"
+          ></div>
           <div class="confirm-box" id="confirmBox" style="display: none">
             <div id="confirmText"></div>
             <div class="confirm-buttons">
@@ -2251,7 +2318,7 @@
             id="cancelSubmitBtn"
             style="display: block"
           >
-            登録を探す
+            選択した登録をキャンセル
           </button>
           <div
             class="modal-message"
@@ -2285,6 +2352,7 @@
       var PAGE_TITLE = b64decode("<?!= title ?>");
       var currentEventId = null;
       var currentRole = null;
+      var currentCancelSignup = null;
       var resizeTimer = null;
       var lastCompactLayout = null;
       var MOBILE_DISPLAY_MODE_STORAGE_KEY = "signupApp.mobileDisplayMode";
@@ -2494,6 +2562,12 @@
           rootStyle.setProperty("--desktop-title-sticky-offset", offset);
         } else {
           rootStyle["--desktop-title-sticky-offset"] = offset;
+        }
+      }
+
+      function clearElement(element) {
+        while (element && element.firstChild) {
+          element.removeChild(element.firstChild);
         }
       }
 
@@ -4164,8 +4238,8 @@
           "modal-tab active-signup";
         document.getElementById("tabCancel").className = "modal-tab";
         document.getElementById("cancelForm").className = "cancel-form";
-        document.getElementById("cancelName").value = "";
-        document.getElementById("cancelClass").value = "";
+        currentCancelSignup = null;
+        clearElement(document.getElementById("cancelSignupList"));
         document.getElementById("cancelMessage").style.display = "none";
         document.getElementById("confirmBox").style.display = "none";
         document.getElementById("confirmYes").disabled = false;
@@ -4173,8 +4247,9 @@
           "はい、キャンセルします。";
         document.getElementById("confirmNo").disabled = false;
         document.getElementById("cancelSubmitBtn").style.display = "block";
-        document.getElementById("cancelSubmitBtn").disabled = false;
-        document.getElementById("cancelSubmitBtn").textContent = "登録を探す";
+        document.getElementById("cancelSubmitBtn").disabled = true;
+        document.getElementById("cancelSubmitBtn").textContent =
+          "選択した登録をキャンセル";
 
         document.getElementById("modalOverlay").classList.add("active");
         document.body.style.overflow = "hidden";
@@ -4213,8 +4288,8 @@
         document.getElementById("cancelForm").className = "cancel-form";
         document.getElementById("confirmBox").style.display = "none";
         document.getElementById("cancelMessage").style.display = "none";
-        document.getElementById("cancelName").value = "";
-        document.getElementById("cancelClass").value = "";
+        currentCancelSignup = null;
+        clearElement(document.getElementById("cancelSignupList"));
         document.getElementById("confirmYes").disabled = false;
         document.getElementById("confirmYes").textContent =
           "はい、キャンセルします。";
@@ -4240,8 +4315,10 @@
         document.getElementById("confirmBox").style.display = "none";
         document.getElementById("cancelMessage").style.display = "none";
         document.getElementById("cancelSubmitBtn").style.display = "block";
-        document.getElementById("cancelSubmitBtn").disabled = false;
-        document.getElementById("cancelSubmitBtn").textContent = "登録を探す";
+        document.getElementById("cancelSubmitBtn").disabled =
+          !currentCancelSignup;
+        document.getElementById("cancelSubmitBtn").textContent =
+          "選択した登録をキャンセル";
         document.getElementById("confirmYes").disabled = false;
         document.getElementById("confirmYes").textContent =
           "はい、キャンセルします。";
@@ -4251,6 +4328,9 @@
           tabSignup.className = "modal-tab active-signup";
           tabCancel.className = "modal-tab";
           document.getElementById("signupHelper").style.display = "block";
+          var signupEvent = getEventById(currentEventId);
+          document.getElementById("namesSection").style.display =
+            signupEvent && signupEvent.signups.length > 0 ? "block" : "none";
           roleButtons.style.display = "block";
           modalForm.className = currentRole
             ? "modal-form visible"
@@ -4260,104 +4340,112 @@
           tabSignup.className = "modal-tab";
           tabCancel.className = "modal-tab active-cancel";
           document.getElementById("signupHelper").style.display = "none";
+          document.getElementById("namesSection").style.display = "none";
           roleButtons.style.display = "none";
           modalForm.className = "modal-form";
           cancelForm.className = "cancel-form visible";
-          var event = getEventById(currentEventId);
-          var cancelRole = document.getElementById("cancelRole");
-          while (cancelRole.firstChild) {
-            cancelRole.removeChild(cancelRole.firstChild);
-          }
-          var defaultOption = document.createElement("option");
-          defaultOption.value = "";
-          defaultOption.textContent = "登録したポジションを選んでください";
-          cancelRole.appendChild(defaultOption);
-          if (event) {
-            ROLE_KEYS.forEach(function (r) {
-              var roleSignups = event.signupsByRole[r.label] || [];
-              if (roleSignups.length > 0) {
-                var opt = document.createElement("option");
-                opt.value = r.label;
-                opt.textContent = r.label;
-                cancelRole.appendChild(opt);
-              }
-            });
-          }
+          currentCancelSignup = null;
+          document.getElementById("cancelSubmitBtn").disabled = true;
+          renderCancelSignupList();
         }
       }
 
+      function renderCancelSignupList() {
+        var list = document.getElementById("cancelSignupList");
+        clearElement(list);
+        var event = getEventById(currentEventId);
+        if (!event) return;
+
+        ROLE_KEYS.forEach(function (roleMeta) {
+          var roleSignups = event.signupsByRole[roleMeta.label] || [];
+          roleSignups.forEach(function (signup) {
+            var option = document.createElement("button");
+            option.type = "button";
+            option.className = "cancel-signup-option";
+            option.setAttribute("aria-pressed", "false");
+
+            var name = document.createElement("span");
+            name.className = "cancel-signup-name";
+            name.textContent = signup.name;
+
+            var details = document.createElement("span");
+            details.className = "cancel-signup-details";
+            details.textContent = signup.cls + " · " + signup.role;
+
+            option.appendChild(name);
+            option.appendChild(details);
+            option.addEventListener("click", function () {
+              selectCancelSignup(signup, option);
+            });
+            list.appendChild(option);
+          });
+        });
+      }
+
+      function selectCancelSignup(signup, selectedOption) {
+        currentCancelSignup = {
+          name: signup.name,
+          cls: signup.cls,
+          role: signup.role,
+        };
+
+        var options = document.getElementById("cancelSignupList").children;
+        Array.prototype.forEach.call(options, function (option) {
+          var selected = option === selectedOption;
+          option.className =
+            "cancel-signup-option" + (selected ? " selected" : "");
+          option.setAttribute("aria-pressed", selected ? "true" : "false");
+        });
+
+        document.getElementById("confirmBox").style.display = "none";
+        document.getElementById("cancelMessage").style.display = "none";
+        document.getElementById("cancelSubmitBtn").style.display = "block";
+        document.getElementById("cancelSubmitBtn").disabled = false;
+      }
+
+      function setCancelSignupListDisabled(disabled) {
+        var options = document.getElementById("cancelSignupList").children;
+        Array.prototype.forEach.call(options, function (option) {
+          option.disabled = disabled;
+        });
+      }
+
       function findAndConfirmCancel() {
-        var name = normaliseNameValue(
-          document.getElementById("cancelName").value,
-        );
-        var cls = normaliseClassValue(
-          document.getElementById("cancelClass").value,
-        );
-        var role = document.getElementById("cancelRole").value;
         var msg = document.getElementById("cancelMessage");
         msg.style.display = "none";
 
-        if (!role) {
-          showCancelMessage("登録したポジションを選んでください", false);
+        if (!currentCancelSignup) {
+          showCancelMessage("キャンセルする登録を選んでください。", false);
           return;
-        }
-        if (!name) {
-          showCancelMessage("名前を入力してください", false);
-          return;
-        }
-        if (name.length > 50) {
-          showCancelMessage("名前は５０文字以下で入力してください。", false);
-          return;
-        }
-        if (!cls) {
-          showCancelMessage("クラスを入力してください", false);
-          return;
-        }
-        if (cls.length > 10) {
-          showCancelMessage("クラスは１０文字内で入力してください。", false);
-          return;
-        }
-
-        var event = getEventById(currentEventId);
-        if (event) {
-          var normName = normaliseComparable(name);
-          var normCls = normaliseClassComparable(cls);
-          var match = event.signups.find(function (s) {
-            return (
-              s.role === role &&
-              normaliseComparable(s.name) === normName &&
-              normaliseClassComparable(s.cls) === normCls
-            );
-          });
-          if (!match) {
-            showCancelMessage(
-              "お名前とクラスの登録が見つかりません。入力内容をご確認ください。",
-              false,
-            );
-            return;
-          }
         }
 
         document.getElementById("confirmText").textContent =
-          "本当にキャンセルしますか？";
+          currentCancelSignup.name +
+          "（" +
+          currentCancelSignup.cls +
+          "・" +
+          currentCancelSignup.role +
+          "）の登録を本当にキャンセルしますか？";
         document.getElementById("confirmBox").style.display = "block";
         document.getElementById("cancelSubmitBtn").style.display = "none";
       }
 
       function confirmCancel() {
-        var name = normaliseNameValue(
-          document.getElementById("cancelName").value,
-        );
-        var cls = normaliseClassValue(
-          document.getElementById("cancelClass").value,
-        );
-        var role = document.getElementById("cancelRole").value;
+        if (!currentCancelSignup) {
+          showCancelMessage("キャンセルする登録を選んでください。", false);
+          return;
+        }
+
+        var name = currentCancelSignup.name;
+        var cls = currentCancelSignup.cls;
+        var role = currentCancelSignup.role;
         var btn = document.getElementById("confirmYes");
 
         btn.disabled = true;
         btn.textContent = "キャンセル中...";
         document.getElementById("confirmNo").disabled = true;
         document.getElementById("cancelSubmitBtn").disabled = true;
+        setCancelSignupListDisabled(true);
 
         google.script.run
           .withSuccessHandler(function (result) {
@@ -4373,9 +4461,11 @@
               }, 1500);
             } else {
               showCancelMessage(result.message, false);
+              document.getElementById("confirmBox").style.display = "none";
               btn.disabled = false;
               btn.textContent = "はい、キャンセルします。";
               document.getElementById("confirmNo").disabled = false;
+              setCancelSignupListDisabled(false);
               document.getElementById("cancelSubmitBtn").style.display =
                 "block";
             }
@@ -4385,9 +4475,11 @@
               "エラーが発生しました。再度試してください。",
               false,
             );
+            document.getElementById("confirmBox").style.display = "none";
             btn.disabled = false;
             btn.textContent = "はい、キャンセルします。";
             document.getElementById("confirmNo").disabled = false;
+            setCancelSignupListDisabled(false);
             document.getElementById("cancelSubmitBtn").style.display = "block";
           })
           .cancelSignup(currentEventId, name, cls, role, alias);

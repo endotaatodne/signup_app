@@ -313,7 +313,10 @@ function loadClient(options = {}) {
       "showMessage",
       "showCancelMessage",
       "openModal",
+      "renderCancelSignupList",
+      "selectCancelSignup",
       "findAndConfirmCancel",
+      "confirmCancel",
       "submitSignup",
       "buildGrid",
       "buildMobileAgenda",
@@ -1133,7 +1136,7 @@ test("showCancelMessage forwards to the cancel message target", () => {
   assert.equal(cancelNode.style.display, "block");
 });
 
-test("index.html leaves name length enforcement to validation while keeping class inputs at 10", () => {
+test("index.html keeps signup validation inputs and uses a cancellation selection list", () => {
   const htmlSource = fs.readFileSync(
     path.resolve(__dirname, "..", "index.html"),
     "utf8",
@@ -1145,40 +1148,150 @@ test("index.html leaves name length enforcement to validation while keeping clas
   }
 
   const inputNameBlock = getInputBlock("inputName");
-  const cancelNameBlock = getInputBlock("cancelName");
   const inputClassBlock = getInputBlock("inputClass");
-  const cancelClassBlock = getInputBlock("cancelClass");
 
   assert.ok(inputNameBlock);
-  assert.ok(cancelNameBlock);
   assert.ok(inputClassBlock);
-  assert.ok(cancelClassBlock);
   assert.doesNotMatch(inputNameBlock, /maxlength=/);
-  assert.doesNotMatch(cancelNameBlock, /maxlength=/);
   assert.match(inputClassBlock, /maxlength="10"/);
-  assert.match(cancelClassBlock, /maxlength="10"/);
+  assert.match(htmlSource, /id="cancelSignupList"/);
+  assert.doesNotMatch(htmlSource, /id="cancelName"/);
+  assert.doesNotMatch(htmlSource, /id="cancelClass"/);
+  assert.doesNotMatch(htmlSource, /id="cancelRole"/);
 });
 
-test("findAndConfirmCancel enforces the 50-character name limit client-side", () => {
+test("findAndConfirmCancel requires a selected signup", () => {
   const cancelMessage = createElement("div");
   cancelMessage.style = { display: "none" };
-  const cancelRole = createElement("select");
-  cancelRole.value = "general";
 
   const { exports: client } = loadClient({
     elements: {
-      cancelRole,
-      cancelName: { ...createElement("input"), value: "A".repeat(51) },
-      cancelClass: { ...createElement("input"), value: "1-1" },
       cancelMessage,
     },
   });
 
   client.findAndConfirmCancel();
 
-  assert.equal(cancelMessage.textContent, "名前は５０文字以下で入力してください。");
+  assert.equal(cancelMessage.textContent, "キャンセルする登録を選んでください。");
   assert.equal(cancelMessage.className, "modal-message error");
   assert.equal(cancelMessage.style.display, "block");
+});
+
+test("cancellation list renders existing signups and confirms the selected details", () => {
+  const cancelSignupList = createElement("div");
+  const cancelMessage = createElement("div");
+  cancelMessage.style = { display: "none" };
+  const confirmBox = createElement("div");
+  confirmBox.style = { display: "none" };
+  const confirmText = createElement("div");
+  const cancelSubmitBtn = createElement("button");
+
+  const { exports: client, context } = loadClient({
+    elements: {
+      cancelSignupList,
+      cancelMessage,
+      confirmBox,
+      confirmText,
+      cancelSubmitBtn,
+    },
+  });
+  context.currentEventId = 1;
+
+  client.renderCancelSignupList();
+
+  assert.equal(cancelSignupList.children.length, 2);
+  assert.equal(cancelSignupList.children[0].children[0].textContent, "Alice");
+  assert.equal(
+    cancelSignupList.children[0].children[1].textContent,
+    "1-1 · 一般保護者",
+  );
+  assert.equal(cancelSignupList.children[0].getAttribute("aria-pressed"), "false");
+
+  cancelSignupList.children[0].dispatchEvent({ type: "click" });
+
+  assert.equal(cancelSignupList.children[0].className, "cancel-signup-option selected");
+  assert.equal(cancelSignupList.children[0].getAttribute("aria-pressed"), "true");
+  assert.equal(cancelSignupList.children[1].getAttribute("aria-pressed"), "false");
+  assert.equal(cancelSubmitBtn.disabled, false);
+
+  client.findAndConfirmCancel();
+
+  assert.equal(
+    confirmText.textContent,
+    "Alice（1-1・一般保護者）の登録を本当にキャンセルしますか？",
+  );
+  assert.equal(confirmBox.style.display, "block");
+  assert.equal(cancelSubmitBtn.style.display, "none");
+});
+
+test("confirmCancel sends the selected signup details to the existing backend", () => {
+  const cancelSignupList = createElement("div");
+  const selectedOption = createElement("button");
+  cancelSignupList.appendChild(selectedOption);
+  const confirmBox = createElement("div");
+  confirmBox.style = { display: "block" };
+  const confirmYes = createElement("button");
+  const confirmNo = createElement("button");
+  const cancelSubmitBtn = createElement("button");
+  const cancelMessage = createElement("div");
+  cancelMessage.style = { display: "none" };
+  let receivedCancelArgs = null;
+  const google = {
+    script: {
+      run: {
+        withSuccessHandler(handler) {
+          return {
+            withFailureHandler() {
+              return this;
+            },
+            getDeployedUrl() {
+              handler("https://example.com/app");
+              return this;
+            },
+            cancelSignup(...args) {
+              receivedCancelArgs = args;
+              handler({ success: false, message: "Rejected by test." });
+              return this;
+            },
+          };
+        },
+      },
+    },
+  };
+
+  const { exports: client, context } = loadClient({
+    elements: {
+      cancelSignupList,
+      confirmBox,
+      confirmYes,
+      confirmNo,
+      cancelSubmitBtn,
+      cancelMessage,
+    },
+    extraGlobals: {
+      google,
+    },
+  });
+  context.currentEventId = 1;
+  client.selectCancelSignup(
+    { name: "Alice", cls: "1-1", role: "一般保護者" },
+    selectedOption,
+  );
+
+  client.confirmCancel();
+
+  assert.deepEqual(Array.from(receivedCancelArgs), [
+    1,
+    "Alice",
+    "1-1",
+    "一般保護者",
+    "test-alias",
+  ]);
+  assert.equal(cancelMessage.textContent, "Rejected by test.");
+  assert.equal(confirmBox.style.display, "none");
+  assert.equal(confirmYes.disabled, false);
+  assert.equal(confirmNo.disabled, false);
+  assert.equal(selectedOption.disabled, false);
 });
 
 test("submitSignup enforces the 50-character name limit client-side", () => {
