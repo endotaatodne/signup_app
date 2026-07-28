@@ -694,8 +694,35 @@
         line-height: 1.5;
       }
       #confirmText {
-        font-size: 20px;
+        text-align: center;
+      }
+      .confirm-question {
+        margin-bottom: 10px;
+        font-size: 16px;
         font-weight: 700;
+      }
+      .confirm-signup-summary {
+        padding: 12px;
+        border: 2px solid #c62828;
+        border-radius: 8px;
+        background: white;
+        overflow: hidden;
+        text-align: center;
+      }
+      .confirm-signup-name {
+        display: block;
+        font-size: 22px;
+        font-weight: 800;
+        line-height: 1.35;
+        overflow-wrap: anywhere;
+      }
+      .confirm-signup-details {
+        display: block;
+        margin-top: 5px;
+        font-size: 16px;
+        font-weight: 800;
+        line-height: 1.4;
+        overflow-wrap: anywhere;
       }
       .confirm-buttons {
         display: flex;
@@ -1648,7 +1675,21 @@
         font-size: 20px;
       }
 
-      body.compact-layout #confirmText {
+      body.compact-layout .confirm-question {
+        font-size: 24px;
+        margin-bottom: 14px;
+      }
+
+      body.compact-layout .confirm-signup-summary {
+        padding: 16px;
+        border-radius: 12px;
+      }
+
+      body.compact-layout .confirm-signup-name {
+        font-size: 30px;
+      }
+
+      body.compact-layout .confirm-signup-details {
         font-size: 24px;
       }
 
@@ -4449,15 +4490,40 @@
           return;
         }
 
-        document.getElementById("confirmText").textContent =
-          currentCancelSignup.name +
-          "（" +
-          currentCancelSignup.cls +
-          "・" +
-          currentCancelSignup.role +
-          "）の登録を本当にキャンセルしますか？";
-        document.getElementById("confirmBox").style.display = "block";
+        var confirmText = document.getElementById("confirmText");
+        clearElement(confirmText);
+
+        var question = document.createElement("div");
+        question.className = "confirm-question";
+        question.textContent = "以下の登録を本当にキャンセルしますか？";
+
+        var summary = document.createElement("div");
+        summary.className = "confirm-signup-summary";
+
+        var name = document.createElement("span");
+        name.className = "confirm-signup-name";
+        name.textContent = currentCancelSignup.name;
+
+        var details = document.createElement("span");
+        details.className = "confirm-signup-details";
+        details.textContent =
+          currentCancelSignup.cls + " · " + currentCancelSignup.role;
+
+        summary.appendChild(name);
+        summary.appendChild(details);
+        confirmText.appendChild(question);
+        confirmText.appendChild(summary);
+
+        var confirmBox = document.getElementById("confirmBox");
+        confirmBox.style.display = "block";
         document.getElementById("cancelSubmitBtn").style.display = "none";
+        if (confirmBox.scrollIntoView) {
+          confirmBox.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+            inline: "nearest",
+          });
+        }
       }
 
       function confirmCancel() {

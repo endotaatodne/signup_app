@@ -1185,6 +1185,10 @@ test("cancellation list renders existing signups and confirms the selected detai
   cancelMessage.style = { display: "none" };
   const confirmBox = createElement("div");
   confirmBox.style = { display: "none" };
+  let confirmScrollOptions = null;
+  confirmBox.scrollIntoView = function (options) {
+    confirmScrollOptions = options;
+  };
   const confirmText = createElement("div");
   const cancelSubmitBtn = createElement("button");
 
@@ -1221,12 +1225,23 @@ test("cancellation list renders existing signups and confirms the selected detai
 
   client.findAndConfirmCancel();
 
+  assert.equal(confirmText.children.length, 2);
   assert.equal(
-    confirmText.textContent,
-    "Alice（1-1・一般保護者）の登録を本当にキャンセルしますか？",
+    confirmText.children[0].textContent,
+    "以下の登録を本当にキャンセルしますか？",
+  );
+  assert.equal(confirmText.children[0].className, "confirm-question");
+  assert.equal(confirmText.children[1].className, "confirm-signup-summary");
+  assert.equal(confirmText.children[1].children[0].textContent, "Alice");
+  assert.equal(
+    confirmText.children[1].children[1].textContent,
+    "1-1 · 一般保護者",
   );
   assert.equal(confirmBox.style.display, "block");
   assert.equal(cancelSubmitBtn.style.display, "none");
+  assert.equal(confirmScrollOptions.behavior, "smooth");
+  assert.equal(confirmScrollOptions.block, "center");
+  assert.equal(confirmScrollOptions.inline, "nearest");
 });
 
 test("confirmCancel sends the selected signup details to the existing backend", () => {
@@ -1406,6 +1421,26 @@ test("cancellation list styling contains highlights inside the scroll area", () 
   assert.match(
     htmlSource,
     /\.cancel-signup-details\s*{[\s\S]*?overflow-wrap:\s*anywhere;/,
+  );
+});
+
+test("cancellation confirmation prominently centres the selected signup", () => {
+  const htmlSource = fs.readFileSync(
+    path.resolve(__dirname, "..", "index.html"),
+    "utf8",
+  );
+
+  assert.match(
+    htmlSource,
+    /\.confirm-signup-summary\s*{[\s\S]*?border:\s*2px solid #c62828;[\s\S]*?text-align:\s*center;/,
+  );
+  assert.match(
+    htmlSource,
+    /\.confirm-signup-name\s*{[\s\S]*?font-size:\s*22px;[\s\S]*?font-weight:\s*800;/,
+  );
+  assert.match(
+    htmlSource,
+    /\.confirm-signup-details\s*{[\s\S]*?font-size:\s*16px;[\s\S]*?font-weight:\s*800;/,
   );
 });
 
