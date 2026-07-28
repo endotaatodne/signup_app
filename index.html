@@ -600,37 +600,63 @@
         flex-direction: column;
         gap: 7px;
         max-height: 260px;
+        padding: 2px 6px 2px 2px;
         margin-bottom: 10px;
         overflow-y: auto;
+        overscroll-behavior: contain;
+        scrollbar-gutter: stable;
       }
       .cancel-signup-option {
+        flex: 0 0 auto;
         width: 100%;
+        min-width: 0;
+        max-width: 100%;
         padding: 10px 12px;
         border: 1px solid #ddd;
         border-radius: 8px;
         background: white;
+        background-clip: padding-box;
         color: #333;
         cursor: pointer;
+        overflow: hidden;
         text-align: left;
+        touch-action: manipulation;
+        transition:
+          background-color 0.1s ease,
+          border-color 0.1s ease,
+          box-shadow 0.1s ease;
+        white-space: normal;
+        -webkit-tap-highlight-color: transparent;
       }
-      .cancel-signup-option:hover {
+      @media (hover: hover) and (pointer: fine) {
+        .cancel-signup-option:hover {
+          border-color: #c62828;
+          background: #fff8f7;
+        }
+      }
+      .cancel-signup-option:active {
         border-color: #c62828;
         background: #fff8f7;
+      }
+      .cancel-signup-option:focus-visible {
+        outline: 2px solid #c62828;
+        outline-offset: -2px;
       }
       .cancel-signup-option:disabled {
         cursor: wait;
         opacity: 0.65;
       }
       .cancel-signup-option.selected {
-        border: 2px solid #c62828;
+        border-color: #c62828;
         background: #fdecea;
-        padding: 9px 11px;
+        box-shadow: inset 0 0 0 1px #c62828;
       }
       .cancel-signup-name {
         display: block;
         font-size: 15px;
         font-weight: 700;
         line-height: 1.35;
+        overflow-wrap: anywhere;
       }
       .cancel-signup-details {
         display: block;
@@ -638,6 +664,7 @@
         color: #666;
         font-size: 12px;
         line-height: 1.4;
+        overflow-wrap: anywhere;
       }
       .cancel-submit {
         width: 100%;
@@ -1613,10 +1640,6 @@
         border-radius: 12px;
       }
 
-      body.compact-layout .cancel-signup-option.selected {
-        padding: 12px 15px;
-      }
-
       body.compact-layout .cancel-signup-name {
         font-size: 27px;
       }
@@ -2353,6 +2376,7 @@
       var currentEventId = null;
       var currentRole = null;
       var currentCancelSignup = null;
+      var currentCancelOption = null;
       var resizeTimer = null;
       var lastCompactLayout = null;
       var MOBILE_DISPLAY_MODE_STORAGE_KEY = "signupApp.mobileDisplayMode";
@@ -4234,22 +4258,9 @@
         var modalTabs = document.getElementById("modalTabs");
         modalTabs.style.display = event.signups.length > 0 ? "flex" : "none";
 
-        document.getElementById("tabSignup").className =
-          "modal-tab active-signup";
-        document.getElementById("tabCancel").className = "modal-tab";
-        document.getElementById("cancelForm").className = "cancel-form";
-        currentCancelSignup = null;
+        resetCancelSignupSelection();
         clearElement(document.getElementById("cancelSignupList"));
-        document.getElementById("cancelMessage").style.display = "none";
-        document.getElementById("confirmBox").style.display = "none";
-        document.getElementById("confirmYes").disabled = false;
-        document.getElementById("confirmYes").textContent =
-          "はい、キャンセルします。";
-        document.getElementById("confirmNo").disabled = false;
-        document.getElementById("cancelSubmitBtn").style.display = "block";
-        document.getElementById("cancelSubmitBtn").disabled = true;
-        document.getElementById("cancelSubmitBtn").textContent =
-          "選択した登録をキャンセル";
+        switchTab("signup");
 
         document.getElementById("modalOverlay").classList.add("active");
         document.body.style.overflow = "hidden";
@@ -4288,7 +4299,7 @@
         document.getElementById("cancelForm").className = "cancel-form";
         document.getElementById("confirmBox").style.display = "none";
         document.getElementById("cancelMessage").style.display = "none";
-        currentCancelSignup = null;
+        resetCancelSignupSelection();
         clearElement(document.getElementById("cancelSignupList"));
         document.getElementById("confirmYes").disabled = false;
         document.getElementById("confirmYes").textContent =
@@ -4331,7 +4342,7 @@
           var signupEvent = getEventById(currentEventId);
           document.getElementById("namesSection").style.display =
             signupEvent && signupEvent.signups.length > 0 ? "block" : "none";
-          roleButtons.style.display = "block";
+          roleButtons.style.display = "";
           modalForm.className = currentRole
             ? "modal-form visible"
             : "modal-form";
@@ -4344,14 +4355,32 @@
           roleButtons.style.display = "none";
           modalForm.className = "modal-form";
           cancelForm.className = "cancel-form visible";
-          currentCancelSignup = null;
+          resetCancelSignupSelection();
           document.getElementById("cancelSubmitBtn").disabled = true;
           renderCancelSignupList();
         }
+        resetModalTabScroll(tab);
+      }
+
+      function resetModalTabScroll(tab) {
+        var modal = document.querySelector(".modal");
+        if (modal) modal.scrollTop = 0;
+
+        var tabScrollArea =
+          tab === "cancel"
+            ? document.getElementById("cancelSignupList")
+            : document.getElementById("namesSection");
+        if (tabScrollArea) tabScrollArea.scrollTop = 0;
+      }
+
+      function resetCancelSignupSelection() {
+        currentCancelSignup = null;
+        currentCancelOption = null;
       }
 
       function renderCancelSignupList() {
         var list = document.getElementById("cancelSignupList");
+        resetCancelSignupSelection();
         clearElement(list);
         var event = getEventById(currentEventId);
         if (!event) return;
@@ -4362,6 +4391,8 @@
             var option = document.createElement("button");
             option.type = "button";
             option.className = "cancel-signup-option";
+            option.cancelSignupData = signup;
+            option.setAttribute("data-cancel-signup", "");
             option.setAttribute("aria-pressed", "false");
 
             var name = document.createElement("span");
@@ -4374,28 +4405,27 @@
 
             option.appendChild(name);
             option.appendChild(details);
-            option.addEventListener("click", function () {
-              selectCancelSignup(signup, option);
-            });
             list.appendChild(option);
           });
         });
       }
 
       function selectCancelSignup(signup, selectedOption) {
+        if (!signup || !selectedOption) return;
+
+        if (currentCancelOption && currentCancelOption !== selectedOption) {
+          currentCancelOption.classList.remove("selected");
+          currentCancelOption.setAttribute("aria-pressed", "false");
+        }
+
         currentCancelSignup = {
           name: signup.name,
           cls: signup.cls,
           role: signup.role,
         };
-
-        var options = document.getElementById("cancelSignupList").children;
-        Array.prototype.forEach.call(options, function (option) {
-          var selected = option === selectedOption;
-          option.className =
-            "cancel-signup-option" + (selected ? " selected" : "");
-          option.setAttribute("aria-pressed", selected ? "true" : "false");
-        });
+        currentCancelOption = selectedOption;
+        selectedOption.classList.add("selected");
+        selectedOption.setAttribute("aria-pressed", "true");
 
         document.getElementById("confirmBox").style.display = "none";
         document.getElementById("cancelMessage").style.display = "none";
@@ -4670,6 +4700,17 @@
         .addEventListener("click", function (e) {
           e.stopPropagation();
           findAndConfirmCancel();
+        });
+      document
+        .getElementById("cancelSignupList")
+        .addEventListener("click", function (e) {
+          var option =
+            e.target && e.target.closest
+              ? e.target.closest("[data-cancel-signup]")
+              : null;
+          var list = document.getElementById("cancelSignupList");
+          if (!option || !list.contains(option) || option.disabled) return;
+          selectCancelSignup(option.cancelSignupData, option);
         });
       document
         .getElementById("confirmYes")

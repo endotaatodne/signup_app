@@ -313,6 +313,8 @@ function loadClient(options = {}) {
       "showMessage",
       "showCancelMessage",
       "openModal",
+      "closeModal",
+      "switchTab",
       "renderCancelSignupList",
       "selectCancelSignup",
       "findAndConfirmCancel",
@@ -1207,9 +1209,12 @@ test("cancellation list renders existing signups and confirms the selected detai
   );
   assert.equal(cancelSignupList.children[0].getAttribute("aria-pressed"), "false");
 
-  cancelSignupList.children[0].dispatchEvent({ type: "click" });
+  cancelSignupList.dispatchEvent({
+    type: "click",
+    target: cancelSignupList.children[0].children[1],
+  });
 
-  assert.equal(cancelSignupList.children[0].className, "cancel-signup-option selected");
+  assert.equal(cancelSignupList.children[0].classList.has("selected"), true);
   assert.equal(cancelSignupList.children[0].getAttribute("aria-pressed"), "true");
   assert.equal(cancelSignupList.children[1].getAttribute("aria-pressed"), "false");
   assert.equal(cancelSubmitBtn.disabled, false);
@@ -1292,6 +1297,116 @@ test("confirmCancel sends the selected signup details to the existing backend", 
   assert.equal(confirmYes.disabled, false);
   assert.equal(confirmNo.disabled, false);
   assert.equal(selectedOption.disabled, false);
+});
+
+test("cancellation selection updates only the previous and current options", () => {
+  const cancelSignupList = createElement("div");
+  const cancelSubmitBtn = createElement("button");
+  const firstOption = createElement("button");
+  const secondOption = createElement("button");
+  const untouchedOption = createElement("button");
+  cancelSignupList.appendChild(firstOption);
+  cancelSignupList.appendChild(secondOption);
+  cancelSignupList.appendChild(untouchedOption);
+
+  const { exports: client } = loadClient({
+    elements: {
+      cancelSignupList,
+      cancelSubmitBtn,
+      cancelMessage: createElement("div"),
+      confirmBox: createElement("div"),
+    },
+  });
+
+  client.selectCancelSignup(
+    { name: "Alice", cls: "1-1", role: "一般保護者" },
+    firstOption,
+  );
+  client.selectCancelSignup(
+    { name: "Bob", cls: "1-2", role: "学年委員" },
+    secondOption,
+  );
+
+  assert.equal(firstOption.classList.has("selected"), false);
+  assert.equal(firstOption.getAttribute("aria-pressed"), "false");
+  assert.equal(secondOption.classList.has("selected"), true);
+  assert.equal(secondOption.getAttribute("aria-pressed"), "true");
+  assert.equal(untouchedOption.getAttribute("aria-pressed"), null);
+});
+
+test("registration tab restores role choices and resets retained modal scroll", () => {
+  const roleButtons = createElement("div");
+  const namesSection = createElement("div");
+  const cancelSignupList = createElement("div");
+  const modal = createElement("div");
+  const { exports: client } = loadClient({
+    elements: {
+      ".modal": modal,
+      modalTitle: createElement("div"),
+      modalSubtitle: createElement("div"),
+      namesSection,
+      namesGroups: createElement("div"),
+      roleButtons,
+      modalForm: createElement("div"),
+      inputName: createElement("input"),
+      inputClass: createElement("input"),
+      modalMessage: createElement("div"),
+      modalOverlay: createElement("div"),
+      cancelSignupList,
+    },
+  });
+
+  client.openModal(1);
+  modal.scrollTop = 120;
+  cancelSignupList.scrollTop = 80;
+  client.switchTab("cancel");
+
+  assert.equal(roleButtons.style.display, "none");
+  assert.equal(modal.scrollTop, 0);
+  assert.equal(cancelSignupList.scrollTop, 0);
+
+  modal.scrollTop = 90;
+  namesSection.scrollTop = 60;
+  client.switchTab("signup");
+
+  assert.equal(roleButtons.style.display, "");
+  assert.ok(roleButtons.children.length > 0);
+  assert.equal(modal.scrollTop, 0);
+  assert.equal(namesSection.scrollTop, 0);
+
+  client.switchTab("cancel");
+  client.openModal(1);
+
+  assert.equal(roleButtons.style.display, "");
+  assert.ok(roleButtons.children.length > 0);
+});
+
+test("cancellation list styling contains highlights inside the scroll area", () => {
+  const htmlSource = fs.readFileSync(
+    path.resolve(__dirname, "..", "index.html"),
+    "utf8",
+  );
+
+  assert.match(
+    htmlSource,
+    /\.cancel-signup-list\s*{[\s\S]*?scrollbar-gutter:\s*stable;/,
+  );
+  assert.match(
+    htmlSource,
+    /\.cancel-signup-option\s*{[\s\S]*?flex:\s*0 0 auto;[\s\S]*?overflow:\s*hidden;[\s\S]*?touch-action:\s*manipulation;/,
+  );
+  assert.match(
+    htmlSource,
+    /\.cancel-signup-option\.selected\s*{[\s\S]*?box-shadow:\s*inset 0 0 0 1px #c62828;/,
+  );
+  assert.match(
+    htmlSource,
+    /@media \(hover:\s*hover\) and \(pointer:\s*fine\)\s*{[\s\S]*?\.cancel-signup-option:hover/,
+  );
+  assert.match(
+    htmlSource,
+    /\.cancel-signup-details\s*{[\s\S]*?overflow-wrap:\s*anywhere;/,
+  );
 });
 
 test("submitSignup enforces the 50-character name limit client-side", () => {
