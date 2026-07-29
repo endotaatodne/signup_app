@@ -2037,6 +2037,10 @@
         display: none;
       }
 
+      .desktop-insights-panel {
+        display: none;
+      }
+
       body.desktop-layout {
         padding: 0 32px 56px;
         background: #f5f2ee;
@@ -2111,13 +2115,91 @@
       }
 
       body.desktop-layout .desktop-stat {
+        appearance: none;
         min-width: 0;
         padding: 10px 13px;
         border: 1px solid #e2dbd2;
         border-radius: 11px;
         background: rgba(255, 255, 255, 0.92);
+        color: inherit;
+        cursor: pointer;
+        font: inherit;
         box-shadow: 0 3px 10px rgba(52, 43, 34, 0.05);
         text-align: right;
+        transition:
+          border-color 0.15s ease,
+          background-color 0.15s ease,
+          box-shadow 0.15s ease,
+          transform 0.15s ease;
+      }
+
+      body.desktop-layout .desktop-stat:hover {
+        border-color: #c9bba9;
+        background: #ffffff;
+        box-shadow: 0 7px 18px rgba(52, 43, 34, 0.1);
+        transform: translateY(-1px);
+      }
+
+      body.desktop-layout .desktop-stat:focus-visible {
+        outline: 3px solid #8b6840;
+        outline-offset: 2px;
+      }
+
+      body.desktop-layout .desktop-stat.is-active {
+        border-color: #8b6840;
+        background: #fffaf2;
+        box-shadow: inset 0 0 0 1px #8b6840;
+      }
+
+      body.desktop-layout
+        .desktop-stat[data-desktop-insight="vacancies"] {
+        border-color: #c8dfcc;
+        background: #e1f0e4;
+      }
+
+      body.desktop-layout
+        .desktop-stat[data-desktop-insight="vacancies"]:hover {
+        background: #d7eadd;
+      }
+
+      body.desktop-layout
+        .desktop-stat[data-desktop-insight="vacancies"]
+        .desktop-stat-value {
+        color: #356b41;
+      }
+
+      body.desktop-layout
+        .desktop-stat[data-desktop-insight="positions"] {
+        border-color: #c7d8e8;
+        background: #e2edf7;
+      }
+
+      body.desktop-layout
+        .desktop-stat[data-desktop-insight="positions"]:hover {
+        background: #d7e6f3;
+      }
+
+      body.desktop-layout
+        .desktop-stat[data-desktop-insight="positions"]
+        .desktop-stat-value {
+        color: #315f80;
+      }
+
+      body.desktop-layout
+        .desktop-stat[data-desktop-insight="registrations"] {
+        border-color: #dccbe4;
+        background: #eee4f3;
+      }
+
+      body.desktop-layout
+        .desktop-stat[data-desktop-insight="registrations"]:hover {
+        background: #e5d8ec;
+      }
+
+      body.desktop-layout
+        .desktop-stat[data-desktop-insight="registrations"]
+        .desktop-stat-value {
+        color: #6c4d77;
       }
 
       body.desktop-layout .desktop-stat-value {
@@ -2135,6 +2217,221 @@
         font-size: 11px;
         font-weight: 800;
         line-height: 1.2;
+      }
+
+      body.desktop-layout .desktop-insights-panel {
+        position: absolute;
+        top: 84px;
+        right: 0;
+        z-index: 25;
+        display: block;
+        width: min(780px, 100%);
+        max-height: min(420px, calc(100vh - 190px));
+        overflow-y: auto;
+        padding: 0 18px 18px;
+        border: 1px solid #d8cec2;
+        border-radius: 15px;
+        background: #fffdf9;
+        box-shadow: 0 22px 50px rgba(52, 43, 34, 0.22);
+        scrollbar-gutter: stable;
+      }
+
+      body.desktop-layout .desktop-insights-panel[hidden] {
+        display: none;
+      }
+
+      body.desktop-layout .desktop-insights-header {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        display: flex;
+        justify-content: space-between;
+        gap: 18px;
+        align-items: flex-start;
+        margin: 0 -18px 14px;
+        padding: 17px 18px 14px;
+        border-bottom: 1px solid #e8e0d7;
+        background: rgba(255, 253, 249, 0.97);
+        backdrop-filter: blur(8px);
+      }
+
+      body.desktop-layout .desktop-insights-title {
+        color: #29231f;
+        font-size: 20px;
+        font-weight: 900;
+        line-height: 1.25;
+      }
+
+      body.desktop-layout .desktop-insights-description {
+        margin-top: 4px;
+        color: #746a60;
+        font-size: 13px;
+        font-weight: 600;
+        line-height: 1.4;
+      }
+
+      body.desktop-layout .desktop-insights-close {
+        flex: 0 0 auto;
+        width: 38px;
+        height: 38px;
+        border: 1px solid #ddd3c8;
+        border-radius: 50%;
+        background: #ffffff;
+        color: #51483f;
+        cursor: pointer;
+        font-size: 24px;
+        font-weight: 500;
+        line-height: 1;
+      }
+
+      body.desktop-layout .desktop-insights-close:hover {
+        border-color: #bba996;
+        background: #f8f3ed;
+      }
+
+      body.desktop-layout .desktop-insights-close:focus-visible {
+        outline: 3px solid #8b6840;
+        outline-offset: 2px;
+      }
+
+      body.desktop-layout .desktop-insights-content {
+        display: grid;
+        gap: 10px;
+      }
+
+      body.desktop-layout .desktop-insights-content.is-vacancies,
+      body.desktop-layout .desktop-insights-content.is-registrations {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      body.desktop-layout .desktop-insight-item,
+      body.desktop-layout .desktop-insight-role {
+        width: 100%;
+        min-width: 0;
+        padding: 13px 14px;
+        border: 1px solid #e2d9cf;
+        border-radius: 11px;
+        background: #ffffff;
+        color: #302a25;
+        cursor: pointer;
+        font: inherit;
+        text-align: left;
+        transition:
+          border-color 0.15s ease,
+          background-color 0.15s ease,
+          box-shadow 0.15s ease;
+      }
+
+      body.desktop-layout .desktop-insight-item:hover,
+      body.desktop-layout .desktop-insight-role:hover {
+        border-color: #bba996;
+        background: #fffbf5;
+        box-shadow: 0 5px 14px rgba(52, 43, 34, 0.09);
+      }
+
+      body.desktop-layout .desktop-insight-item:focus-visible,
+      body.desktop-layout .desktop-insight-role:focus-visible {
+        outline: 3px solid #8b6840;
+        outline-offset: 2px;
+      }
+
+      body.desktop-layout .desktop-insight-item-heading,
+      body.desktop-layout .desktop-insight-role-heading {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: baseline;
+      }
+
+      body.desktop-layout .desktop-insight-item-title,
+      body.desktop-layout .desktop-insight-role-title {
+        min-width: 0;
+        color: #28221e;
+        font-size: 16px;
+        font-weight: 900;
+        line-height: 1.3;
+      }
+
+      body.desktop-layout .desktop-insight-item-time,
+      body.desktop-layout .desktop-insight-role-count {
+        flex: 0 0 auto;
+        color: #755231;
+        font-size: 13px;
+        font-weight: 900;
+        white-space: nowrap;
+      }
+
+      body.desktop-layout .desktop-insight-item-meta,
+      body.desktop-layout .desktop-insight-role-meta {
+        margin-top: 4px;
+        color: #756c63;
+        font-size: 12px;
+        font-weight: 600;
+        line-height: 1.35;
+      }
+
+      body.desktop-layout .desktop-insight-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        margin-top: 9px;
+      }
+
+      body.desktop-layout .desktop-insight-chip {
+        display: inline-flex;
+        min-height: 25px;
+        align-items: center;
+        padding: 4px 8px;
+        border-radius: 999px;
+        background: #f2eee8;
+        color: #5d554d;
+        font-size: 11px;
+        font-weight: 800;
+        line-height: 1.2;
+      }
+
+      body.desktop-layout .desktop-insight-chip.role-general {
+        background: #edf7ee;
+        color: #2e7d32;
+      }
+
+      body.desktop-layout .desktop-insight-chip.role-classrep {
+        background: #fff4da;
+        color: #a85f00;
+      }
+
+      body.desktop-layout .desktop-insight-chip.role-steeringcommittee {
+        background: #eaf3ff;
+        color: #1565c0;
+      }
+
+      body.desktop-layout .desktop-insight-chip.role-orgcommittee {
+        background: #f4eafd;
+        color: #6a1b9a;
+      }
+
+      body.desktop-layout .desktop-insight-chip.is-low {
+        box-shadow: inset 0 0 0 1px currentColor;
+      }
+
+      body.desktop-layout .desktop-insight-names {
+        margin-top: 8px;
+        color: #5e554d;
+        font-size: 12px;
+        font-weight: 600;
+        line-height: 1.45;
+        overflow-wrap: anywhere;
+      }
+
+      body.desktop-layout .desktop-insight-empty {
+        grid-column: 1 / -1;
+        padding: 24px 16px;
+        border: 1px dashed #d8cec2;
+        border-radius: 11px;
+        color: #746a60;
+        font-size: 14px;
+        font-weight: 700;
+        text-align: center;
       }
 
       body.desktop-layout .mobile-availability-control {
@@ -2386,22 +2683,70 @@
           </button>
         </div>
         <div
+          id="desktopScheduleStats"
           class="desktop-schedule-stats"
           aria-label="募集状況"
           aria-live="polite"
         >
-          <div class="desktop-stat">
+          <button
+            class="desktop-stat"
+            type="button"
+            data-desktop-insight="vacancies"
+            aria-controls="desktopInsightsPanel"
+            aria-expanded="false"
+          >
             <strong class="desktop-stat-value" id="desktopAvailableCount">0</strong>
             <span class="desktop-stat-label">空き枠</span>
-          </div>
-          <div class="desktop-stat">
+          </button>
+          <button
+            class="desktop-stat"
+            type="button"
+            data-desktop-insight="positions"
+            aria-controls="desktopInsightsPanel"
+            aria-expanded="false"
+          >
             <strong class="desktop-stat-value" id="desktopOpenRoleCount">0</strong>
             <span class="desktop-stat-label">募集中のポジション</span>
-          </div>
-          <div class="desktop-stat">
+          </button>
+          <button
+            class="desktop-stat"
+            type="button"
+            data-desktop-insight="registrations"
+            aria-controls="desktopInsightsPanel"
+            aria-expanded="false"
+          >
             <strong class="desktop-stat-value" id="desktopSignupCount">0</strong>
             <span class="desktop-stat-label">現在の登録</span>
+          </button>
+        </div>
+        <div
+          id="desktopInsightsPanel"
+          class="desktop-insights-panel"
+          role="region"
+          aria-labelledby="desktopInsightsTitle"
+          hidden
+        >
+          <div class="desktop-insights-header">
+            <div>
+              <h2 class="desktop-insights-title" id="desktopInsightsTitle"></h2>
+              <p
+                class="desktop-insights-description"
+                id="desktopInsightsDescription"
+              ></p>
+            </div>
+            <button
+              class="desktop-insights-close"
+              id="desktopInsightsClose"
+              type="button"
+              aria-label="詳細を閉じる"
+            >
+              ×
+            </button>
           </div>
+          <div
+            class="desktop-insights-content"
+            id="desktopInsightsContent"
+          ></div>
         </div>
         <div
           id="mobileAvailabilityControl"
@@ -2601,6 +2946,7 @@
       var mobileActivityFilter = MOBILE_ACTIVITY_FILTER_ALL;
       var mobileKeywordSearchQuery = "";
       var mobileTimeFilterDropdownOpen = false;
+      var activeDesktopInsightView = null;
 
       var ROLE_KEYS = [
         {
@@ -3450,6 +3796,313 @@
         if (availableNode) availableNode.textContent = availableCount;
         if (openRoleNode) openRoleNode.textContent = openRoleCount;
         if (signupNode) signupNode.textContent = signupCount;
+
+        var panel = document.getElementById("desktopInsightsPanel");
+        if (
+          activeDesktopInsightView &&
+          panel &&
+          !panel.hidden
+        ) {
+          renderDesktopInsightPanel(activeDesktopInsightView);
+        }
+      }
+
+      function getDesktopInsightViews() {
+        return ["vacancies", "positions", "registrations"];
+      }
+
+      function normaliseDesktopInsightView(view) {
+        var requested = String(view || "");
+        return getDesktopInsightViews().indexOf(requested) === -1
+          ? null
+          : requested;
+      }
+
+      function updateDesktopInsightButtons() {
+        var stats = document.getElementById("desktopScheduleStats");
+        if (!stats || !stats.children) return;
+        Array.prototype.forEach.call(stats.children, function (button) {
+          var view = button.getAttribute("data-desktop-insight");
+          if (!view) return;
+          var active = view === activeDesktopInsightView;
+          if (button.classList && button.classList.toggle) {
+            button.classList.toggle("is-active", active);
+          }
+          button.setAttribute("aria-expanded", active ? "true" : "false");
+        });
+      }
+
+      function getDesktopInsightEvents(predicate) {
+        return ((gridData && gridData.events) || [])
+          .filter(predicate)
+          .slice()
+          .sort(compareEventsByTime);
+      }
+
+      function getDesktopInsightEventMeta(event) {
+        return [event.location, event.subtitle, event.description]
+          .filter(function (value) {
+            return value && String(value).trim() !== "";
+          })
+          .join(" · ");
+      }
+
+      function createDesktopInsightChip(roleMeta, text, lowAvailability) {
+        var chip = document.createElement("span");
+        chip.className =
+          "desktop-insight-chip role-" +
+          roleMeta.classSuffix +
+          (lowAvailability ? " is-low" : "");
+        chip.textContent = text;
+        return chip;
+      }
+
+      function createDesktopInsightEventItem(event, view) {
+        var item = document.createElement("button");
+        item.type = "button";
+        item.className = "desktop-insight-item";
+        item.setAttribute("data-insight-eventid", event.eventId);
+
+        var heading = document.createElement("div");
+        heading.className = "desktop-insight-item-heading";
+
+        var title = document.createElement("span");
+        title.className = "desktop-insight-item-title";
+        title.textContent = event.activity;
+
+        var time = document.createElement("span");
+        time.className = "desktop-insight-item-time";
+        time.textContent = event.endTime
+          ? formatTimeRange(event.startTime, event.endTime)
+          : formatTime(event.startTime);
+
+        heading.appendChild(title);
+        heading.appendChild(time);
+        item.appendChild(heading);
+
+        var metaText = getDesktopInsightEventMeta(event);
+        if (metaText) {
+          var meta = document.createElement("div");
+          meta.className = "desktop-insight-item-meta";
+          meta.textContent = metaText;
+          item.appendChild(meta);
+        }
+
+        var chips = document.createElement("div");
+        chips.className = "desktop-insight-chips";
+
+        if (view === "vacancies") {
+          ROLE_KEYS.forEach(function (roleMeta) {
+            var remaining = getRemainingForRole(event, roleMeta.key);
+            if (remaining <= 0) return;
+            chips.appendChild(
+              createDesktopInsightChip(
+                roleMeta,
+                roleMeta.label + " " + formatRemainingSlots(remaining),
+                remaining === 1,
+              ),
+            );
+          });
+        } else {
+          ROLE_KEYS.forEach(function (roleMeta) {
+            var roleSignups =
+              (event.signupsByRole &&
+                event.signupsByRole[roleMeta.label]) ||
+              [];
+            if (roleSignups.length === 0) return;
+            chips.appendChild(
+              createDesktopInsightChip(
+                roleMeta,
+                roleMeta.label + " " + roleSignups.length + "名",
+                false,
+              ),
+            );
+          });
+        }
+
+        if (chips.firstChild) item.appendChild(chips);
+
+        if (view === "registrations") {
+          var nameLines = [];
+          ROLE_KEYS.forEach(function (roleMeta) {
+            var roleSignups =
+              (event.signupsByRole &&
+                event.signupsByRole[roleMeta.label]) ||
+              [];
+            if (roleSignups.length === 0) return;
+            nameLines.push(
+              roleMeta.label +
+                ": " +
+                roleSignups
+                  .map(function (signup) {
+                    return signup.name;
+                  })
+                  .join(", "),
+            );
+          });
+          if (nameLines.length > 0) {
+            var names = document.createElement("div");
+            names.className = "desktop-insight-names";
+            names.textContent = nameLines.join(" / ");
+            item.appendChild(names);
+          }
+        }
+
+        return item;
+      }
+
+      function renderDesktopInsightEmpty(content, message) {
+        var empty = document.createElement("div");
+        empty.className = "desktop-insight-empty";
+        empty.textContent = message;
+        content.appendChild(empty);
+      }
+
+      function renderDesktopVacancyInsights(content) {
+        var events = getDesktopInsightEvents(function (event) {
+          return hasAnyAvailable(event.slots || {});
+        });
+        events.forEach(function (event) {
+          content.appendChild(createDesktopInsightEventItem(event, "vacancies"));
+        });
+        if (events.length === 0) {
+          renderDesktopInsightEmpty(content, "現在、空いている募集枠はありません。");
+        }
+      }
+
+      function renderDesktopPositionInsights(content) {
+        var events = (gridData && gridData.events) || [];
+        var renderedCount = 0;
+
+        ROLE_KEYS.forEach(function (roleMeta) {
+          var matchingEvents = events.filter(function (event) {
+            return getRemainingForRole(event, roleMeta.key) > 0;
+          });
+          var remaining = matchingEvents.reduce(function (total, event) {
+            return total + getRemainingForRole(event, roleMeta.key);
+          }, 0);
+          if (remaining <= 0) return;
+
+          var roleButton = document.createElement("button");
+          roleButton.type = "button";
+          roleButton.className = "desktop-insight-role";
+          roleButton.setAttribute("data-insight-role", roleMeta.key);
+
+          var heading = document.createElement("div");
+          heading.className = "desktop-insight-role-heading";
+
+          var title = document.createElement("span");
+          title.className = "desktop-insight-role-title";
+          title.textContent = roleMeta.label;
+
+          var count = document.createElement("span");
+          count.className = "desktop-insight-role-count";
+          count.textContent = formatRemainingSlots(remaining);
+
+          var meta = document.createElement("div");
+          meta.className = "desktop-insight-role-meta";
+          meta.textContent =
+            matchingEvents.length +
+            "件の募集 · クリックしてこのポジションに絞り込む";
+
+          heading.appendChild(title);
+          heading.appendChild(count);
+          roleButton.appendChild(heading);
+          roleButton.appendChild(meta);
+          content.appendChild(roleButton);
+          renderedCount += 1;
+        });
+
+        if (renderedCount === 0) {
+          renderDesktopInsightEmpty(
+            content,
+            "現在、募集中のポジションはありません。",
+          );
+        }
+      }
+
+      function renderDesktopRegistrationInsights(content) {
+        var events = getDesktopInsightEvents(function (event) {
+          return event.signups && event.signups.length > 0;
+        });
+        events.forEach(function (event) {
+          content.appendChild(
+            createDesktopInsightEventItem(event, "registrations"),
+          );
+        });
+        if (events.length === 0) {
+          renderDesktopInsightEmpty(content, "現在の登録はありません。");
+        }
+      }
+
+      function renderDesktopInsightPanel(view) {
+        var activeView = normaliseDesktopInsightView(view);
+        var panel = document.getElementById("desktopInsightsPanel");
+        var title = document.getElementById("desktopInsightsTitle");
+        var description = document.getElementById(
+          "desktopInsightsDescription",
+        );
+        var content = document.getElementById("desktopInsightsContent");
+        if (!activeView || !panel || !title || !description || !content) return;
+
+        clearElement(content);
+        content.className =
+          "desktop-insights-content is-" + activeView;
+
+        if (activeView === "vacancies") {
+          title.textContent = "空き枠の一覧";
+          description.textContent =
+            "時間順に募集中の活動を表示しています。選択すると登録画面が開きます。";
+          renderDesktopVacancyInsights(content);
+        } else if (activeView === "positions") {
+          title.textContent = "募集中のポジション";
+          description.textContent =
+            "ポジションを選ぶと、下の募集カードをその条件で絞り込みます。";
+          renderDesktopPositionInsights(content);
+        } else {
+          title.textContent = "現在の登録";
+          description.textContent =
+            "登録を時間順に表示しています。選択すると登録・キャンセル画面が開きます。";
+          renderDesktopRegistrationInsights(content);
+        }
+      }
+
+      function closeDesktopInsightsPanel(restoreFocus) {
+        var previousView = activeDesktopInsightView;
+        var panel = document.getElementById("desktopInsightsPanel");
+        activeDesktopInsightView = null;
+        if (panel) panel.hidden = true;
+        updateDesktopInsightButtons();
+
+        if (!restoreFocus || !previousView) return;
+        var stats = document.getElementById("desktopScheduleStats");
+        if (!stats || !stats.children) return;
+        Array.prototype.forEach.call(stats.children, function (button) {
+          if (
+            button.getAttribute("data-desktop-insight") === previousView &&
+            button.focus
+          ) {
+            button.focus();
+          }
+        });
+      }
+
+      function setDesktopInsightView(view) {
+        var nextView = normaliseDesktopInsightView(view);
+        var panel = document.getElementById("desktopInsightsPanel");
+        if (!nextView || !panel || isCompactLayout()) {
+          closeDesktopInsightsPanel(false);
+          return;
+        }
+        if (activeDesktopInsightView === nextView && !panel.hidden) {
+          closeDesktopInsightsPanel(false);
+          return;
+        }
+
+        activeDesktopInsightView = nextView;
+        panel.hidden = false;
+        updateDesktopInsightButtons();
+        renderDesktopInsightPanel(nextView);
       }
 
       function formatRemainingSlots(remaining) {
@@ -3803,6 +4456,7 @@
         var compact = isCompactLayout();
         document.body.classList.toggle("compact-layout", compact);
         document.body.classList.toggle("desktop-layout", !compact);
+        if (compact) closeDesktopInsightsPanel(false);
       }
       function formatTime(time) {
         if (!time) return "";
@@ -4537,6 +5191,79 @@
         .addEventListener("keydown", function (e) {
           if (e.key === "Enter") submitSignup();
         });
+
+      document
+        .getElementById("desktopScheduleStats")
+        .addEventListener("click", function (e) {
+          var button =
+            e.target && e.target.closest
+              ? e.target.closest("[data-desktop-insight]")
+              : null;
+          if (!button || !this.contains(button)) return;
+          if (e.stopPropagation) e.stopPropagation();
+          setDesktopInsightView(button.getAttribute("data-desktop-insight"));
+        });
+      document
+        .getElementById("desktopInsightsPanel")
+        .addEventListener("click", function (e) {
+          var closeButton =
+            e.target && e.target.closest
+              ? e.target.closest("#desktopInsightsClose")
+              : null;
+          if (closeButton) {
+            if (e.stopPropagation) e.stopPropagation();
+            closeDesktopInsightsPanel(true);
+            return;
+          }
+
+          var roleButton =
+            e.target && e.target.closest
+              ? e.target.closest("[data-insight-role]")
+              : null;
+          if (roleButton) {
+            if (e.stopPropagation) e.stopPropagation();
+            var roleKey = roleButton.getAttribute("data-insight-role");
+            closeDesktopInsightsPanel(false);
+            setMobileDisplayMode("signup");
+            setMobileRoleFilter(roleKey);
+            var agenda = getMobileAgenda();
+            if (agenda && agenda.scrollIntoView) {
+              agenda.scrollIntoView({
+                behavior: "smooth",
+                block: "start",
+                inline: "nearest",
+              });
+            }
+            return;
+          }
+
+          var eventButton =
+            e.target && e.target.closest
+              ? e.target.closest("[data-insight-eventid]")
+              : null;
+          if (eventButton) {
+            if (e.stopPropagation) e.stopPropagation();
+            var eventId = eventButton.getAttribute("data-insight-eventid");
+            closeDesktopInsightsPanel(false);
+            openModal(eventId);
+          }
+        });
+      document.addEventListener("click", function (e) {
+        if (!activeDesktopInsightView) return;
+        var target = e.target;
+        var stats = document.getElementById("desktopScheduleStats");
+        var panel = document.getElementById("desktopInsightsPanel");
+        var insideStats = stats && target && stats.contains(target);
+        var insidePanel = panel && target && panel.contains(target);
+        if (!insideStats && !insidePanel) {
+          closeDesktopInsightsPanel(false);
+        }
+      });
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape" && activeDesktopInsightView) {
+          closeDesktopInsightsPanel(true);
+        }
+      });
 
       document
         .getElementById("mobileAgenda")

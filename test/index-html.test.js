@@ -298,6 +298,9 @@ function loadClient(options = {}) {
       "getMobileFilteredEvents",
       "updateMobileAvailabilityControl",
       "updateDesktopScheduleSummary",
+      "renderDesktopInsightPanel",
+      "setDesktopInsightView",
+      "closeDesktopInsightsPanel",
       "formatTime",
       "formatTimeRange",
       "normaliseWhitespace",
@@ -1624,7 +1627,27 @@ test("desktop reuses the responsive filters and card schedule", () => {
   );
   assert.match(
     htmlSource,
+    /\.desktop-insights-panel\s*{[\s\S]*?display:\s*none;/,
+  );
+  assert.match(
+    htmlSource,
     /body\.desktop-layout \.desktop-schedule-stats\s*{[\s\S]*?display:\s*grid;/,
+  );
+  assert.match(
+    htmlSource,
+    /\.desktop-stat\[data-desktop-insight="vacancies"\]\s*{[\s\S]*?background:\s*#e1f0e4;/,
+  );
+  assert.match(
+    htmlSource,
+    /\.desktop-stat\[data-desktop-insight="positions"\]\s*{[\s\S]*?background:\s*#e2edf7;/,
+  );
+  assert.match(
+    htmlSource,
+    /\.desktop-stat\[data-desktop-insight="registrations"\]\s*{[\s\S]*?background:\s*#eee4f3;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout \.desktop-insights-panel\s*{[\s\S]*?position:\s*absolute;[\s\S]*?max-height:/,
   );
   assert.match(
     htmlSource,
@@ -1668,6 +1691,10 @@ test("desktop reuses the responsive filters and card schedule", () => {
   assert.match(htmlSource, /id="desktopAvailableCount"/);
   assert.match(htmlSource, /id="desktopOpenRoleCount"/);
   assert.match(htmlSource, /id="desktopSignupCount"/);
+  assert.match(htmlSource, /data-desktop-insight="vacancies"/);
+  assert.match(htmlSource, /data-desktop-insight="positions"/);
+  assert.match(htmlSource, /data-desktop-insight="registrations"/);
+  assert.match(htmlSource, /id="desktopInsightsPanel"/);
   assert.doesNotMatch(htmlSource, /id="desktopScheduleView"/);
   assert.doesNotMatch(htmlSource, /id="grid"/);
   assert.doesNotMatch(htmlSource, /function buildGrid\(\)/);
@@ -1690,6 +1717,92 @@ test("desktop schedule summary counts open slots, roles, and registrations", () 
   assert.equal(availableCount.textContent, 3);
   assert.equal(openRoleCount.textContent, 3);
   assert.equal(signupCount.textContent, 2);
+});
+
+test("desktop insight cards render useful views and reuse existing actions", () => {
+  const stats = createElement("div");
+  const vacancyButton = createElement("button");
+  vacancyButton.setAttribute("data-desktop-insight", "vacancies");
+  const positionButton = createElement("button");
+  positionButton.setAttribute("data-desktop-insight", "positions");
+  const registrationButton = createElement("button");
+  registrationButton.setAttribute("data-desktop-insight", "registrations");
+  stats.appendChild(vacancyButton);
+  stats.appendChild(positionButton);
+  stats.appendChild(registrationButton);
+
+  const panel = createElement("div");
+  panel.hidden = true;
+  const title = createElement("h2");
+  const description = createElement("p");
+  const content = createElement("div");
+
+  const { exports: client, context } = loadClient({
+    elements: {
+      desktopScheduleStats: stats,
+      desktopInsightsPanel: panel,
+      desktopInsightsTitle: title,
+      desktopInsightsDescription: description,
+      desktopInsightsContent: content,
+    },
+  });
+
+  client.setDesktopInsightView("vacancies");
+  assert.equal(panel.hidden, false);
+  assert.equal(title.textContent, "空き枠の一覧");
+  assert.equal(content.className, "desktop-insights-content is-vacancies");
+  assert.equal(content.children.length, 2);
+  assert.ok(
+    content.children.find(function (item) {
+      return item.getAttribute("data-insight-eventid") === "1";
+    }),
+  );
+  assert.equal(vacancyButton.classList.has("is-active"), true);
+  assert.equal(vacancyButton.getAttribute("aria-expanded"), "true");
+
+  client.setDesktopInsightView("positions");
+  assert.equal(title.textContent, "募集中のポジション");
+  assert.equal(content.className, "desktop-insights-content is-positions");
+  assert.equal(content.children.length, 3);
+  assert.equal(content.children[0].getAttribute("data-insight-role"), "general");
+  assert.match(content.children[0].children[1].textContent, /1件の募集/);
+
+  client.setDesktopInsightView("registrations");
+  assert.equal(title.textContent, "現在の登録");
+  assert.equal(content.className, "desktop-insights-content is-registrations");
+  assert.equal(content.children.length, 1);
+  const names = content.children[0].children.find(function (child) {
+    return child.className === "desktop-insight-names";
+  });
+  assert.ok(names);
+  assert.match(names.textContent, /Alice/);
+  assert.match(names.textContent, /Bob/);
+
+  client.setDesktopInsightView("registrations");
+  assert.equal(panel.hidden, true);
+  assert.equal(registrationButton.getAttribute("aria-expanded"), "false");
+
+  client.setDesktopInsightView("positions");
+  panel.dispatchEvent({
+    type: "click",
+    target: content.children[0],
+    stopPropagation() {},
+  });
+  assert.equal(client.getMobileRoleFilter(), "general");
+  assert.equal(client.getMobileDisplayMode(), "signup");
+  assert.equal(panel.hidden, true);
+
+  client.setDesktopInsightView("vacancies");
+  const eventOneButton = content.children.find(function (item) {
+    return item.getAttribute("data-insight-eventid") === "1";
+  });
+  panel.dispatchEvent({
+    type: "click",
+    target: eventOneButton,
+    stopPropagation() {},
+  });
+  assert.equal(String(context.currentEventId), "1");
+  assert.equal(panel.hidden, true);
 });
 
 test("mobile role filter active pills keep their role colour families", () => {
