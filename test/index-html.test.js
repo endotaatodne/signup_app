@@ -1635,6 +1635,10 @@ test("desktop reuses the responsive filters and card schedule", () => {
   );
   assert.match(
     htmlSource,
+    /\.desktop-vacancy-scope-control\s*{[\s\S]*?display:\s*none;/,
+  );
+  assert.match(
+    htmlSource,
     /body\.desktop-layout \.desktop-schedule-stats\s*{[\s\S]*?display:\s*grid;/,
   );
   assert.match(
@@ -1660,6 +1664,10 @@ test("desktop reuses the responsive filters and card schedule", () => {
   assert.match(
     htmlSource,
     /body\.desktop-layout \.desktop-stat-filtered\.is-visible\s*{[\s\S]*?visibility:\s*visible;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout \.desktop-vacancy-scope-control\s*{[\s\S]*?display:\s*inline-flex;/,
   );
   assert.match(
     htmlSource,
@@ -1707,6 +1715,9 @@ test("desktop reuses the responsive filters and card schedule", () => {
   assert.match(htmlSource, /id="desktopFilteredOpenRoleCount"/);
   assert.match(htmlSource, /id="desktopFilteredSignupCount"/);
   assert.match(htmlSource, /id="desktopFilterSummary"/);
+  assert.match(htmlSource, /id="desktopVacancyScopeControl"/);
+  assert.match(htmlSource, /data-desktop-vacancy-scope="overall"/);
+  assert.match(htmlSource, /data-desktop-vacancy-scope="filtered"/);
   assert.match(htmlSource, /class="desktop-stat-scope">全体<\/span>/);
   assert.match(
     htmlSource,
@@ -1837,6 +1848,104 @@ test("desktop schedule summary keeps overall totals and adds filtered context", 
   client.setMobileActivityFilter("__all__");
   assert.equal(filteredAvailableCount.textContent, "");
   assert.equal(filterSummary.textContent, "");
+});
+
+test("desktop vacancy scope can reuse current filters and resets to overall", () => {
+  const panel = createElement("div");
+  panel.hidden = true;
+  const title = createElement("h2");
+  const description = createElement("p");
+  const content = createElement("div");
+  const scopeControl = createElement("div");
+  scopeControl.hidden = true;
+  const overallButton = createElement("button");
+  overallButton.setAttribute("data-desktop-vacancy-scope", "overall");
+  const filteredButton = createElement("button");
+  filteredButton.setAttribute("data-desktop-vacancy-scope", "filtered");
+  const overallCount = createElement("span");
+  const filteredCount = createElement("span");
+  overallButton.appendChild(overallCount);
+  filteredButton.appendChild(filteredCount);
+  scopeControl.appendChild(overallButton);
+  scopeControl.appendChild(filteredButton);
+  panel.appendChild(scopeControl);
+  panel.appendChild(content);
+
+  const { exports: client } = loadClient({
+    elements: {
+      desktopInsightsPanel: panel,
+      desktopInsightsTitle: title,
+      desktopInsightsDescription: description,
+      desktopInsightsContent: content,
+      desktopVacancyScopeControl: scopeControl,
+      desktopVacancyScopeOverall: overallButton,
+      desktopVacancyScopeFiltered: filteredButton,
+      desktopVacancyScopeOverallCount: overallCount,
+      desktopVacancyScopeFilteredCount: filteredCount,
+    },
+  });
+
+  client.setDesktopInsightView("vacancies");
+  assert.equal(panel.hidden, false);
+  assert.equal(scopeControl.hidden, false);
+  assert.equal(overallCount.textContent, "2件");
+  assert.equal(filteredCount.textContent, "0件");
+  assert.equal(filteredButton.hidden, true);
+  assert.equal(overallButton.classList.has("is-active"), true);
+  assert.equal(overallButton.getAttribute("aria-pressed"), "true");
+  assert.equal(content.children.length, 2);
+
+  client.setMobileKeywordSearchQuery("Library Desk");
+  assert.equal(filteredButton.hidden, false);
+  assert.equal(overallCount.textContent, "2件");
+  assert.equal(filteredCount.textContent, "1件");
+  assert.equal(content.children.length, 2);
+
+  panel.dispatchEvent({
+    type: "click",
+    target: filteredButton,
+    stopPropagation() {},
+  });
+  assert.equal(overallButton.classList.has("is-active"), false);
+  assert.equal(filteredButton.classList.has("is-active"), true);
+  assert.equal(filteredButton.getAttribute("aria-pressed"), "true");
+  assert.match(description.textContent, /現在の絞り込み/);
+  assert.equal(content.children.length, 1);
+  assert.equal(
+    content.children[0].getAttribute("data-insight-eventid"),
+    "2",
+  );
+
+  client.setMobileKeywordSearchQuery("no matching vacancy");
+  assert.equal(filteredCount.textContent, "0件");
+  assert.equal(content.children.length, 1);
+  assert.equal(content.children[0].className, "desktop-insight-empty");
+  assert.match(content.children[0].textContent, /現在の絞り込み/);
+
+  client.setMobileKeywordSearchQuery("");
+  assert.equal(filteredButton.hidden, true);
+  assert.equal(overallButton.classList.has("is-active"), true);
+  assert.equal(content.children.length, 2);
+
+  client.setMobileKeywordSearchQuery("Library Desk");
+  panel.dispatchEvent({
+    type: "click",
+    target: filteredButton,
+    stopPropagation() {},
+  });
+  assert.equal(content.children.length, 1);
+
+  client.setDesktopInsightView("vacancies");
+  assert.equal(panel.hidden, true);
+  client.setDesktopInsightView("vacancies");
+  assert.equal(panel.hidden, false);
+  assert.equal(filteredButton.hidden, false);
+  assert.equal(overallButton.classList.has("is-active"), true);
+  assert.equal(filteredButton.classList.has("is-active"), false);
+  assert.equal(content.children.length, 2);
+
+  client.setDesktopInsightView("positions");
+  assert.equal(scopeControl.hidden, true);
 });
 
 test("desktop insight cards render useful views and reuse existing actions", () => {

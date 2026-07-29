@@ -2045,6 +2045,10 @@
         display: none;
       }
 
+      .desktop-vacancy-scope-control {
+        display: none;
+      }
+
       body.desktop-layout {
         padding: 0 32px 56px;
         background: #f5f2ee;
@@ -2299,6 +2303,11 @@
         backdrop-filter: blur(8px);
       }
 
+      body.desktop-layout .desktop-insights-heading {
+        min-width: 0;
+        flex: 1 1 auto;
+      }
+
       body.desktop-layout .desktop-insights-title {
         color: #29231f;
         font-size: 20px;
@@ -2312,6 +2321,63 @@
         font-size: 13px;
         font-weight: 600;
         line-height: 1.4;
+      }
+
+      body.desktop-layout .desktop-vacancy-scope-control {
+        display: inline-flex;
+        max-width: 100%;
+        flex-wrap: wrap;
+        gap: 3px;
+        margin-top: 10px;
+        padding: 3px;
+        border: 1px solid #ddd4ca;
+        border-radius: 10px;
+        background: #eee9e2;
+      }
+
+      body.desktop-layout .desktop-vacancy-scope-control[hidden] {
+        display: none;
+      }
+
+      body.desktop-layout .desktop-vacancy-scope-button {
+        min-height: 32px;
+        padding: 6px 10px;
+        border: 1px solid transparent;
+        border-radius: 7px;
+        background: transparent;
+        color: #62594f;
+        cursor: pointer;
+        font: inherit;
+        font-size: 12px;
+        font-weight: 800;
+        line-height: 1.2;
+      }
+
+      body.desktop-layout .desktop-vacancy-scope-button:hover {
+        background: rgba(255, 255, 255, 0.62);
+      }
+
+      body.desktop-layout .desktop-vacancy-scope-button.is-active {
+        border-color: #cabdaf;
+        background: #ffffff;
+        color: #302923;
+        box-shadow: 0 2px 7px rgba(52, 43, 34, 0.1);
+      }
+
+      body.desktop-layout .desktop-vacancy-scope-button:focus-visible {
+        outline: 3px solid #8b6840;
+        outline-offset: 2px;
+      }
+
+      body.desktop-layout .desktop-vacancy-scope-button[hidden] {
+        display: none;
+      }
+
+      body.desktop-layout .desktop-vacancy-scope-count {
+        margin-left: 3px;
+        color: #776d63;
+        font-size: 11px;
+        white-space: nowrap;
       }
 
       body.desktop-layout .desktop-insights-close {
@@ -2908,12 +2974,47 @@
           hidden
         >
           <div class="desktop-insights-header">
-            <div>
+            <div class="desktop-insights-heading">
               <h2 class="desktop-insights-title" id="desktopInsightsTitle"></h2>
               <p
                 class="desktop-insights-description"
                 id="desktopInsightsDescription"
               ></p>
+              <div
+                id="desktopVacancyScopeControl"
+                class="desktop-vacancy-scope-control"
+                role="group"
+                aria-label="空き枠の表示範囲"
+                hidden
+              >
+                <button
+                  id="desktopVacancyScopeOverall"
+                  class="desktop-vacancy-scope-button is-active"
+                  type="button"
+                  data-desktop-vacancy-scope="overall"
+                  aria-pressed="true"
+                >
+                  <span>全体</span>
+                  <span
+                    id="desktopVacancyScopeOverallCount"
+                    class="desktop-vacancy-scope-count"
+                  ></span>
+                </button>
+                <button
+                  id="desktopVacancyScopeFiltered"
+                  class="desktop-vacancy-scope-button"
+                  type="button"
+                  data-desktop-vacancy-scope="filtered"
+                  aria-pressed="false"
+                  hidden
+                >
+                  <span>現在の絞り込み</span>
+                  <span
+                    id="desktopVacancyScopeFilteredCount"
+                    class="desktop-vacancy-scope-count"
+                  ></span>
+                </button>
+              </div>
             </div>
             <button
               class="desktop-insights-close"
@@ -3136,6 +3237,9 @@
       var mobileKeywordSearchQuery = "";
       var mobileTimeFilterDropdownOpen = false;
       var activeDesktopInsightView = null;
+      var DESKTOP_VACANCY_SCOPE_OVERALL = "overall";
+      var DESKTOP_VACANCY_SCOPE_FILTERED = "filtered";
+      var desktopVacancyScope = DESKTOP_VACANCY_SCOPE_OVERALL;
 
       var ROLE_KEYS = [
         {
@@ -4247,15 +4351,118 @@
         content.appendChild(empty);
       }
 
-      function renderDesktopVacancyInsights(content) {
-        var events = getDesktopInsightEvents(function (event) {
-          return hasAnyAvailable(event.slots || {});
+      function getDesktopVacancyEvents(events) {
+        return (events || [])
+          .filter(function (event) {
+            return getAvailableSlotCount(event) > 0;
+          })
+          .slice()
+          .sort(compareEventsByTime);
+      }
+
+      function normaliseDesktopVacancyScope(scope, filtersActive) {
+        return scope === DESKTOP_VACANCY_SCOPE_FILTERED && filtersActive
+          ? DESKTOP_VACANCY_SCOPE_FILTERED
+          : DESKTOP_VACANCY_SCOPE_OVERALL;
+      }
+
+      function updateDesktopVacancyScopeControl(
+        overallCount,
+        filteredCount,
+        filtersActive,
+      ) {
+        var control = document.getElementById(
+          "desktopVacancyScopeControl",
+        );
+        var overallButton = document.getElementById(
+          "desktopVacancyScopeOverall",
+        );
+        var filteredButton = document.getElementById(
+          "desktopVacancyScopeFiltered",
+        );
+        var overallCountNode = document.getElementById(
+          "desktopVacancyScopeOverallCount",
+        );
+        var filteredCountNode = document.getElementById(
+          "desktopVacancyScopeFilteredCount",
+        );
+
+        if (control) control.hidden = false;
+        if (overallCountNode) overallCountNode.textContent = overallCount + "件";
+        if (filteredCountNode) {
+          filteredCountNode.textContent = filteredCount + "件";
+        }
+        if (filteredButton) filteredButton.hidden = !filtersActive;
+
+        [
+          {
+            button: overallButton,
+            scope: DESKTOP_VACANCY_SCOPE_OVERALL,
+          },
+          {
+            button: filteredButton,
+            scope: DESKTOP_VACANCY_SCOPE_FILTERED,
+          },
+        ].forEach(function (item) {
+          if (!item.button) return;
+          var active = item.scope === desktopVacancyScope;
+          if (item.button.classList && item.button.classList.toggle) {
+            item.button.classList.toggle("is-active", active);
+          }
+          item.button.setAttribute("aria-pressed", active ? "true" : "false");
         });
+      }
+
+      function setDesktopVacancyScope(scope) {
+        desktopVacancyScope = normaliseDesktopVacancyScope(
+          scope,
+          hasActiveScheduleFilters(),
+        );
+        if (activeDesktopInsightView === "vacancies") {
+          renderDesktopInsightPanel("vacancies");
+        }
+      }
+
+      function renderDesktopVacancyInsights(content) {
+        var overallEvents = getDesktopVacancyEvents(
+          (gridData && gridData.events) || [],
+        );
+        var filtersActive = hasActiveScheduleFilters();
+        var filteredEvents = filtersActive
+          ? getDesktopVacancyEvents(getVisibleScheduleEvents())
+          : [];
+        desktopVacancyScope = normaliseDesktopVacancyScope(
+          desktopVacancyScope,
+          filtersActive,
+        );
+        updateDesktopVacancyScopeControl(
+          overallEvents.length,
+          filteredEvents.length,
+          filtersActive,
+        );
+
+        var filteredScope =
+          desktopVacancyScope === DESKTOP_VACANCY_SCOPE_FILTERED;
+        var events = filteredScope ? filteredEvents : overallEvents;
+        var description = document.getElementById(
+          "desktopInsightsDescription",
+        );
+        if (description) {
+          description.textContent = filteredScope
+            ? "現在の絞り込みに合う空き枠を時間順に表示しています。選択すると登録画面が開きます。"
+            : "全体の募集から、時間順に募集中の活動を表示しています。選択すると登録画面が開きます。";
+        }
+
         events.forEach(function (event) {
           content.appendChild(createDesktopInsightEventItem(event, "vacancies"));
         });
         if (events.length === 0) {
-          renderDesktopInsightEmpty(content, "現在、空いている募集枠はありません。");
+          renderDesktopInsightEmpty(
+            content,
+            filteredScope
+              ? "現在の絞り込みに合う空き枠はありません。"
+              : "現在、空いている募集枠はありません。",
+          );
         }
       }
 
@@ -4333,8 +4540,14 @@
           "desktopInsightsDescription",
         );
         var content = document.getElementById("desktopInsightsContent");
+        var vacancyScopeControl = document.getElementById(
+          "desktopVacancyScopeControl",
+        );
         if (!activeView || !panel || !title || !description || !content) return;
 
+        if (vacancyScopeControl) {
+          vacancyScopeControl.hidden = activeView !== "vacancies";
+        }
         clearElement(content);
         content.className =
           "desktop-insights-content is-" + activeView;
@@ -4389,6 +4602,9 @@
           return;
         }
 
+        if (nextView === "vacancies") {
+          desktopVacancyScope = DESKTOP_VACANCY_SCOPE_OVERALL;
+        }
         activeDesktopInsightView = nextView;
         panel.hidden = false;
         updateDesktopInsightButtons();
@@ -5503,6 +5719,20 @@
           if (closeButton) {
             if (e.stopPropagation) e.stopPropagation();
             closeDesktopInsightsPanel(true);
+            return;
+          }
+
+          var vacancyScopeButton =
+            e.target && e.target.closest
+              ? e.target.closest("[data-desktop-vacancy-scope]")
+              : null;
+          if (vacancyScopeButton) {
+            if (e.stopPropagation) e.stopPropagation();
+            setDesktopVacancyScope(
+              vacancyScopeButton.getAttribute(
+                "data-desktop-vacancy-scope",
+              ),
+            );
             return;
           }
 
