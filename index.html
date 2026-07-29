@@ -2041,6 +2041,10 @@
         display: none;
       }
 
+      .desktop-filter-summary {
+        display: none;
+      }
+
       body.desktop-layout {
         padding: 0 32px 56px;
         background: #f5f2ee;
@@ -2116,6 +2120,7 @@
 
       body.desktop-layout .desktop-stat {
         appearance: none;
+        position: relative;
         min-width: 0;
         padding: 10px 13px;
         border: 1px solid #e2dbd2;
@@ -2217,6 +2222,45 @@
         font-size: 11px;
         font-weight: 800;
         line-height: 1.2;
+      }
+
+      body.desktop-layout .desktop-stat-context {
+        display: flex;
+        min-height: 16px;
+        justify-content: flex-end;
+        gap: 6px;
+        align-items: center;
+        margin-top: 4px;
+      }
+
+      body.desktop-layout .desktop-stat-scope {
+        position: absolute;
+        top: 10px;
+        left: 12px;
+        display: inline-flex;
+        align-items: center;
+        min-height: 16px;
+        padding: 1px 5px;
+        border: 1px solid rgba(82, 72, 62, 0.16);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.55);
+        color: #766d63;
+        font-size: 9px;
+        font-weight: 900;
+        line-height: 1;
+      }
+
+      body.desktop-layout .desktop-stat-filtered {
+        visibility: hidden;
+        color: #625a52;
+        font-size: 10px;
+        font-weight: 800;
+        line-height: 1.2;
+        white-space: nowrap;
+      }
+
+      body.desktop-layout .desktop-stat-filtered.is-visible {
+        visibility: visible;
       }
 
       body.desktop-layout .desktop-insights-panel {
@@ -2536,6 +2580,28 @@
         box-shadow: 0 8px 24px rgba(52, 43, 34, 0.07);
       }
 
+      body.desktop-layout .desktop-filter-summary {
+        visibility: hidden;
+        display: inline-flex;
+        width: max-content;
+        max-width: 100%;
+        min-height: 24px;
+        align-items: center;
+        margin-bottom: 8px;
+        padding: 3px 8px;
+        border: 1px solid #ded6cd;
+        border-radius: 999px;
+        background: #f2eee8;
+        color: #675f56;
+        font-size: 11px;
+        font-weight: 800;
+        line-height: 1.25;
+      }
+
+      body.desktop-layout .desktop-filter-summary.is-visible {
+        visibility: visible;
+      }
+
       body.desktop-layout .mobile-filter-row-secondary {
         grid-template-columns: repeat(12, minmax(0, 1fr));
         gap: 14px 18px;
@@ -2776,7 +2842,7 @@
         <div
           id="desktopScheduleStats"
           class="desktop-schedule-stats"
-          aria-label="募集状況"
+          aria-label="募集状況（全体）"
           aria-live="polite"
         >
           <button
@@ -2786,8 +2852,16 @@
             aria-controls="desktopInsightsPanel"
             aria-expanded="false"
           >
+            <span class="desktop-stat-scope">全体</span>
             <strong class="desktop-stat-value" id="desktopAvailableCount">0</strong>
             <span class="desktop-stat-label">空き枠</span>
+            <span class="desktop-stat-context">
+              <span
+                class="desktop-stat-filtered"
+                id="desktopFilteredAvailableCount"
+                aria-hidden="true"
+              ></span>
+            </span>
           </button>
           <button
             class="desktop-stat"
@@ -2796,8 +2870,16 @@
             aria-controls="desktopInsightsPanel"
             aria-expanded="false"
           >
+            <span class="desktop-stat-scope">全体</span>
             <strong class="desktop-stat-value" id="desktopOpenRoleCount">0</strong>
             <span class="desktop-stat-label">募集中のポジション</span>
+            <span class="desktop-stat-context">
+              <span
+                class="desktop-stat-filtered"
+                id="desktopFilteredOpenRoleCount"
+                aria-hidden="true"
+              ></span>
+            </span>
           </button>
           <button
             class="desktop-stat"
@@ -2806,8 +2888,16 @@
             aria-controls="desktopInsightsPanel"
             aria-expanded="false"
           >
+            <span class="desktop-stat-scope">全体</span>
             <strong class="desktop-stat-value" id="desktopSignupCount">0</strong>
             <span class="desktop-stat-label">現在の登録</span>
+            <span class="desktop-stat-context">
+              <span
+                class="desktop-stat-filtered"
+                id="desktopFilteredSignupCount"
+                aria-hidden="true"
+              ></span>
+            </span>
           </button>
         </div>
         <div
@@ -2844,6 +2934,14 @@
           class="mobile-availability-control"
           aria-label="募集枠の絞り込み"
         >
+          <div
+            id="desktopFilterSummary"
+            class="desktop-filter-summary"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            aria-hidden="true"
+          ></div>
           <div class="mobile-filter-row mobile-filter-row-secondary">
             <div class="mobile-filter-field mobile-activity-filter-field">
               <span class="mobile-filter-label">募集枠</span>
@@ -3887,30 +3985,102 @@
         }
       }
 
-      function updateDesktopScheduleSummary() {
+      function getScheduleSummaryCounts(events) {
         var availableCount = 0;
         var openRoleCount = 0;
         var signupCount = 0;
 
-        ((gridData && gridData.events) || []).forEach(function (event) {
+        (events || []).forEach(function (event) {
           signupCount += (event.signups || []).length;
           ROLE_KEYS.forEach(function (roleMeta) {
-            var slot = (event.slots && event.slots[roleMeta.key]) || {};
-            var remaining = Math.max(
-              0,
-              Number(slot.max || 0) - Number(slot.filled || 0),
-            );
+            var remaining = getRemainingForRole(event, roleMeta.key);
             availableCount += remaining;
             if (remaining > 0) openRoleCount += 1;
           });
         });
 
+        return {
+          availableCount: availableCount,
+          openRoleCount: openRoleCount,
+          signupCount: signupCount,
+        };
+      }
+
+      function getVisibleScheduleEvents() {
+        if (getMobileDisplayMode() === "overview") {
+          var activity = getMobileActivityFilter();
+          return ((gridData && gridData.events) || []).filter(function (event) {
+            return eventMatchesActivityFilter(event, activity);
+          });
+        }
+        return getMobileFilteredEvents();
+      }
+
+      function hasActiveScheduleFilters() {
+        var activityActive =
+          getMobileActivityFilter() !== MOBILE_ACTIVITY_FILTER_ALL;
+        if (getMobileDisplayMode() === "overview") return activityActive;
+        return (
+          activityActive ||
+          getMobileRoleFilter() !== MOBILE_ROLE_FILTER_ALL ||
+          getMobileAvailableTimeFilters().length > 0 ||
+          getMobileKeywordSearchQuery() !== ""
+        );
+      }
+
+      function updateDesktopFilteredContext(node, text, visible) {
+        if (!node) return;
+        node.textContent = visible ? text : "";
+        if (node.classList && node.classList.toggle) {
+          node.classList.toggle("is-visible", visible);
+        }
+        node.setAttribute("aria-hidden", visible ? "false" : "true");
+      }
+
+      function updateDesktopScheduleSummary() {
+        var allEvents = (gridData && gridData.events) || [];
+        var overallCounts = getScheduleSummaryCounts(allEvents);
         var availableNode = document.getElementById("desktopAvailableCount");
         var openRoleNode = document.getElementById("desktopOpenRoleCount");
         var signupNode = document.getElementById("desktopSignupCount");
-        if (availableNode) availableNode.textContent = availableCount;
-        if (openRoleNode) openRoleNode.textContent = openRoleCount;
-        if (signupNode) signupNode.textContent = signupCount;
+        if (availableNode) {
+          availableNode.textContent = overallCounts.availableCount;
+        }
+        if (openRoleNode) {
+          openRoleNode.textContent = overallCounts.openRoleCount;
+        }
+        if (signupNode) signupNode.textContent = overallCounts.signupCount;
+
+        var filtersActive = hasActiveScheduleFilters();
+        var filteredEvents = filtersActive ? getVisibleScheduleEvents() : [];
+        var filteredCounts = filtersActive
+          ? getScheduleSummaryCounts(filteredEvents)
+          : {
+              availableCount: 0,
+              openRoleCount: 0,
+              signupCount: 0,
+            };
+
+        updateDesktopFilteredContext(
+          document.getElementById("desktopFilteredAvailableCount"),
+          "表示中 " + filteredCounts.availableCount + "枠",
+          filtersActive,
+        );
+        updateDesktopFilteredContext(
+          document.getElementById("desktopFilteredOpenRoleCount"),
+          "表示中 " + filteredCounts.openRoleCount + "件",
+          filtersActive,
+        );
+        updateDesktopFilteredContext(
+          document.getElementById("desktopFilteredSignupCount"),
+          "表示中 " + filteredCounts.signupCount + "名",
+          filtersActive,
+        );
+        updateDesktopFilteredContext(
+          document.getElementById("desktopFilterSummary"),
+          "絞り込み中：" + filteredEvents.length + "件表示",
+          filtersActive,
+        );
 
         var panel = document.getElementById("desktopInsightsPanel");
         if (
@@ -4172,17 +4342,17 @@
         if (activeView === "vacancies") {
           title.textContent = "空き枠の一覧";
           description.textContent =
-            "時間順に募集中の活動を表示しています。選択すると登録画面が開きます。";
+            "全体の募集から、時間順に募集中の活動を表示しています。選択すると登録画面が開きます。";
           renderDesktopVacancyInsights(content);
         } else if (activeView === "positions") {
           title.textContent = "募集中のポジション";
           description.textContent =
-            "ポジションを選ぶと、下の募集カードをその条件で絞り込みます。";
+            "全体のポジションです。選ぶと、下の募集カードをその条件で絞り込みます。";
           renderDesktopPositionInsights(content);
         } else {
           title.textContent = "現在の登録";
           description.textContent =
-            "登録を時間順に表示しています。選択すると登録・キャンセル画面が開きます。";
+            "全体の登録を時間順に表示しています。選択すると登録・キャンセル画面が開きます。";
           renderDesktopRegistrationInsights(content);
         }
       }
@@ -4553,7 +4723,6 @@
       }
 
       function buildMobileAgenda() {
-        updateDesktopScheduleSummary();
         var filters = document.getElementById("mobileAvailabilityControl");
         var activeMode = getMobileDisplayMode();
         if (activeMode !== "signup") {
@@ -4565,6 +4734,7 @@
           filters.classList.toggle("is-overview-mode", activeMode === "overview");
         }
         updateMobileAvailabilityControl();
+        updateDesktopScheduleSummary();
         if (activeMode === "signup") {
           buildMobileAgendaByTime();
         } else {

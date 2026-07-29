@@ -1631,6 +1631,10 @@ test("desktop reuses the responsive filters and card schedule", () => {
   );
   assert.match(
     htmlSource,
+    /\.desktop-filter-summary\s*{[\s\S]*?display:\s*none;/,
+  );
+  assert.match(
+    htmlSource,
     /body\.desktop-layout \.desktop-schedule-stats\s*{[\s\S]*?display:\s*grid;/,
   );
   assert.match(
@@ -1648,6 +1652,14 @@ test("desktop reuses the responsive filters and card schedule", () => {
   assert.match(
     htmlSource,
     /body\.desktop-layout \.desktop-insights-panel\s*{[\s\S]*?position:\s*absolute;[\s\S]*?max-height:/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout \.desktop-filter-summary\s*{[\s\S]*?visibility:\s*hidden;[\s\S]*?display:\s*inline-flex;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout \.desktop-stat-filtered\.is-visible\s*{[\s\S]*?visibility:\s*visible;/,
   );
   assert.match(
     htmlSource,
@@ -1691,6 +1703,19 @@ test("desktop reuses the responsive filters and card schedule", () => {
   assert.match(htmlSource, /id="desktopAvailableCount"/);
   assert.match(htmlSource, /id="desktopOpenRoleCount"/);
   assert.match(htmlSource, /id="desktopSignupCount"/);
+  assert.match(htmlSource, /id="desktopFilteredAvailableCount"/);
+  assert.match(htmlSource, /id="desktopFilteredOpenRoleCount"/);
+  assert.match(htmlSource, /id="desktopFilteredSignupCount"/);
+  assert.match(htmlSource, /id="desktopFilterSummary"/);
+  assert.match(htmlSource, /class="desktop-stat-scope">全体<\/span>/);
+  assert.match(
+    htmlSource,
+    /class="desktop-stat-scope">全体<\/span>\s*<strong class="desktop-stat-value" id="desktopAvailableCount"/,
+  );
+  assert.doesNotMatch(
+    htmlSource,
+    /class="desktop-stat-context">\s*<span class="desktop-stat-scope">/,
+  );
   assert.match(htmlSource, /data-desktop-insight="vacancies"/);
   assert.match(htmlSource, /data-desktop-insight="positions"/);
   assert.match(htmlSource, /data-desktop-insight="registrations"/);
@@ -1717,6 +1742,101 @@ test("desktop schedule summary counts open slots, roles, and registrations", () 
   assert.equal(availableCount.textContent, 3);
   assert.equal(openRoleCount.textContent, 3);
   assert.equal(signupCount.textContent, 2);
+});
+
+test("desktop schedule summary keeps overall totals and adds filtered context", () => {
+  const availableCount = createElement("strong");
+  const openRoleCount = createElement("strong");
+  const signupCount = createElement("strong");
+  const filteredAvailableCount = createElement("span");
+  const filteredOpenRoleCount = createElement("span");
+  const filteredSignupCount = createElement("span");
+  const filterSummary = createElement("div");
+  const { exports: client } = loadClient({
+    elements: {
+      desktopAvailableCount: availableCount,
+      desktopOpenRoleCount: openRoleCount,
+      desktopSignupCount: signupCount,
+      desktopFilteredAvailableCount: filteredAvailableCount,
+      desktopFilteredOpenRoleCount: filteredOpenRoleCount,
+      desktopFilteredSignupCount: filteredSignupCount,
+      desktopFilterSummary: filterSummary,
+    },
+  });
+
+  client.updateDesktopScheduleSummary();
+  assert.equal(availableCount.textContent, 3);
+  assert.equal(openRoleCount.textContent, 3);
+  assert.equal(signupCount.textContent, 2);
+  assert.equal(filteredAvailableCount.textContent, "");
+  assert.equal(filteredAvailableCount.classList.has("is-visible"), false);
+  assert.equal(filterSummary.textContent, "");
+  assert.equal(filterSummary.getAttribute("aria-hidden"), "true");
+
+  client.setMobileKeywordSearchQuery("   ");
+  assert.equal(filteredAvailableCount.textContent, "");
+  assert.equal(filterSummary.textContent, "");
+
+  client.setMobileKeywordSearchQuery("Alice");
+  assert.equal(availableCount.textContent, 3);
+  assert.equal(openRoleCount.textContent, 3);
+  assert.equal(signupCount.textContent, 2);
+  assert.equal(filteredAvailableCount.textContent, "表示中 2枠");
+  assert.equal(filteredOpenRoleCount.textContent, "表示中 2件");
+  assert.equal(filteredSignupCount.textContent, "表示中 2名");
+  assert.equal(filteredAvailableCount.classList.has("is-visible"), true);
+  assert.equal(filterSummary.textContent, "絞り込み中：1件表示");
+  assert.equal(filterSummary.classList.has("is-visible"), true);
+  assert.equal(filterSummary.getAttribute("aria-hidden"), "false");
+
+  client.setMobileRoleFilter("general");
+  assert.equal(availableCount.textContent, 3);
+  assert.equal(openRoleCount.textContent, 3);
+  assert.equal(signupCount.textContent, 2);
+  assert.equal(filteredAvailableCount.textContent, "表示中 2枠");
+  assert.equal(filteredOpenRoleCount.textContent, "表示中 2件");
+  assert.equal(filteredSignupCount.textContent, "表示中 2名");
+  assert.equal(filterSummary.textContent, "絞り込み中：1件表示");
+
+  client.setMobileDisplayMode("overview");
+  assert.equal(filteredAvailableCount.textContent, "");
+  assert.equal(filteredOpenRoleCount.textContent, "");
+  assert.equal(filteredSignupCount.textContent, "");
+  assert.equal(filterSummary.textContent, "");
+
+  client.setMobileDisplayMode("signup");
+  assert.equal(filteredAvailableCount.textContent, "表示中 2枠");
+  assert.equal(filteredOpenRoleCount.textContent, "表示中 2件");
+  assert.equal(filteredSignupCount.textContent, "表示中 2名");
+  assert.equal(filterSummary.textContent, "絞り込み中：1件表示");
+
+  client.setMobileKeywordSearchQuery("no matching activity");
+  assert.equal(filteredAvailableCount.textContent, "表示中 0枠");
+  assert.equal(filteredOpenRoleCount.textContent, "表示中 0件");
+  assert.equal(filteredSignupCount.textContent, "表示中 0名");
+  assert.equal(filterSummary.textContent, "絞り込み中：0件表示");
+
+  client.setMobileKeywordSearchQuery("");
+  assert.equal(filteredAvailableCount.textContent, "");
+  assert.equal(filteredOpenRoleCount.textContent, "");
+  assert.equal(filteredSignupCount.textContent, "");
+  assert.equal(filterSummary.textContent, "");
+  assert.equal(filterSummary.classList.has("is-visible"), false);
+  assert.equal(filterSummary.getAttribute("aria-hidden"), "true");
+
+  client.setMobileActivityFilter("Hall Monitor");
+  assert.equal(filteredAvailableCount.textContent, "表示中 2枠");
+  assert.equal(filteredOpenRoleCount.textContent, "表示中 2件");
+  assert.equal(filteredSignupCount.textContent, "表示中 2名");
+  assert.equal(filterSummary.textContent, "絞り込み中：1件表示");
+
+  client.setMobileDisplayMode("overview");
+  assert.equal(filteredAvailableCount.textContent, "表示中 2枠");
+  assert.equal(filterSummary.textContent, "絞り込み中：1件表示");
+
+  client.setMobileActivityFilter("__all__");
+  assert.equal(filteredAvailableCount.textContent, "");
+  assert.equal(filterSummary.textContent, "");
 });
 
 test("desktop insight cards render useful views and reuse existing actions", () => {
@@ -1761,6 +1881,7 @@ test("desktop insight cards render useful views and reuse existing actions", () 
   client.setDesktopInsightView("vacancies");
   assert.equal(panel.hidden, false);
   assert.equal(title.textContent, "空き枠の一覧");
+  assert.match(description.textContent, /全体/);
   assert.equal(content.className, "desktop-insights-content is-vacancies");
   assert.equal(content.children.length, 2);
   const vacancyEventOne = content.children.find(function (item) {
@@ -1782,6 +1903,7 @@ test("desktop insight cards render useful views and reuse existing actions", () 
 
   client.setDesktopInsightView("positions");
   assert.equal(title.textContent, "募集中のポジション");
+  assert.match(description.textContent, /全体/);
   assert.equal(content.className, "desktop-insights-content is-positions");
   assert.equal(content.children.length, 3);
   assert.equal(content.children[0].getAttribute("data-insight-role"), "general");
@@ -1801,6 +1923,7 @@ test("desktop insight cards render useful views and reuse existing actions", () 
 
   client.setDesktopInsightView("registrations");
   assert.equal(title.textContent, "現在の登録");
+  assert.match(description.textContent, /全体/);
   assert.equal(content.className, "desktop-insights-content is-registrations");
   assert.equal(content.children.length, 1);
   const names = content.children[0].children.find(function (child) {
