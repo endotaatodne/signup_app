@@ -14,9 +14,13 @@
   - Replaces cancellation lookup fields with a selectable list of the slot's existing registrations.
   - Improves cancellation selection, scrolling, disabled states, and confirmation so the selected name, class, and role are clearly shown before removal.
   - Removes spaces from Japanese names consistently in the client and backend before signup storage and cancellation matching, preserves normal spacing in non-Japanese names, and removes the now-unnecessary manual-spacing helper text.
+  - Uses the normalised participant name without class for same-slot, overlapping-time, and restricted-activity duplicate checks, while retaining class for signup records and cancellation matching.
+  - Adds an optional ActivityLimits tab for server-enforced per-person signup limits on selected activities while leaving unlisted activities unrestricted.
+  - Prioritises the activity-specific limit message when a signup is blocked by both an activity limit and an overlapping-time rule.
+  - Validates ActivityLimits headers, activity references, duplicate rows, and positive whole-number limits; configuration errors block only new signups and remain hidden from participants.
   - Closes the available-time menu when clicking outside it and prevents unintended page positioning when opening desktop registration details.
   - Updates the Steering Committee role wording to 役員、運営・実行委員.
-  - Expands backend and frontend tests for responsive layouts, filters, desktop summaries and detail views, cancellation selection, and name normalization.
+  - Expands backend and frontend tests for responsive layouts, filters, desktop summaries and detail views, cancellation selection, name normalization, and activity limits.
   - Bumps the app version to 0.2.4.
 
 ## v0.2.3 - 2026-06-24

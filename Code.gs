@@ -19,9 +19,11 @@ const SHEET_NAMES = {
   config: "Config",
   events: "Events",
   signups: "Signups",
+  activityLimits: "ActivityLimits",
 };
 
 const CONFIG_HEADER_ALIASES = [["alias", "eventalias"], ["sheetid"]];
+const ACTIVITY_LIMIT_HEADER_ALIASES = [["activity"], ["maxperperson"]];
 const EVENT_HEADER_ALIASES = [
   ["eventid"],
   ["activity"],
@@ -285,35 +287,49 @@ function eventRangesOverlap_(a, b) {
 function findConcurrentSignup_(
   eventRows,
   signupRows,
-  signupDisplayRows,
   eventId,
   name,
-  cls,
   eventRow,
 ) {
   const targetRange = getEventRange_(eventRow);
   const normalisedName = normaliseComparable_(name);
-  const normalisedClass = normaliseClassComparable_(cls);
   const eventById = {};
 
   eventRows.slice(1).forEach(function (row) {
     eventById[String(row[0])] = row;
   });
 
-  return signupRows.slice(1).find(function (row, index) {
+  return signupRows.slice(1).find(function (row) {
     if (row[1] == eventId) return false;
     if (normaliseComparable_(row[2]) !== normalisedName) return false;
-
-    const displayRow = signupDisplayRows[index + 1] || [];
-    const rowClass =
-      displayRow && displayRow[3] !== undefined ? displayRow[3] : row[3];
-    if (normaliseClassComparable_(rowClass) !== normalisedClass) return false;
 
     const conflictingEvent = eventById[String(row[1])];
     if (!conflictingEvent) return false;
 
     return eventRangesOverlap_(targetRange, getEventRange_(conflictingEvent));
   });
+}
+
+function countPersonSignupsForActivity_(
+  eventRows,
+  signupRows,
+  activity,
+  name,
+) {
+  const targetActivity = normaliseActivityKey_(activity);
+  const normalisedName = normaliseComparable_(name);
+  const activityByEventId = Object.create(null);
+
+  eventRows.slice(1).forEach(function (row) {
+    activityByEventId[String(row[0])] = normaliseActivityKey_(row[1]);
+  });
+
+  return signupRows.slice(1).reduce(function (count, row) {
+    if (activityByEventId[String(row[1])] !== targetActivity) return count;
+    if (normaliseComparable_(row[2]) !== normalisedName) return count;
+
+    return count + 1;
+  }, 0);
 }
 
 /**
@@ -420,7 +436,6 @@ function submitSignup(eventId, name, cls, role, alias) {
     }
 
     const signupRows = data.signupRows;
-    const signupDisplayRows = data.signupDisplayRows;
     // Use loose equality intentionally because stored EventID cells may be
     // typed differently by Sheets while still representing the same ID.
     const existing = signupRows.slice(1).filter((r) => r[1] == eventId);
@@ -449,13 +464,49 @@ function submitSignup(eventId, name, cls, role, alias) {
       };
     }
 
+    let activityLimits;
+    try {
+      activityLimits = getOptionalActivityLimits_(spreadsheet, eventRows);
+    } catch (configurationError) {
+      console.error(
+        "ActivityLimits configuration error: " + configurationError.message,
+      );
+      return {
+        success: false,
+        code: "configuration_error",
+        message:
+          "現在、登録を受け付けることができません。主催者にお問い合わせください。",
+      };
+    }
+
+    const activityKey = normaliseActivityKey_(eventRow[1]);
+    const activityLimit = activityLimits[activityKey];
+    if (
+      activityLimit !== undefined &&
+      countPersonSignupsForActivity_(
+        eventRows,
+        signupRows,
+        eventRow[1],
+        name,
+      ) >= activityLimit
+    ) {
+      return {
+        success: false,
+        code: "activity_limit",
+        message:
+          "申し訳ございません。「" +
+          normaliseWhitespace_(eventRow[1]) +
+          "」は現在、お一人につき" +
+          activityLimit +
+          "枠までのお申し込みとさせていただいております。",
+      };
+    }
+
     const concurrentSignup = findConcurrentSignup_(
       eventRows,
       signupRows,
-      signupDisplayRows,
       eventId,
       name,
-      cls,
       eventRow,
     );
     if (concurrentSignup) {
@@ -829,6 +880,80 @@ function getSheetData_(
   }
 
   return result;
+}
+
+function normaliseActivityKey_(value) {
+  return normaliseWhitespace_(value);
+}
+
+function getOptionalActivityLimits_(spreadsheet, eventRows) {
+  const sheet = spreadsheet.getSheetByName(SHEET_NAMES.activityLimits);
+  if (!sheet) return Object.create(null);
+
+  const values = sheet.getDataRange().getValues();
+  if (!values.length) {
+    throw new Error('The "ActivityLimits" sheet is empty.');
+  }
+
+  validateSheetHeaders_(
+    values[0],
+    ACTIVITY_LIMIT_HEADER_ALIASES,
+    SHEET_NAMES.activityLimits,
+  );
+
+  const eventActivities = Object.create(null);
+  eventRows.slice(1).forEach(function (row) {
+    eventActivities[normaliseActivityKey_(row[1])] = true;
+  });
+
+  const limits = Object.create(null);
+  values.slice(1).forEach(function (row, index) {
+    const rowNumber = index + 2;
+    const activity = normaliseActivityKey_(row && row[0]);
+    const rawLimit = row && row[1];
+    const limitText = String(rawLimit == null ? "" : rawLimit).trim();
+
+    if (!activity && !limitText) return;
+    if (!activity) {
+      throw new Error(
+        'Activity is required in "ActivityLimits" sheet row ' +
+          rowNumber +
+          ".",
+      );
+    }
+    if (!limitText) {
+      throw new Error(
+        'MaxPerPerson is required in "ActivityLimits" sheet row ' +
+          rowNumber +
+          ".",
+      );
+    }
+
+    const hasSupportedLimitType =
+      typeof rawLimit === "number" || typeof rawLimit === "string";
+    const limit = Number(rawLimit);
+    if (!hasSupportedLimitType || !Number.isInteger(limit) || limit <= 0) {
+      throw new Error(
+        'Invalid MaxPerPerson in "ActivityLimits" sheet row ' +
+          rowNumber +
+          ".",
+      );
+    }
+    if (!eventActivities[activity]) {
+      throw new Error(
+        'Unknown Activity in "ActivityLimits" sheet row ' + rowNumber + ".",
+      );
+    }
+    if (limits[activity] !== undefined) {
+      throw new Error(
+        'Duplicate Activity in "ActivityLimits" sheet row ' + rowNumber + ".",
+      );
+    }
+
+    limits[activity] = limit;
+  });
+
+  return limits;
 }
 
 function getValidatedEventSpreadsheetData_(spreadsheet) {

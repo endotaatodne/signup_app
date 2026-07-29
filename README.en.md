@@ -17,6 +17,7 @@ A free, open-source volunteer signup app built on Google Apps Script and Google 
 - Time ranges displayed per slot/card (e.g. 9:00 am - 10:00 am)
 - Four volunteer roles per slot — General, Class Rep, Steering Committee, Org Committee (fully configurable)
 - Role-based slot limits — each role has its own quota
+- Optional per-person signup limits for selected activities, configured in Google Sheets
 - Roles with zero quota are hidden automatically
 - Colour-coded roles — green (General), amber (Class Rep), blue (Steering Committee), purple (Org Committee)
 - Names displayed by role in each schedule card
@@ -26,7 +27,7 @@ A free, open-source volunteer signup app built on Google Apps Script and Google 
 - Names grouped by role in the signup modal
 - Notes shown in the modal when clicking a slot
 - Slot limits enforced server-side with race condition protection
-- Duplicate name prevention per slot
+- Name-based duplicate prevention within a slot, across overlapping slots, and within restricted activities
 - Subtitle and location shown for each activity/card (e.g. responsible person and room)
 - Notes/description shown per schedule card
 - Hint text shown on slots with existing signups
@@ -44,7 +45,7 @@ A free, open-source volunteer signup app built on Google Apps Script and Google 
 ```
 Master Admin Sheet (Config tab)
       ↓ lookup alias
-Event Google Sheet (Events + Signups tabs)
+Event Google Sheet (Events + Signups tabs, optional ActivityLimits tab)
       ↓
 Google Apps Script (backend + web server)
       ↓
@@ -92,7 +93,7 @@ https://docs.google.com/spreadsheets/d/YOUR_MASTER_SHEET_ID/edit
 
 1. Create a new spreadsheet for your first event (or duplicate an existing one)
 2. Name it whatever you like — this name appears as the page title in the app
-3. Create two tabs:
+3. Create the two required tabs below. Add the optional tab only if the event needs per-activity signup limits:
 
 **Events tab** — add these headers in row 1:
 
@@ -105,6 +106,14 @@ https://docs.google.com/spreadsheets/d/YOUR_MASTER_SHEET_ID/edit
 | A        | B       | C    | D     | E    | F         |
 | -------- | ------- | ---- | ----- | ---- | --------- |
 | SignupID | EventID | Name | Class | Role | Timestamp |
+
+**ActivityLimits tab (optional)** — add these headers in row 1:
+
+| A        | B            |
+| -------- | ------------ |
+| Activity | MaxPerPerson |
+
+Add one row for each activity that should have a per-person limit. For example, `競技ボランティア` with a `MaxPerPerson` value of `1` allows each participant to register for only one slot with that activity. Activities that are not listed remain unrestricted. If this tab does not exist, or contains only the header row, the app keeps its existing behaviour with no per-activity limits.
 
 4. Add your events data under the Events headers. Use `0` for roles not needed in a slot.
 5. Note the Sheet ID from the URL.
@@ -232,6 +241,8 @@ Visiting the URL without a parameter shows a friendly "No event specified" messa
 
 When a name containing Japanese characters is submitted, spaces (including full-width spaces) are removed consistently by both the browser and backend. For example, `山田 太郎` is stored as `山田太郎`. Names without Japanese characters keep a single normalised space between words.
 
+For duplicate, overlapping-time, and activity-limit checks, the participant is identified by their normalised name only. Class remains free-text information that is stored and displayed with the signup, and it is used when cancelling the selected registration, but changing the class does not create a separate identity for these checks.
+
 ---
 
 ## Managing Events
@@ -239,16 +250,33 @@ When a name containing Japanese characters is submitted, spaces (including full-
 ### Adding a New Event
 
 1. Duplicate an existing event Sheet in Google Drive
-2. Clear the data rows (keep the headers)
+2. Clear the data rows from the **Events** and **Signups** tabs (keep the headers)
 3. Update the Sheet name — this becomes the page title
-4. Note the new Sheet ID
-5. Open the **Master Admin Sheet** → **Config tab**
-6. Add a new row with the alias and Sheet ID
-7. Share the new URL with users — no redeployment needed
+4. Review, replace, or remove any copied **ActivityLimits** rules so they match the new event
+5. Note the new Sheet ID
+6. Open the **Master Admin Sheet** → **Config tab**
+7. Add a new row with the alias and Sheet ID
+8. Share the new URL with users — no redeployment needed
 
 ### Editing Events
 
-Edit rows directly in the **Events tab** of the relevant Sheet. Changes appear on the next page load.
+Edit rows directly in the **Events tab** of the relevant Sheet. Changes appear on the next page load. If an activity is renamed or removed, update the matching **ActivityLimits** row at the same time.
+
+### Limiting Signups Per Activity
+
+The optional **ActivityLimits** tab is read and validated on the server during each new signup. Its rules are not sent to the browser.
+
+- Use the exact headers `Activity` and `MaxPerPerson` in columns A and B.
+- Enter each restricted activity once. Duplicate activities are not allowed.
+- Use the same activity value as the **Activity** column in the **Events** tab. A Google Sheets dropdown sourced from the Events activity column is recommended.
+- Set `MaxPerPerson` to a positive whole number such as `1` or `2`. Leave unrestricted activities out of this tab.
+- A participant is matched by their normalised name. The limit counts all signups under that name across every slot with the same activity, including different dates, times, classes, and roles.
+- Cancelling a signup immediately releases one place under the activity limit.
+- Lowering a limit does not remove existing signups. A participant who already meets or exceeds the new limit cannot add another signup for that activity.
+
+When a participant reaches a limit, the app explains that the named activity is limited to the configured number of slots per person. If the attempted signup also overlaps another signup, this more specific activity-limit message is shown first. Existing same-slot duplicate and overlapping-time checks continue to apply independently when the activity limit has not been reached.
+
+If the tab has invalid headers, an unknown activity, a duplicate activity, or an invalid limit, new signups are stopped with a generic message asking the participant to contact the organiser. Schedule viewing and cancellation continue to work, and the detailed configuration error is recorded in the Apps Script execution log for the administrator.
 
 ### Removing Events
 
@@ -297,6 +325,17 @@ Users can cancel their own signup from the app:
 | J      | ClassRepSlots  | Max Class Rep spots (0 = not needed)                               |
 | K      | SteeringCommitteeSlots | Max Steering Committee spots (0 = not needed)              |
 | L      | OrgCommitteeSlots | Max Org Committee spots (0 = not needed)                        |
+
+---
+
+## ActivityLimits Tab Column Reference
+
+| Column | Field        | Description                                                                  |
+| ------ | ------------ | ---------------------------------------------------------------------------- |
+| A      | Activity     | Activity value from the Events tab; each restricted activity may appear once |
+| B      | MaxPerPerson | Positive whole-number limit for one normalised participant name across that activity |
+
+The tab is optional. Keep only the header row, or remove the tab, when no activities need this restriction.
 
 ---
 
@@ -391,6 +430,7 @@ npm run deploy
 
 - All Google Sheets should be set to **Restricted** sharing — only you can edit
 - The web app runs as you (the deployer) — anonymous users cannot access your Sheets directly
+- Activity limit rules are validated and enforced server-side and are not sent to the browser
 - `MASTER_SHEET_ID` is stored in Script Properties
 - `.clasp.json` is local-only CLASP configuration containing the Apps Script project script ID; it is included in `.gitignore` and should not be version controlled or shared
 - Only Sheet IDs registered in the Config tab can be loaded — arbitrary Sheet IDs are rejected

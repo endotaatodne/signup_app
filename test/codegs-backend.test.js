@@ -20,13 +20,14 @@ function appRoleGeneral() {
 
 function createAdditionalEventRow({
   id = 2,
+  activity = "Canteen",
   date = "2026-04-20T00:00:00Z",
   start = "1970-01-01T10:30:00Z",
   end = "1970-01-01T11:30:00Z",
 } = {}) {
   return [
     id,
-    "Canteen",
+    activity,
     "Morning",
     new Date(date),
     new Date(start),
@@ -87,6 +88,7 @@ function loadBackend(options = {}) {
     eventRows = createEventRows(),
     signupRows = [["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"]],
     signupDisplayRows = signupRows,
+    activityLimitRows,
     eventSpreadsheetName = "Spring Fete",
     extraSpreadsheets = {},
     nowValue,
@@ -97,10 +99,14 @@ function loadBackend(options = {}) {
   const masterSpreadsheet = createSpreadsheet("Master", {
     Config: createSheet(configRows),
   });
-  const eventSpreadsheet = createSpreadsheet(eventSpreadsheetName, {
+  const eventSheets = {
     Events: createSheet(eventRows),
     Signups: createSheet(signupRows, signupDisplayRows),
-  });
+  };
+  if (activityLimitRows !== undefined) {
+    eventSheets.ActivityLimits = createSheet(activityLimitRows);
+  }
+  const eventSpreadsheet = createSpreadsheet(eventSpreadsheetName, eventSheets);
 
   const spreadsheets = {
     [MASTER_SHEET_ID]: masterSpreadsheet,
@@ -571,7 +577,7 @@ test("submitSignup rejects the same person in an overlapping time slot", () => {
   assert.equal(result.code, "time_conflict");
 });
 
-test("submitSignup allows the same name in another class at the same time", () => {
+test("submitSignup rejects the same name in another class at the same time", () => {
   const eventRows = createEventRows();
   eventRows.push(createAdditionalEventRow());
   const signupRows = [
@@ -582,7 +588,8 @@ test("submitSignup allows the same name in another class at the same time", () =
 
   const result = app.submitSignup("1", "Alice", "1-2", app.ROLES.general, "spring-fete");
 
-  assert.equal(result.success, true);
+  assert.equal(result.success, false);
+  assert.equal(result.code, "time_conflict");
 });
 
 test("submitSignup allows the same person in a back-to-back time slot", () => {
@@ -624,21 +631,6 @@ test("submitSignup allows the same person at the same time on a different date",
   assert.equal(result.success, true);
 });
 
-test("submitSignup applies class normalisation to time-conflict checks", () => {
-  const eventRows = createEventRows();
-  eventRows.push(createAdditionalEventRow());
-  const signupRows = [
-    ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
-    ["s1", 2, "Alice", "\uFF11\u2212\uFF11", appRoleGeneral(), new Date()],
-  ];
-  const { app } = loadBackend({ eventRows, signupRows });
-
-  const result = app.submitSignup("1", "Alice", "1-1", app.ROLES.general, "spring-fete");
-
-  assert.equal(result.success, false);
-  assert.equal(result.code, "time_conflict");
-});
-
 test("submitSignup rejects overlapping same-person signup across roles", () => {
   const eventRows = createEventRows();
   eventRows.push(createAdditionalEventRow());
@@ -658,6 +650,359 @@ test("submitSignup rejects overlapping same-person signup across roles", () => {
 
   assert.equal(result.success, false);
   assert.equal(result.code, "time_conflict");
+});
+
+test("submitSignup treats a header-only ActivityLimits sheet as unrestricted", () => {
+  const eventRows = createEventRows();
+  eventRows.push(
+    createAdditionalEventRow({
+      activity: "Hall Monitor",
+      start: "1970-01-01T11:00:00Z",
+      end: "1970-01-01T12:00:00Z",
+    }),
+  );
+  const signupRows = [
+    ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
+    ["s1", 2, "Bob", "1-1", appRoleGeneral(), new Date()],
+  ];
+  const { app } = loadBackend({
+    eventRows,
+    signupRows,
+    activityLimitRows: [["Activity", "MaxPerPerson"]],
+  });
+
+  const result = app.submitSignup(
+    "1",
+    "Alice",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+
+  assert.equal(result.success, true);
+});
+
+test("submitSignup enforces an activity limit across separate time slots", () => {
+  const eventRows = createEventRows();
+  eventRows.push(
+    createAdditionalEventRow({
+      activity: "Hall\u3000Monitor",
+      start: "1970-01-01T11:00:00Z",
+      end: "1970-01-01T12:00:00Z",
+    }),
+  );
+  const signupRows = [
+    ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
+    ["s1", 2, "Alice", "\uFF11\u2212\uFF11", appRoleGeneral(), new Date()],
+  ];
+  const { app, spreadsheets } = loadBackend({
+    eventRows,
+    signupRows,
+    activityLimitRows: [["Activity", "MaxPerPerson"], [" Hall Monitor ", 1]],
+  });
+  const signupsSheet = spreadsheets[EVENT_SHEET_ID].getSheetByName("Signups");
+
+  const result = app.submitSignup(
+    "1",
+    " alice ",
+    "1-1",
+    app.ROLES.classRep,
+    "spring-fete",
+  );
+
+  assert.equal(result.success, false);
+  assert.equal(result.code, "activity_limit");
+  assert.match(result.message, /1/);
+  assert.equal(signupsSheet.getDataRange().getValues().length, 2);
+});
+
+test("submitSignup prioritises a reached activity limit over a time conflict", () => {
+  const eventRows = createEventRows();
+  eventRows.push(
+    createAdditionalEventRow({
+      activity: "Hall Monitor",
+    }),
+  );
+  const signupRows = [
+    ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
+    ["s1", 2, "Alice", "1-1", appRoleGeneral(), new Date()],
+  ];
+  const { app } = loadBackend({
+    eventRows,
+    signupRows,
+    activityLimitRows: [["Activity", "MaxPerPerson"], ["Hall Monitor", 1]],
+  });
+
+  const result = app.submitSignup(
+    "1",
+    "Alice",
+    "1-2",
+    app.ROLES.general,
+    "spring-fete",
+  );
+
+  assert.equal(result.success, false);
+  assert.equal(result.code, "activity_limit");
+  assert.match(result.message, /Hall Monitor/);
+  assert.doesNotMatch(result.message, /同じ時間帯/);
+});
+
+test("submitSignup keeps the time-conflict message below an unreached activity limit", () => {
+  const eventRows = createEventRows();
+  eventRows.push(
+    createAdditionalEventRow({
+      activity: "Hall Monitor",
+    }),
+  );
+  const signupRows = [
+    ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
+    ["s1", 2, "Alice", "1-1", appRoleGeneral(), new Date()],
+  ];
+  const { app } = loadBackend({
+    eventRows,
+    signupRows,
+    activityLimitRows: [["Activity", "MaxPerPerson"], ["Hall Monitor", 2]],
+  });
+
+  const result = app.submitSignup(
+    "1",
+    "Alice",
+    "1-2",
+    app.ROLES.general,
+    "spring-fete",
+  );
+
+  assert.equal(result.success, false);
+  assert.equal(result.code, "time_conflict");
+  assert.match(result.message, /同じ時間帯/);
+});
+
+test("submitSignup honours numeric activity-limit boundaries", () => {
+  const eventRows = createEventRows();
+  eventRows.push(
+    createAdditionalEventRow({
+      activity: "Hall Monitor",
+      start: "1970-01-01T11:00:00Z",
+      end: "1970-01-01T12:00:00Z",
+    }),
+  );
+  eventRows.push(
+    createAdditionalEventRow({
+      id: 3,
+      activity: "Hall Monitor",
+      start: "1970-01-01T12:00:00Z",
+      end: "1970-01-01T13:00:00Z",
+    }),
+  );
+  const signupRows = [
+    ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
+    ["s1", 2, "Alice", "1-1", appRoleGeneral(), new Date()],
+  ];
+  const { app } = loadBackend({
+    eventRows,
+    signupRows,
+    activityLimitRows: [["Activity", "MaxPerPerson"], ["Hall Monitor", 2]],
+  });
+
+  const secondSignup = app.submitSignup(
+    "1",
+    "Alice",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+  const thirdSignup = app.submitSignup(
+    "3",
+    "Alice",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+
+  assert.equal(secondSignup.success, true);
+  assert.equal(thirdSignup.success, false);
+  assert.equal(thirdSignup.code, "activity_limit");
+});
+
+test("submitSignup activity limits match the same name across different classes", () => {
+  const eventRows = createEventRows();
+  eventRows.push(
+    createAdditionalEventRow({
+      activity: "Hall Monitor",
+      start: "1970-01-01T11:00:00Z",
+      end: "1970-01-01T12:00:00Z",
+    }),
+  );
+  const signupRows = [
+    ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
+    ["s1", 2, "Alice", "1-1", appRoleGeneral(), new Date()],
+  ];
+  const { app } = loadBackend({
+    eventRows,
+    signupRows,
+    activityLimitRows: [["Activity", "MaxPerPerson"], ["Hall Monitor", 1]],
+  });
+
+  const result = app.submitSignup(
+    "1",
+    "Alice",
+    "1-2",
+    app.ROLES.general,
+    "spring-fete",
+  );
+
+  assert.equal(result.success, false);
+  assert.equal(result.code, "activity_limit");
+});
+
+test("submitSignup leaves unlisted activities unrestricted", () => {
+  const eventRows = createEventRows();
+  eventRows.push(
+    createAdditionalEventRow({
+      activity: "Canteen",
+      start: "1970-01-01T11:00:00Z",
+      end: "1970-01-01T12:00:00Z",
+    }),
+  );
+  eventRows.push(
+    createAdditionalEventRow({
+      id: 3,
+      activity: "Canteen",
+      start: "1970-01-01T12:00:00Z",
+      end: "1970-01-01T13:00:00Z",
+    }),
+  );
+  const signupRows = [
+    ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
+    ["s1", 2, "Alice", "1-1", appRoleGeneral(), new Date()],
+  ];
+  const { app } = loadBackend({
+    eventRows,
+    signupRows,
+    activityLimitRows: [["Activity", "MaxPerPerson"], ["Hall Monitor", 1]],
+  });
+
+  const result = app.submitSignup(
+    "3",
+    "Alice",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+
+  assert.equal(result.success, true);
+});
+
+test("cancelling a signup restores its activity-limit allowance", () => {
+  const eventRows = createEventRows();
+  eventRows.push(
+    createAdditionalEventRow({
+      activity: "Hall Monitor",
+      start: "1970-01-01T11:00:00Z",
+      end: "1970-01-01T12:00:00Z",
+    }),
+  );
+  const signupRows = [
+    ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
+    ["s1", 2, "Alice", "1-1", appRoleGeneral(), new Date()],
+  ];
+  const { app } = loadBackend({
+    eventRows,
+    signupRows,
+    activityLimitRows: [["Activity", "MaxPerPerson"], ["Hall Monitor", 1]],
+  });
+
+  const cancelResult = app.cancelSignup(
+    "2",
+    "Alice",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+  const signupResult = app.submitSignup(
+    "1",
+    "Alice",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+
+  assert.equal(cancelResult.success, true);
+  assert.equal(signupResult.success, true);
+});
+
+[
+  {
+    name: "unknown activities",
+    rows: [["Activity", "MaxPerPerson"], ["Missing Activity", 1]],
+    logPattern: /Unknown Activity/,
+  },
+  {
+    name: "duplicate activities",
+    rows: [
+      ["Activity", "MaxPerPerson"],
+      ["Hall Monitor", 1],
+      [" Hall\u3000Monitor ", 1],
+    ],
+    logPattern: /Duplicate Activity/,
+  },
+  {
+    name: "invalid limits",
+    rows: [["Activity", "MaxPerPerson"], ["Hall Monitor", 1.5]],
+    logPattern: /Invalid MaxPerPerson/,
+  },
+  {
+    name: "invalid headers",
+    rows: [["WrongActivity", "MaxPerPerson"], ["Hall Monitor", 1]],
+    logPattern: /headers are invalid/,
+  },
+].forEach(({ name, rows, logPattern }) => {
+  test(`submitSignup rejects ActivityLimits with ${name} without exposing details`, () => {
+    const { app, logs, lock } = loadBackend({ activityLimitRows: rows });
+
+    const result = app.submitSignup(
+      "1",
+      "Alice",
+      "1-1",
+      app.ROLES.general,
+      "spring-fete",
+    );
+
+    assert.equal(result.success, false);
+    assert.equal(result.code, "configuration_error");
+    assert.doesNotMatch(result.message, /ActivityLimits|Missing Activity|MaxPerPerson/);
+    assert.ok(logs.some((entry) => logPattern.test(entry.message)));
+    assert.equal(lock.released, true);
+  });
+});
+
+test("malformed ActivityLimits do not affect page rendering or cancellation", () => {
+  const signupRows = [
+    ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
+    ["s1", 1, "Alice", "1-1", appRoleGeneral(), new Date()],
+  ];
+  const { app, spreadsheets } = loadBackend({
+    signupRows,
+    activityLimitRows: [
+      ["Activity", "MaxPerPerson"],
+      ["Hall Monitor", 1],
+      ["Hall Monitor", 2],
+    ],
+  });
+  const signupsSheet = spreadsheets[EVENT_SHEET_ID].getSheetByName("Signups");
+
+  const pageResult = app.doGet({ parameter: { event: "Spring-Fete" } });
+  const cancelResult = app.cancelSignup(
+    "1",
+    "Alice",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+
+  assert.equal(pageResult.kind, "template");
+  assert.equal(cancelResult.success, true);
+  assert.deepEqual(signupsSheet.__state.deletedRows, [2]);
 });
 
 test("submitSignup rejects a full role slot", () => {
