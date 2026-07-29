@@ -3148,6 +3148,30 @@
         return document.getElementById("mobileAgenda");
       }
 
+      function scrollDesktopAgendaIntoView() {
+        var agenda = getMobileAgenda();
+        if (!agenda || !agenda.scrollIntoView) return;
+
+        var controls = document.querySelector(".schedule-controls");
+        if (agenda.style && controls && controls.getBoundingClientRect) {
+          var controlsRect = controls.getBoundingClientRect();
+          var controlsBottom = controlsRect && controlsRect.bottom;
+          if (
+            typeof controlsBottom === "number" &&
+            isFinite(controlsBottom)
+          ) {
+            agenda.style.scrollMarginTop =
+              Math.ceil(Math.max(0, controlsBottom) + 16) + "px";
+          }
+        }
+
+        agenda.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+          inline: "nearest",
+        });
+      }
+
       function getMobileTimeFilterSelect() {
         return document.getElementById("mobileTimeAvailabilityFilter");
       }
@@ -5226,14 +5250,7 @@
             closeDesktopInsightsPanel(false);
             setMobileDisplayMode("signup");
             setMobileRoleFilter(roleKey);
-            var agenda = getMobileAgenda();
-            if (agenda && agenda.scrollIntoView) {
-              agenda.scrollIntoView({
-                behavior: "smooth",
-                block: "start",
-                inline: "nearest",
-              });
-            }
+            scrollDesktopAgendaIntoView();
             return;
           }
 

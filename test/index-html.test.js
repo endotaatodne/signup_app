@@ -1224,7 +1224,7 @@ test("cancellation list renders existing signups and confirms the selected detai
   assert.equal(confirmText.children.length, 2);
   assert.equal(
     confirmText.children[0].textContent,
-    "以下の登録を本当にキャンセルしますか？",
+    "本当に以下の登録をキャンセルしますか？",
   );
   assert.equal(confirmText.children[0].className, "confirm-question");
   assert.equal(confirmText.children[1].className, "confirm-signup-summary");
@@ -1736,14 +1736,25 @@ test("desktop insight cards render useful views and reuse existing actions", () 
   const title = createElement("h2");
   const description = createElement("p");
   const content = createElement("div");
+  const scheduleControls = createElement("div");
+  scheduleControls.getBoundingClientRect = function () {
+    return { bottom: 260 };
+  };
+  const agenda = createElement("div");
+  let agendaScrollOptions = null;
+  agenda.scrollIntoView = function (options) {
+    agendaScrollOptions = options;
+  };
 
   const { exports: client, context } = loadClient({
     elements: {
+      ".schedule-controls": scheduleControls,
       desktopScheduleStats: stats,
       desktopInsightsPanel: panel,
       desktopInsightsTitle: title,
       desktopInsightsDescription: description,
       desktopInsightsContent: content,
+      mobileAgenda: agenda,
     },
   });
 
@@ -1791,6 +1802,10 @@ test("desktop insight cards render useful views and reuse existing actions", () 
   assert.equal(client.getMobileRoleFilter(), "general");
   assert.equal(client.getMobileDisplayMode(), "signup");
   assert.equal(panel.hidden, true);
+  assert.equal(agenda.style.scrollMarginTop, "276px");
+  assert.equal(agendaScrollOptions.behavior, "smooth");
+  assert.equal(agendaScrollOptions.block, "start");
+  assert.equal(agendaScrollOptions.inline, "nearest");
 
   client.setDesktopInsightView("vacancies");
   const eventOneButton = content.children.find(function (item) {
