@@ -5,10 +5,31 @@ const assert = require("node:assert/strict");
 
 const { loadIndexHtml } = require("../test-support/load-index-html");
 
+function elementMatchesSelector(element, selector) {
+  if (!element || !selector) return false;
+  if (selector.startsWith("#")) {
+    const id = selector.slice(1);
+    return element.id === id || element.getAttribute?.("id") === id;
+  }
+
+  const attributeMatch = selector.match(/^\[([^\]=]+)(?:="([^"]*)")?\]$/);
+  if (attributeMatch) {
+    const value = element.getAttribute?.(attributeMatch[1]);
+    return attributeMatch[2] === undefined
+      ? value !== null
+      : value === attributeMatch[2];
+  }
+
+  return false;
+}
+
 function createElement(tagName) {
   const attributes = {};
+  const listeners = {};
   return {
     tagName,
+    id: "",
+    parentNode: null,
     className: "",
     textContent: "",
     innerHTML: "",
@@ -22,24 +43,52 @@ function createElement(tagName) {
     },
     setAttribute(name, value) {
       attributes[name] = String(value);
+      if (name === "id") this.id = String(value);
     },
     getAttribute(name) {
       return Object.prototype.hasOwnProperty.call(attributes, name)
         ? attributes[name]
         : null;
     },
-    addEventListener() {},
-    removeEventListener() {},
-    closest() {
+    addEventListener(type, handler) {
+      if (!listeners[type]) listeners[type] = [];
+      listeners[type].push(handler);
+    },
+    removeEventListener(type, handler) {
+      if (!listeners[type]) return;
+      listeners[type] = listeners[type].filter((item) => item !== handler);
+    },
+    dispatchEvent(event) {
+      const eventWithTarget = { target: this, ...event };
+      (listeners[eventWithTarget.type] || []).forEach((handler) =>
+        handler(eventWithTarget),
+      );
+    },
+    closest(selector) {
+      let current = this;
+      while (current) {
+        if (elementMatchesSelector(current, selector)) return current;
+        current = current.parentNode || null;
+      }
       return null;
     },
+    contains(node) {
+      let current = node;
+      while (current) {
+        if (current === this) return true;
+        current = current.parentNode || null;
+      }
+      return false;
+    },
     appendChild(child) {
+      child.parentNode = this;
       this.children.push(child);
       return child;
     },
     removeChild(child) {
       const index = this.children.indexOf(child);
       if (index >= 0) this.children.splice(index, 1);
+      if (child.parentNode === this) child.parentNode = null;
       return child;
     },
     focus() {},
@@ -70,6 +119,13 @@ function createClassList() {
 
 function createDocument(elements = {}) {
   const fallbackElements = {};
+  const listeners = {};
+  function withElementId(id, element) {
+    if (element?.setAttribute) element.setAttribute("id", id);
+    else if (element) element.id = id;
+    return element;
+  }
+
   return {
     elements,
     body: {
@@ -80,14 +136,26 @@ function createDocument(elements = {}) {
       clientWidth: 0,
     },
     getElementById(id) {
-      if (elements[id]) return elements[id];
+      if (elements[id]) return withElementId(id, elements[id]);
       if (!fallbackElements[id]) {
         fallbackElements[id] = createElement("div");
       }
-      return fallbackElements[id];
+      return withElementId(id, fallbackElements[id]);
+    },
+    addEventListener(type, handler) {
+      if (!listeners[type]) listeners[type] = [];
+      listeners[type].push(handler);
+    },
+    removeEventListener(type, handler) {
+      if (!listeners[type]) return;
+      listeners[type] = listeners[type].filter((item) => item !== handler);
+    },
+    dispatchEvent(event) {
+      (listeners[event.type] || []).forEach((handler) => handler(event));
     },
     querySelector(selector) {
       if (elements[selector]) return elements[selector];
+      if (selector.startsWith("#")) return this.getElementById(selector.slice(1));
       if (!fallbackElements[selector]) {
         fallbackElements[selector] = createElement("div");
       }
@@ -204,7 +272,6 @@ function loadClient(options = {}) {
       "ROLE_META_BY_LABEL",
       "gridData",
       "b64decode",
-      "getEventLookupKey",
       "buildGridIndexes",
       "getEventById",
       "getRoleMetaByLabel",
@@ -214,6 +281,26 @@ function loadClient(options = {}) {
       "getEffectiveWidth",
       "isCompactLayout",
       "hasAnyAvailable",
+      "getAvailableSlotCount",
+      "getMobileAvailableTimeOptions",
+      "getMobileAvailableTimeFilters",
+      "getMobileAvailableTimeFilter",
+      "setMobileAvailableTimeFilter",
+      "setMobileTimeFilterDropdownOpen",
+      "getMobileActivityFilter",
+      "setMobileActivityFilter",
+      "getMobileRoleFilter",
+      "setMobileRoleFilter",
+      "getMobileKeywordSearchQuery",
+      "setMobileKeywordSearchQuery",
+      "getMobileVolunteerNameQuery",
+      "setMobileVolunteerNameQuery",
+      "getMobileFilteredEvents",
+      "updateMobileAvailabilityControl",
+      "updateDesktopScheduleSummary",
+      "renderDesktopInsightPanel",
+      "setDesktopInsightView",
+      "closeDesktopInsightsPanel",
       "formatTime",
       "formatTimeRange",
       "normaliseWhitespace",
@@ -229,12 +316,16 @@ function loadClient(options = {}) {
       "showMessage",
       "showCancelMessage",
       "openModal",
+      "closeModal",
+      "switchTab",
+      "renderCancelSignupList",
+      "selectCancelSignup",
       "findAndConfirmCancel",
+      "confirmCancel",
       "submitSignup",
-      "buildGrid",
       "buildMobileAgenda",
-      "buildMobileAgendaByActivity",
       "buildMobileAgendaByTime",
+      "buildMobileDayOverview",
       "renderResponsiveView",
     ],
     {
@@ -268,17 +359,13 @@ test("server template data is injected only as quoted base64 values", () => {
   assert.match(htmlSource, /var PAGE_TITLE = b64decode\("<\?!= title \?>"\);/);
 });
 
-test("buildGridIndexes creates lookups and groups signups by role", () => {
-  const { exports: client, context } = loadClient();
+test("buildGridIndexes creates the event lookup and groups signups by role", () => {
+  const { exports: client } = loadClient();
 
   client.buildGridIndexes();
 
   const firstEvent = client.getEventById(1);
   assert.equal(firstEvent.activity, "Hall Monitor");
-  assert.equal(
-    context.gridIndexes.eventByActivityAndTime["Hall Monitor\u000009:30"].eventId,
-    1,
-  );
   assert.equal(firstEvent.signupsByRole["一般保護者"].length, 1);
   assert.equal(firstEvent.signupsByRole["学年委員"].length, 1);
 });
@@ -288,7 +375,7 @@ test("getRoleMetaByLabel returns metadata for known role labels", () => {
 
   assert.equal(client.getRoleMetaByLabel("一般保護者").key, "general");
   assert.equal(
-    client.getRoleMetaByLabel("運営委員・役員").key,
+    client.getRoleMetaByLabel("役員、運営・実行委員").key,
     "steeringCommittee",
   );
   assert.equal(
@@ -362,6 +449,618 @@ test("hasAnyAvailable reports whether at least one role still has capacity", () 
   );
 });
 
+test("mobile availability control lists activity pills and open time slots", () => {
+  const timeFilter = createElement("div");
+  const timeToggle = createElement("button");
+  const activityFilter = createElement("div");
+  const { exports: client } = loadClient({
+    gridData: {
+      activities: ["Gate", "Shop", "Cleanup"],
+      times: ["09:00", "10:00", "11:00"],
+      events: [
+        {
+          eventId: 1,
+          activity: "Gate",
+          subtitle: "",
+          startTime: "09:00",
+          endTime: "10:00",
+          location: "Front",
+          description: "",
+          slots: {
+            general: { max: 2, filled: 1 },
+            classRep: { max: 0, filled: 0 },
+            steeringCommittee: { max: 0, filled: 0 },
+            orgCommittee: { max: 0, filled: 0 },
+          },
+          signups: [],
+        },
+        {
+          eventId: 2,
+          activity: "Shop",
+          subtitle: "",
+          startTime: "10:00",
+          endTime: "11:00",
+          location: "Hall",
+          description: "",
+          slots: {
+            general: { max: 1, filled: 1 },
+            classRep: { max: 0, filled: 0 },
+            steeringCommittee: { max: 0, filled: 0 },
+            orgCommittee: { max: 0, filled: 0 },
+          },
+          signups: [],
+        },
+        {
+          eventId: 3,
+          activity: "Cleanup",
+          subtitle: "",
+          startTime: "11:00",
+          endTime: "12:00",
+          location: "Gym",
+          description: "",
+          slots: {
+            general: { max: 0, filled: 0 },
+            classRep: { max: 2, filled: 0 },
+            steeringCommittee: { max: 0, filled: 0 },
+            orgCommittee: { max: 0, filled: 0 },
+          },
+          signups: [],
+        },
+      ],
+    },
+    elements: {
+      mobileActivityFilter: activityFilter,
+      mobileTimeAvailabilityFilter: timeFilter,
+      mobileTimeAvailabilityToggle: timeToggle,
+    },
+  });
+
+  client.buildGridIndexes();
+  client.updateMobileAvailabilityControl();
+
+  assert.equal(client.getAvailableSlotCount(client.getMobileFilteredEvents()[0]), 1);
+  assert.equal(activityFilter.children.length, 4);
+  assert.equal(activityFilter.children[0].getAttribute("data-mobile-activity-filter"), "__all__");
+  assert.equal(activityFilter.children[1].textContent, "Gate");
+  assert.equal(timeToggle.textContent, "\u3059\u3079\u3066\u306E\u6642\u9593\u5E2F");
+  assert.equal(timeToggle.getAttribute("aria-expanded"), "false");
+  assert.equal(timeFilter.hidden, true);
+  assert.equal(timeFilter.children.length, 3);
+  assert.equal(timeFilter.children[0].className.includes("is-active"), true);
+  assert.equal(
+    timeFilter.children[0].getAttribute("data-mobile-time-filter"),
+    "__all__",
+  );
+  assert.equal(timeFilter.children[0].children[0].textContent, "\u2713");
+  assert.equal(
+    timeFilter.children[0].children[1].textContent,
+    "\u3059\u3079\u3066\u306E\u6642\u9593\u5E2F",
+  );
+  assert.equal(
+    timeFilter.children[1].getAttribute("data-mobile-time-filter"),
+    "09:00",
+  );
+  assert.match(timeFilter.children[1].children[1].textContent, /9:00 am - 10:00 am/);
+  assert.equal(
+    timeFilter.children[1].children[1].textContent.includes(client.ROLE_KEYS[0].label),
+    false,
+  );
+  assert.equal(
+    timeFilter.children[2].getAttribute("data-mobile-time-filter"),
+    "11:00",
+  );
+});
+
+test("mobile filters render directly without collapsed summary state", () => {
+  const htmlSource = fs.readFileSync(
+    path.resolve(__dirname, "..", "index.html"),
+    "utf8",
+  );
+
+  assert.doesNotMatch(htmlSource, /mobileFilterSummaryBar/);
+  assert.doesNotMatch(htmlSource, /mobileFilterSummaryText/);
+  assert.doesNotMatch(htmlSource, /is-filters-collapsed/);
+  assert.doesNotMatch(htmlSource, /is-filters-expanded/);
+  assert.match(
+    htmlSource,
+    /id="mobileAvailabilityControl"[\s\S]*class="mobile-filter-row mobile-filter-row-secondary"[\s\S]*id="mobileActivityFilter"[\s\S]*id="mobileRoleAvailabilityFilter"[\s\S]*id="mobileKeywordSearch"[\s\S]*id="mobileTimeAvailabilityToggle"/,
+  );
+});
+
+test("mobile available time filter narrows the mobile agenda", () => {
+  const mobileNode = createElement("div");
+  mobileNode.className = "mobile-agenda";
+  mobileNode.style = {};
+  const { exports: client } = loadClient({
+    gridData: {
+      activities: ["Gate", "Cleanup"],
+      times: ["09:00", "11:00"],
+      events: [
+        {
+          eventId: 1,
+          activity: "Gate",
+          subtitle: "",
+          startTime: "09:00",
+          endTime: "10:00",
+          location: "Front",
+          description: "",
+          slots: {
+            general: { max: 1, filled: 0 },
+            classRep: { max: 0, filled: 0 },
+            steeringCommittee: { max: 0, filled: 0 },
+            orgCommittee: { max: 0, filled: 0 },
+          },
+          signups: [],
+        },
+        {
+          eventId: 2,
+          activity: "Cleanup",
+          subtitle: "",
+          startTime: "11:00",
+          endTime: "12:00",
+          location: "Gym",
+          description: "",
+          slots: {
+            general: { max: 0, filled: 0 },
+            classRep: { max: 2, filled: 1 },
+            steeringCommittee: { max: 0, filled: 0 },
+            orgCommittee: { max: 0, filled: 0 },
+          },
+          signups: [],
+        },
+      ],
+    },
+    elements: {
+      mobileAgenda: mobileNode,
+      mobileTimeAvailabilityFilter: createElement("div"),
+    },
+  });
+
+  client.buildGridIndexes();
+  client.setMobileAvailableTimeFilter("11:00");
+  client.buildMobileAgenda();
+
+  const onlySection = mobileNode.children[0];
+  const onlyCard = onlySection.children[1];
+  const titleWrap = onlyCard.children[0].children[0];
+
+  assert.deepEqual(Array.from(client.getMobileAvailableTimeFilters()), ["11:00"]);
+  assert.equal(mobileNode.children.length, 1);
+  assert.equal(onlySection.children[0].textContent, "11:00 am - 12:00 pm");
+  assert.equal(titleWrap.children[0].textContent, "Cleanup");
+  assert.equal(client.getMobileFilteredEvents().length, 1);
+});
+
+test("mobile available time filter supports multiple selected time slots", () => {
+  const mobileNode = createElement("div");
+  mobileNode.className = "mobile-agenda";
+  mobileNode.style = {};
+  const timeFilter = createElement("div");
+  const timeToggle = createElement("button");
+  const detail = createElement("div");
+  const { exports: client, context } = loadClient({
+    gridData: {
+      activities: ["Gate", "Shop", "Cleanup"],
+      times: ["09:00", "10:00", "11:00"],
+      events: [
+        {
+          eventId: 1,
+          activity: "Gate",
+          subtitle: "",
+          startTime: "09:00",
+          endTime: "10:00",
+          location: "Front",
+          description: "",
+          slots: {
+            general: { max: 1, filled: 0 },
+            classRep: { max: 0, filled: 0 },
+            steeringCommittee: { max: 0, filled: 0 },
+            orgCommittee: { max: 0, filled: 0 },
+          },
+          signups: [],
+        },
+        {
+          eventId: 2,
+          activity: "Shop",
+          subtitle: "",
+          startTime: "10:00",
+          endTime: "11:00",
+          location: "Hall",
+          description: "",
+          slots: {
+            general: { max: 1, filled: 0 },
+            classRep: { max: 0, filled: 0 },
+            steeringCommittee: { max: 0, filled: 0 },
+            orgCommittee: { max: 0, filled: 0 },
+          },
+          signups: [],
+        },
+        {
+          eventId: 3,
+          activity: "Cleanup",
+          subtitle: "",
+          startTime: "11:00",
+          endTime: "12:00",
+          location: "Gym",
+          description: "",
+          slots: {
+            general: { max: 0, filled: 0 },
+            classRep: { max: 2, filled: 1 },
+            steeringCommittee: { max: 0, filled: 0 },
+            orgCommittee: { max: 0, filled: 0 },
+          },
+          signups: [],
+        },
+      ],
+    },
+    elements: {
+      mobileAgenda: mobileNode,
+      mobileTimeAvailabilityFilter: timeFilter,
+      mobileTimeAvailabilityToggle: timeToggle,
+      mobileTimeAvailabilityDetail: detail,
+    },
+  });
+
+  client.buildGridIndexes();
+  client.setMobileAvailableTimeFilter("09:00");
+  client.setMobileAvailableTimeFilter("11:00");
+  client.buildMobileAgenda();
+
+  assert.deepEqual(Array.from(client.getMobileAvailableTimeFilters()), [
+    "09:00",
+    "11:00",
+  ]);
+  assert.equal(client.getMobileFilteredEvents().length, 2);
+  assert.equal(mobileNode.children.length, 2);
+  assert.equal(mobileNode.children[0].children[0].textContent, "9:00 am - 10:00 am");
+  assert.equal(mobileNode.children[1].children[0].textContent, "11:00 am - 12:00 pm");
+  assert.equal(timeToggle.textContent, "2\u3064\u306E\u6642\u9593\u5E2F\u3092\u9078\u629E\u4E2D");
+  assert.equal(timeFilter.children.length, 4);
+  assert.equal(timeFilter.hidden, true);
+  assert.equal(timeFilter.children[1].className.includes("is-active"), true);
+  assert.equal(timeFilter.children[3].className.includes("is-active"), true);
+  assert.equal(timeFilter.children[1].children[0].textContent, "\u2713");
+  assert.equal(timeFilter.children[3].children[0].textContent, "\u2713");
+  assert.match(detail.textContent, /2\u3064\u306E\u6642\u9593\u5E2F\u306E\u7A7A\u304D/);
+
+  client.setMobileTimeFilterDropdownOpen(true);
+  assert.equal(timeFilter.hidden, false);
+  assert.equal(timeToggle.getAttribute("aria-expanded"), "true");
+  assert.equal(timeToggle.className.includes("is-open"), true);
+
+  context.document.dispatchEvent({
+    type: "click",
+    target: timeFilter.children[1].children[1],
+  });
+  assert.equal(timeFilter.hidden, false);
+  assert.equal(timeToggle.getAttribute("aria-expanded"), "true");
+
+  context.document.dispatchEvent({
+    type: "click",
+    target: createElement("div"),
+  });
+  assert.equal(timeFilter.hidden, true);
+  assert.equal(timeToggle.getAttribute("aria-expanded"), "false");
+  assert.equal(timeToggle.className.includes("is-open"), false);
+
+  client.setMobileTimeFilterDropdownOpen(true);
+  client.setMobileAvailableTimeFilter("__all__");
+  assert.deepEqual(Array.from(client.getMobileAvailableTimeFilters()), []);
+  assert.equal(timeFilter.children[0].className.includes("is-active"), true);
+  assert.equal(timeToggle.textContent, "\u3059\u3079\u3066\u306E\u6642\u9593\u5E2F");
+});
+
+test("activity filter refreshes the shared card renderer at desktop width", () => {
+  const mobileNode = createElement("div");
+  mobileNode.className = "mobile-agenda";
+  mobileNode.style = {};
+  const activityFilter = createElement("div");
+  const { exports: client } = loadClient({
+    gridData: {
+      activities: ["Gate", "Cleanup"],
+      times: ["09:00", "11:00"],
+      events: [
+        {
+          eventId: 1,
+          activity: "Gate",
+          subtitle: "",
+          startTime: "09:00",
+          endTime: "10:00",
+          location: "Front",
+          description: "",
+          slots: {
+            general: { max: 1, filled: 0 },
+            classRep: { max: 0, filled: 0 },
+            steeringCommittee: { max: 0, filled: 0 },
+            orgCommittee: { max: 0, filled: 0 },
+          },
+          signups: [],
+        },
+        {
+          eventId: 2,
+          activity: "Cleanup",
+          subtitle: "",
+          startTime: "11:00",
+          endTime: "12:00",
+          location: "Gym",
+          description: "",
+          slots: {
+            general: { max: 0, filled: 0 },
+            classRep: { max: 2, filled: 1 },
+            steeringCommittee: { max: 0, filled: 0 },
+            orgCommittee: { max: 0, filled: 0 },
+          },
+          signups: [],
+        },
+      ],
+    },
+    elements: {
+      mobileAgenda: mobileNode,
+      mobileActivityFilter: activityFilter,
+      mobileTimeAvailabilityFilter: createElement("div"),
+      mobileRoleAvailabilityFilter: createElement("div"),
+      mobileKeywordSearch: createElement("input"),
+      mobileTimeAvailabilityDetail: createElement("div"),
+    },
+  });
+
+  client.buildGridIndexes();
+  client.setMobileActivityFilter("Cleanup");
+
+  const onlySection = mobileNode.children[0];
+  const onlyCard = onlySection.children[1];
+  const titleWrap = onlyCard.children[0].children[0];
+
+  assert.equal(client.getMobileActivityFilter(), "Cleanup");
+  assert.equal(activityFilter.children.length, 3);
+  assert.equal(
+    activityFilter.children[2].getAttribute("data-mobile-activity-filter"),
+    "Cleanup",
+  );
+  assert.equal(activityFilter.children[2].className.includes("is-active"), true);
+  assert.equal(client.getMobileFilteredEvents().length, 1);
+  assert.equal(titleWrap.children[0].textContent, "Cleanup");
+});
+
+test("mobile keyword search narrows the mobile agenda by volunteer name", () => {
+  const mobileNode = createElement("div");
+  mobileNode.className = "mobile-agenda";
+  mobileNode.style = {};
+  const { exports: client } = loadClient({
+    gridData: {
+      activities: ["Gate", "Kitchen"],
+      times: ["09:00", "10:00"],
+      events: [
+        {
+          eventId: 1,
+          activity: "Gate",
+          subtitle: "",
+          startTime: "09:00",
+          endTime: "10:00",
+          location: "Front",
+          description: "",
+          slots: {
+            general: { max: 2, filled: 1 },
+            classRep: { max: 0, filled: 0 },
+            steeringCommittee: { max: 0, filled: 0 },
+            orgCommittee: { max: 0, filled: 0 },
+          },
+          signups: [
+            { name: "Alice Tanaka", cls: "1-1", role: clientRoleGeneral() },
+          ],
+        },
+        {
+          eventId: 2,
+          activity: "Kitchen",
+          subtitle: "",
+          startTime: "10:00",
+          endTime: "11:00",
+          location: "Hall",
+          description: "",
+          slots: {
+            general: { max: 2, filled: 1 },
+            classRep: { max: 0, filled: 0 },
+            steeringCommittee: { max: 0, filled: 0 },
+            orgCommittee: { max: 0, filled: 0 },
+          },
+          signups: [
+            { name: "Bob Sato", cls: "1-2", role: clientRoleGeneral() },
+          ],
+        },
+      ],
+    },
+    elements: {
+      mobileAgenda: mobileNode,
+      mobileTimeAvailabilityFilter: createElement("div"),
+      mobileRoleAvailabilityFilter: createElement("div"),
+      mobileKeywordSearch: createElement("input"),
+      mobileTimeAvailabilityDetail: createElement("div"),
+    },
+  });
+
+  function clientRoleGeneral() {
+    return "\u4E00\u822C\u4FDD\u8B77\u8005";
+  }
+
+  client.buildGridIndexes();
+  client.setMobileKeywordSearchQuery("alice");
+  client.buildMobileAgenda();
+
+  const onlySection = mobileNode.children[0];
+  const onlyCard = onlySection.children[1];
+  const titleWrap = onlyCard.children[0].children[0];
+
+  assert.equal(client.getMobileKeywordSearchQuery(), "alice");
+  assert.equal(client.getMobileFilteredEvents().length, 1);
+  assert.equal(titleWrap.children[0].textContent, "Gate");
+});
+
+test("mobile keyword search matches activity subtitle and description", () => {
+  const mobileNode = createElement("div");
+  mobileNode.className = "mobile-agenda";
+  mobileNode.style = {};
+  const { exports: client } = loadClient({
+    gridData: {
+      activities: ["Gate", "Kitchen"],
+      times: ["09:00", "10:00"],
+      events: [
+        {
+          eventId: 1,
+          activity: "Gate",
+          subtitle: "Main entrance",
+          startTime: "09:00",
+          endTime: "10:00",
+          location: "Front",
+          description: "Welcome desk",
+          slots: {
+            general: { max: 1, filled: 0 },
+            classRep: { max: 0, filled: 0 },
+            steeringCommittee: { max: 0, filled: 0 },
+            orgCommittee: { max: 0, filled: 0 },
+          },
+          signups: [],
+        },
+        {
+          eventId: 2,
+          activity: "Kitchen",
+          subtitle: "Lunch prep",
+          startTime: "10:00",
+          endTime: "11:00",
+          location: "Hall",
+          description: "Pack allergy-safe meals",
+          slots: {
+            general: { max: 1, filled: 0 },
+            classRep: { max: 0, filled: 0 },
+            steeringCommittee: { max: 0, filled: 0 },
+            orgCommittee: { max: 0, filled: 0 },
+          },
+          signups: [],
+        },
+      ],
+    },
+    elements: {
+      mobileAgenda: mobileNode,
+      mobileTimeAvailabilityFilter: createElement("div"),
+      mobileRoleAvailabilityFilter: createElement("div"),
+      mobileKeywordSearch: createElement("input"),
+      mobileTimeAvailabilityDetail: createElement("div"),
+    },
+  });
+
+  client.buildGridIndexes();
+  client.setMobileKeywordSearchQuery("allergy");
+  client.buildMobileAgenda();
+
+  const onlySection = mobileNode.children[0];
+  const onlyCard = onlySection.children[1];
+  const titleWrap = onlyCard.children[0].children[0];
+
+  assert.equal(client.getMobileFilteredEvents().length, 1);
+  assert.equal(titleWrap.children[0].textContent, "Kitchen");
+});
+
+test("mobile role filter updates pill state and time availability labels", () => {
+  const timeFilter = createElement("div");
+  const timeToggle = createElement("button");
+  const activityFilter = createElement("div");
+  const roleFilter = createElement("div");
+  const detail = createElement("div");
+  const { exports: client } = loadClient({
+    gridData: {
+      activities: ["Gate", "Desk", "Shop"],
+      times: ["09:00", "10:00"],
+      events: [
+        {
+          eventId: 1,
+          activity: "Gate",
+          subtitle: "",
+          startTime: "09:00",
+          endTime: "10:00",
+          location: "Front",
+          description: "",
+          slots: {
+            general: { max: 2, filled: 1 },
+            classRep: { max: 1, filled: 0 },
+            steeringCommittee: { max: 0, filled: 0 },
+            orgCommittee: { max: 0, filled: 0 },
+          },
+          signups: [],
+        },
+        {
+          eventId: 2,
+          activity: "Desk",
+          subtitle: "",
+          startTime: "09:00",
+          endTime: "10:00",
+          location: "Hall",
+          description: "",
+          slots: {
+            general: { max: 0, filled: 0 },
+            classRep: { max: 2, filled: 0 },
+            steeringCommittee: { max: 0, filled: 0 },
+            orgCommittee: { max: 0, filled: 0 },
+          },
+          signups: [],
+        },
+        {
+          eventId: 3,
+          activity: "Shop",
+          subtitle: "",
+          startTime: "10:00",
+          endTime: "11:00",
+          location: "Canteen",
+          description: "",
+          slots: {
+            general: { max: 1, filled: 1 },
+            classRep: { max: 0, filled: 0 },
+            steeringCommittee: { max: 0, filled: 0 },
+            orgCommittee: { max: 0, filled: 0 },
+          },
+          signups: [],
+        },
+      ],
+    },
+    elements: {
+      mobileActivityFilter: activityFilter,
+      mobileTimeAvailabilityFilter: timeFilter,
+      mobileTimeAvailabilityToggle: timeToggle,
+      mobileRoleAvailabilityFilter: roleFilter,
+      mobileKeywordSearch: createElement("input"),
+      mobileTimeAvailabilityDetail: detail,
+    },
+  });
+
+  client.buildGridIndexes();
+  client.setMobileRoleFilter("general");
+  client.setMobileAvailableTimeFilter("09:00");
+
+  assert.equal(client.getMobileRoleFilter(), "general");
+  assert.equal(roleFilter.children.length, 3);
+  assert.equal(roleFilter.children[1].getAttribute("data-mobile-role-filter"), "general");
+  assert.equal(roleFilter.children[1].className.includes("is-active"), true);
+  assert.equal(roleFilter.children[2].getAttribute("data-mobile-role-filter"), "classRep");
+  assert.deepEqual(Array.from(client.getMobileAvailableTimeFilters()), ["09:00"]);
+  assert.equal(timeFilter.children.length, 2);
+  assert.equal(
+    timeFilter.children[1].getAttribute("data-mobile-time-filter"),
+    "09:00",
+  );
+  assert.equal(timeFilter.children[1].className.includes("is-active"), true);
+  assert.equal(timeFilter.children[1].children[1].textContent, "9:00 am - 10:00 am");
+  assert.equal(timeToggle.textContent, "9:00 am - 10:00 am");
+  assert.ok(detail.textContent.includes(client.ROLE_KEYS[0].label));
+
+  client.setMobileAvailableTimeFilter("__all__");
+  assert.equal(client.getMobileFilteredEvents().length, 2);
+
+  client.setMobileActivityFilter("Desk");
+  assert.equal(client.getMobileRoleFilter(), "__all__");
+  assert.equal(roleFilter.children.length, 2);
+  assert.equal(roleFilter.children[0].className.includes("is-active"), true);
+  assert.equal(roleFilter.children[1].getAttribute("data-mobile-role-filter"), "classRep");
+  assert.equal(client.getMobileFilteredEvents().length, 1);
+});
+
 test("formatTime and formatTimeRange present times in 12-hour format", () => {
   const { exports: client } = loadClient();
 
@@ -387,6 +1086,10 @@ test("name normalization in index.html converts full-width brackets", () => {
 
   assert.equal(client.normaliseBrackets("Alice（parent）"), "Alice(parent)");
   assert.equal(client.normaliseNameValue(" 山田（太郎） "), "山田(太郎)");
+  assert.equal(client.normaliseNameValue(" 山田 太郎 "), "山田太郎");
+  assert.equal(client.normaliseNameValue("山田\u3000太郎"), "山田太郎");
+  assert.equal(client.normaliseNameValue("山田\u2002太郎"), "山田太郎");
+  assert.equal(client.normaliseNameValue(" John  Smith "), "John Smith");
   assert.equal(client.normaliseComparable("山田（太郎）"), "山田(太郎)");
   assert.equal(client.isValidNameValue("山田(太郎)"), true);
   assert.equal(client.isValidNameValue("山田（太郎）"), false);
@@ -431,7 +1134,7 @@ test("showCancelMessage forwards to the cancel message target", () => {
   assert.equal(cancelNode.style.display, "block");
 });
 
-test("index.html leaves name length enforcement to validation while keeping class inputs at 10", () => {
+test("index.html keeps signup validation inputs and uses a cancellation selection list", () => {
   const htmlSource = fs.readFileSync(
     path.resolve(__dirname, "..", "index.html"),
     "utf8",
@@ -443,40 +1146,298 @@ test("index.html leaves name length enforcement to validation while keeping clas
   }
 
   const inputNameBlock = getInputBlock("inputName");
-  const cancelNameBlock = getInputBlock("cancelName");
   const inputClassBlock = getInputBlock("inputClass");
-  const cancelClassBlock = getInputBlock("cancelClass");
 
   assert.ok(inputNameBlock);
-  assert.ok(cancelNameBlock);
   assert.ok(inputClassBlock);
-  assert.ok(cancelClassBlock);
   assert.doesNotMatch(inputNameBlock, /maxlength=/);
-  assert.doesNotMatch(cancelNameBlock, /maxlength=/);
   assert.match(inputClassBlock, /maxlength="10"/);
-  assert.match(cancelClassBlock, /maxlength="10"/);
+  assert.match(htmlSource, /id="cancelSignupList"/);
+  assert.doesNotMatch(htmlSource, /id="cancelName"/);
+  assert.doesNotMatch(htmlSource, /id="cancelClass"/);
+  assert.doesNotMatch(htmlSource, /id="cancelRole"/);
 });
 
-test("findAndConfirmCancel enforces the 50-character name limit client-side", () => {
+test("findAndConfirmCancel requires a selected signup", () => {
   const cancelMessage = createElement("div");
   cancelMessage.style = { display: "none" };
-  const cancelRole = createElement("select");
-  cancelRole.value = "general";
 
   const { exports: client } = loadClient({
     elements: {
-      cancelRole,
-      cancelName: { ...createElement("input"), value: "A".repeat(51) },
-      cancelClass: { ...createElement("input"), value: "1-1" },
       cancelMessage,
     },
   });
 
   client.findAndConfirmCancel();
 
-  assert.equal(cancelMessage.textContent, "名前は５０文字以下で入力してください。");
+  assert.equal(cancelMessage.textContent, "キャンセルする登録を選んでください。");
   assert.equal(cancelMessage.className, "modal-message error");
   assert.equal(cancelMessage.style.display, "block");
+});
+
+test("cancellation list renders existing signups and confirms the selected details", () => {
+  const cancelSignupList = createElement("div");
+  const cancelMessage = createElement("div");
+  cancelMessage.style = { display: "none" };
+  const confirmBox = createElement("div");
+  confirmBox.style = { display: "none" };
+  let confirmScrollOptions = null;
+  confirmBox.scrollIntoView = function (options) {
+    confirmScrollOptions = options;
+  };
+  const confirmText = createElement("div");
+  const cancelSubmitBtn = createElement("button");
+
+  const { exports: client, context } = loadClient({
+    elements: {
+      cancelSignupList,
+      cancelMessage,
+      confirmBox,
+      confirmText,
+      cancelSubmitBtn,
+    },
+  });
+  context.currentEventId = 1;
+
+  client.renderCancelSignupList();
+
+  assert.equal(cancelSignupList.children.length, 2);
+  assert.equal(cancelSignupList.children[0].children[0].textContent, "Alice");
+  assert.equal(
+    cancelSignupList.children[0].children[1].textContent,
+    "1-1 · 一般保護者",
+  );
+  assert.equal(cancelSignupList.children[0].getAttribute("aria-pressed"), "false");
+
+  cancelSignupList.dispatchEvent({
+    type: "click",
+    target: cancelSignupList.children[0].children[1],
+  });
+
+  assert.equal(cancelSignupList.children[0].classList.has("selected"), true);
+  assert.equal(cancelSignupList.children[0].getAttribute("aria-pressed"), "true");
+  assert.equal(cancelSignupList.children[1].getAttribute("aria-pressed"), "false");
+  assert.equal(cancelSubmitBtn.disabled, false);
+
+  client.findAndConfirmCancel();
+
+  assert.equal(confirmText.children.length, 2);
+  assert.equal(
+    confirmText.children[0].textContent,
+    "本当に以下の登録をキャンセルしますか？",
+  );
+  assert.equal(confirmText.children[0].className, "confirm-question");
+  assert.equal(confirmText.children[1].className, "confirm-signup-summary");
+  assert.equal(confirmText.children[1].children[0].textContent, "Alice");
+  assert.equal(
+    confirmText.children[1].children[1].textContent,
+    "1-1 · 一般保護者",
+  );
+  assert.equal(confirmBox.style.display, "block");
+  assert.equal(cancelSubmitBtn.style.display, "none");
+  assert.equal(confirmScrollOptions.behavior, "smooth");
+  assert.equal(confirmScrollOptions.block, "center");
+  assert.equal(confirmScrollOptions.inline, "nearest");
+});
+
+test("confirmCancel sends the selected signup details to the existing backend", () => {
+  const cancelSignupList = createElement("div");
+  const selectedOption = createElement("button");
+  cancelSignupList.appendChild(selectedOption);
+  const confirmBox = createElement("div");
+  confirmBox.style = { display: "block" };
+  const confirmYes = createElement("button");
+  const confirmNo = createElement("button");
+  const cancelSubmitBtn = createElement("button");
+  const cancelMessage = createElement("div");
+  cancelMessage.style = { display: "none" };
+  let receivedCancelArgs = null;
+  const google = {
+    script: {
+      run: {
+        withSuccessHandler(handler) {
+          return {
+            withFailureHandler() {
+              return this;
+            },
+            getDeployedUrl() {
+              handler("https://example.com/app");
+              return this;
+            },
+            cancelSignup(...args) {
+              receivedCancelArgs = args;
+              handler({ success: false, message: "Rejected by test." });
+              return this;
+            },
+          };
+        },
+      },
+    },
+  };
+
+  const { exports: client, context } = loadClient({
+    elements: {
+      cancelSignupList,
+      confirmBox,
+      confirmYes,
+      confirmNo,
+      cancelSubmitBtn,
+      cancelMessage,
+    },
+    extraGlobals: {
+      google,
+    },
+  });
+  context.currentEventId = 1;
+  client.selectCancelSignup(
+    { name: "Alice", cls: "1-1", role: "一般保護者" },
+    selectedOption,
+  );
+
+  client.confirmCancel();
+
+  assert.deepEqual(Array.from(receivedCancelArgs), [
+    1,
+    "Alice",
+    "1-1",
+    "一般保護者",
+    "test-alias",
+  ]);
+  assert.equal(cancelMessage.textContent, "Rejected by test.");
+  assert.equal(confirmBox.style.display, "none");
+  assert.equal(confirmYes.disabled, false);
+  assert.equal(confirmNo.disabled, false);
+  assert.equal(selectedOption.disabled, false);
+});
+
+test("cancellation selection updates only the previous and current options", () => {
+  const cancelSignupList = createElement("div");
+  const cancelSubmitBtn = createElement("button");
+  const firstOption = createElement("button");
+  const secondOption = createElement("button");
+  const untouchedOption = createElement("button");
+  cancelSignupList.appendChild(firstOption);
+  cancelSignupList.appendChild(secondOption);
+  cancelSignupList.appendChild(untouchedOption);
+
+  const { exports: client } = loadClient({
+    elements: {
+      cancelSignupList,
+      cancelSubmitBtn,
+      cancelMessage: createElement("div"),
+      confirmBox: createElement("div"),
+    },
+  });
+
+  client.selectCancelSignup(
+    { name: "Alice", cls: "1-1", role: "一般保護者" },
+    firstOption,
+  );
+  client.selectCancelSignup(
+    { name: "Bob", cls: "1-2", role: "学年委員" },
+    secondOption,
+  );
+
+  assert.equal(firstOption.classList.has("selected"), false);
+  assert.equal(firstOption.getAttribute("aria-pressed"), "false");
+  assert.equal(secondOption.classList.has("selected"), true);
+  assert.equal(secondOption.getAttribute("aria-pressed"), "true");
+  assert.equal(untouchedOption.getAttribute("aria-pressed"), null);
+});
+
+test("registration tab restores role choices and resets retained modal scroll", () => {
+  const roleButtons = createElement("div");
+  const namesSection = createElement("div");
+  const cancelSignupList = createElement("div");
+  const modal = createElement("div");
+  const { exports: client } = loadClient({
+    elements: {
+      ".modal": modal,
+      modalTitle: createElement("div"),
+      modalSubtitle: createElement("div"),
+      namesSection,
+      namesGroups: createElement("div"),
+      roleButtons,
+      modalForm: createElement("div"),
+      inputName: createElement("input"),
+      inputClass: createElement("input"),
+      modalMessage: createElement("div"),
+      modalOverlay: createElement("div"),
+      cancelSignupList,
+    },
+  });
+
+  client.openModal(1);
+  modal.scrollTop = 120;
+  cancelSignupList.scrollTop = 80;
+  client.switchTab("cancel");
+
+  assert.equal(roleButtons.style.display, "none");
+  assert.equal(modal.scrollTop, 0);
+  assert.equal(cancelSignupList.scrollTop, 0);
+
+  modal.scrollTop = 90;
+  namesSection.scrollTop = 60;
+  client.switchTab("signup");
+
+  assert.equal(roleButtons.style.display, "");
+  assert.ok(roleButtons.children.length > 0);
+  assert.equal(modal.scrollTop, 0);
+  assert.equal(namesSection.scrollTop, 0);
+
+  client.switchTab("cancel");
+  client.openModal(1);
+
+  assert.equal(roleButtons.style.display, "");
+  assert.ok(roleButtons.children.length > 0);
+});
+
+test("cancellation list styling contains highlights inside the scroll area", () => {
+  const htmlSource = fs.readFileSync(
+    path.resolve(__dirname, "..", "index.html"),
+    "utf8",
+  );
+
+  assert.match(
+    htmlSource,
+    /\.cancel-signup-list\s*{[\s\S]*?scrollbar-gutter:\s*stable;/,
+  );
+  assert.match(
+    htmlSource,
+    /\.cancel-signup-option\s*{[\s\S]*?flex:\s*0 0 auto;[\s\S]*?overflow:\s*hidden;[\s\S]*?touch-action:\s*manipulation;/,
+  );
+  assert.match(
+    htmlSource,
+    /\.cancel-signup-option\.selected\s*{[\s\S]*?box-shadow:\s*inset 0 0 0 1px #c62828;/,
+  );
+  assert.match(
+    htmlSource,
+    /@media \(hover:\s*hover\) and \(pointer:\s*fine\)\s*{[\s\S]*?\.cancel-signup-option:hover/,
+  );
+  assert.match(
+    htmlSource,
+    /\.cancel-signup-details\s*{[\s\S]*?overflow-wrap:\s*anywhere;/,
+  );
+});
+
+test("cancellation confirmation prominently centres the selected signup", () => {
+  const htmlSource = fs.readFileSync(
+    path.resolve(__dirname, "..", "index.html"),
+    "utf8",
+  );
+
+  assert.match(
+    htmlSource,
+    /\.confirm-signup-summary\s*{[\s\S]*?border:\s*2px solid #c62828;[\s\S]*?text-align:\s*center;/,
+  );
+  assert.match(
+    htmlSource,
+    /\.confirm-signup-name\s*{[\s\S]*?font-size:\s*22px;[\s\S]*?font-weight:\s*800;/,
+  );
+  assert.match(
+    htmlSource,
+    /\.confirm-signup-details\s*{[\s\S]*?font-size:\s*16px;[\s\S]*?font-weight:\s*800;/,
+  );
 });
 
 test("submitSignup enforces the 50-character name limit client-side", () => {
@@ -504,7 +1465,7 @@ test("submitSignup enforces the 50-character name limit client-side", () => {
   assert.equal(modalMessage.style.display, "block");
 });
 
-test("submitSignup normalises full-width brackets before sending to backend", () => {
+test("submitSignup normalises Japanese spacing and brackets before sending to backend", () => {
   const modalMessage = createElement("div");
   modalMessage.style = { display: "none" };
   const submitBtn = createElement("button");
@@ -535,7 +1496,7 @@ test("submitSignup normalises full-width brackets before sending to backend", ()
   const { exports: client, context } = loadClient({
     elements: {
       honeypot: { ...createElement("input"), value: "" },
-      inputName: { ...createElement("input"), value: "山田（太郎）" },
+      inputName: { ...createElement("input"), value: "山田　（太郎）" },
       inputClass: { ...createElement("input"), value: "1-1" },
       submitBtn,
       modalMessage,
@@ -646,7 +1607,7 @@ test("submitSignup refreshes grid data after a stale full-slot rejection", () =>
   assert.equal(roleButtons.children[0].children[1].textContent, "Full");
 });
 
-test("desktop grid typography overrides are scoped to desktop layout", () => {
+test("desktop reuses the responsive filters and card schedule", () => {
   const htmlSource = fs.readFileSync(
     path.resolve(__dirname, "..", "index.html"),
     "utf8",
@@ -654,57 +1615,699 @@ test("desktop grid typography overrides are scoped to desktop layout", () => {
 
   assert.match(
     htmlSource,
-    /body\.desktop-layout td\.time-cell\s*{[\s\S]*?font-size:\s*16px;/,
+    /body\.desktop-layout\s*{[\s\S]*?background:\s*#f5f2ee;/,
   );
   assert.match(
     htmlSource,
-    /body\.desktop-layout td\.desc-cell\s*{[\s\S]*?font-size:\s*15px;/,
+    /\.schedule-controls\s*{[\s\S]*?display:\s*contents;/,
   );
   assert.match(
     htmlSource,
-    /body\.desktop-layout \.activity-title\s*{[\s\S]*?font-size:\s*18px;/,
+    /\.desktop-schedule-stats\s*{[\s\S]*?display:\s*none;/,
   );
   assert.match(
     htmlSource,
-    /body\.desktop-layout \.activity-subtitle\s*{[\s\S]*?font-size:\s*15px;/,
+    /\.desktop-insights-panel\s*{[\s\S]*?display:\s*none;/,
+  );
+  assert.match(
+    htmlSource,
+    /\.desktop-filter-summary\s*{[\s\S]*?display:\s*none;/,
+  );
+  assert.match(
+    htmlSource,
+    /\.desktop-insight-scope-control\s*{[\s\S]*?display:\s*none;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout \.desktop-schedule-stats\s*{[\s\S]*?display:\s*grid;[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/,
+  );
+  assert.match(
+    htmlSource,
+    /\.desktop-stat\[data-desktop-insight="vacancies"\]\s*{[\s\S]*?background:\s*#e1f0e4;/,
+  );
+  assert.match(
+    htmlSource,
+    /\.desktop-stat\[data-desktop-insight="registrations"\]\s*{[\s\S]*?background:\s*#eee4f3;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout \.desktop-insights-panel\s*{[\s\S]*?position:\s*absolute;[\s\S]*?max-height:/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout \.desktop-filter-summary\s*{[\s\S]*?visibility:\s*hidden;[\s\S]*?display:\s*inline-flex;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout \.desktop-stat-filtered\.is-visible\s*{[\s\S]*?visibility:\s*visible;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout \.desktop-insight-scope-control\s*{[\s\S]*?display:\s*inline-flex;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout \.mobile-availability-control\s*{[\s\S]*?display:\s*block;[\s\S]*?border-radius:\s*16px;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout \.schedule-controls\s*{[\s\S]*?position:\s*sticky;[\s\S]*?top:\s*84px;[\s\S]*?z-index:\s*20;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout \.mobile-activity-filter-field\s*{[\s\S]*?grid-column:\s*1\s*\/\s*span 7;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout \.mobile-role-filter-field\s*{[\s\S]*?grid-column:\s*8\s*\/\s*-1;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout \.mobile-activity-filter-pills,[\s\S]*?body\.desktop-layout \.mobile-role-filter-pills\s*{[\s\S]*?flex-wrap:\s*wrap;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout \.mobile-activity-filter-pill,[\s\S]*?body\.desktop-layout \.mobile-role-filter-pill\s*{[\s\S]*?flex:\s*0 0 auto;[\s\S]*?white-space:\s*nowrap;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout \.mobile-time-group\s*{[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/,
+  );
+  assert.match(
+    htmlSource,
+    /@media \(min-width:\s*1280px\)\s*{[\s\S]*?body\.desktop-layout \.mobile-time-group,[\s\S]*?grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\);/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout \.modal \.role-buttons\s*{[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/,
+  );
+  assert.match(htmlSource, /<main class="schedule-shell">/);
+  assert.match(htmlSource, /id="mobileAvailabilityControl"/);
+  assert.match(htmlSource, /id="mobileAgenda" class="mobile-agenda"/);
+  assert.match(htmlSource, /id="desktopAvailableCount"/);
+  assert.match(htmlSource, /id="desktopSignupCount"/);
+  assert.match(htmlSource, /id="desktopSignupCapacityCount"/);
+  assert.match(htmlSource, /id="desktopFilteredAvailableCount"/);
+  assert.match(htmlSource, /id="desktopFilteredSignupCount"/);
+  assert.match(htmlSource, /id="desktopFilterSummary"/);
+  assert.match(htmlSource, /id="desktopInsightScopeControl"/);
+  assert.match(htmlSource, /data-desktop-insight-scope="overall"/);
+  assert.match(htmlSource, /data-desktop-insight-scope="filtered"/);
+  assert.match(htmlSource, /class="desktop-stat-scope">全体<\/span>/);
+  assert.match(
+    htmlSource,
+    /class="desktop-stat-scope">全体<\/span>\s*<strong class="desktop-stat-value" id="desktopAvailableCount"/,
   );
   assert.doesNotMatch(
     htmlSource,
-    /body\.compact-layout [^{]*(?:td\.time-cell|td\.desc-cell|\.activity-title|\.activity-subtitle)/,
+    /class="desktop-stat-context">\s*<span class="desktop-stat-scope">/,
   );
+  assert.match(htmlSource, /data-desktop-insight="vacancies"/);
+  assert.match(htmlSource, /data-desktop-insight="registrations"/);
+  assert.doesNotMatch(htmlSource, /data-desktop-insight="positions"/);
+  assert.doesNotMatch(htmlSource, /id="desktopOpenRoleCount"/);
+  assert.doesNotMatch(htmlSource, /募集中のポジション/);
+  assert.match(htmlSource, /id="desktopInsightsPanel"/);
+  assert.doesNotMatch(htmlSource, /id="desktopScheduleView"/);
+  assert.doesNotMatch(htmlSource, /id="grid"/);
+  assert.doesNotMatch(htmlSource, /function buildGrid\(\)/);
 });
 
-test("buildGrid renders desktop header text with CSS classes", () => {
-  const table = createElement("table");
+test("desktop schedule summary counts open slots, registrations, and capacity", () => {
+  const availableCount = createElement("strong");
+  const signupCount = createElement("strong");
+  const signupCapacityCount = createElement("span");
   const { exports: client } = loadClient({
     elements: {
-      grid: table,
+      desktopAvailableCount: availableCount,
+      desktopSignupCount: signupCount,
+      desktopSignupCapacityCount: signupCapacityCount,
     },
   });
 
-  client.buildGridIndexes();
-  client.buildGrid();
+  client.updateDesktopScheduleSummary();
 
-  const headerRow = table.children[0].children[0];
-  const firstActivityHeader = headerRow.children[2];
-  const title = firstActivityHeader.children[0];
-  const subtitle = firstActivityHeader.children[1];
-  const location = firstActivityHeader.children[2];
+  assert.equal(availableCount.textContent, 3);
+  assert.equal(signupCount.textContent, "2名");
+  assert.equal(signupCapacityCount.textContent, "/ 6枠");
+});
 
-  assert.equal(title.className, "activity-title");
-  assert.equal(title.textContent, "Hall Monitor");
-  assert.equal(title.style.fontWeight, "600");
-  assert.equal(title.style.cssText || "", "");
-  assert.equal(subtitle.className, "activity-subtitle");
-  assert.equal(subtitle.textContent, "Morning");
-  assert.equal(subtitle.style.cssText, "font-weight:400;color:#888;margin-top:2px;");
-  assert.equal(location.className, "activity-location");
-  assert.equal(location.textContent, "Gym");
+test("desktop schedule summary keeps overall totals and adds filtered context", () => {
+  const availableCount = createElement("strong");
+  const signupCount = createElement("strong");
+  const signupCapacityCount = createElement("span");
+  const filteredAvailableCount = createElement("span");
+  const filteredSignupCount = createElement("span");
+  const filterSummary = createElement("div");
+  const { exports: client } = loadClient({
+    elements: {
+      desktopAvailableCount: availableCount,
+      desktopSignupCount: signupCount,
+      desktopSignupCapacityCount: signupCapacityCount,
+      desktopFilteredAvailableCount: filteredAvailableCount,
+      desktopFilteredSignupCount: filteredSignupCount,
+      desktopFilterSummary: filterSummary,
+    },
+  });
+
+  client.updateDesktopScheduleSummary();
+  assert.equal(availableCount.textContent, 3);
+  assert.equal(signupCount.textContent, "2名");
+  assert.equal(signupCapacityCount.textContent, "/ 6枠");
+  assert.equal(filteredAvailableCount.textContent, "");
+  assert.equal(filteredAvailableCount.classList.has("is-visible"), false);
+  assert.equal(filterSummary.textContent, "");
+  assert.equal(filterSummary.getAttribute("aria-hidden"), "true");
+
+  client.setMobileKeywordSearchQuery("   ");
+  assert.equal(filteredAvailableCount.textContent, "");
+  assert.equal(filterSummary.textContent, "");
+
+  client.setMobileKeywordSearchQuery("Alice");
+  assert.equal(availableCount.textContent, 3);
+  assert.equal(signupCount.textContent, "2名");
+  assert.equal(signupCapacityCount.textContent, "/ 6枠");
+  assert.equal(filteredAvailableCount.textContent, "表示中 2枠");
+  assert.equal(filteredSignupCount.textContent, "表示中 2名 / 4枠");
+  assert.equal(filteredAvailableCount.classList.has("is-visible"), true);
+  assert.equal(filterSummary.textContent, "絞り込み中：1件表示");
+  assert.equal(filterSummary.classList.has("is-visible"), true);
+  assert.equal(filterSummary.getAttribute("aria-hidden"), "false");
+
+  client.setMobileRoleFilter("general");
+  assert.equal(availableCount.textContent, 3);
+  assert.equal(signupCount.textContent, "2名");
+  assert.equal(signupCapacityCount.textContent, "/ 6枠");
+  assert.equal(filteredAvailableCount.textContent, "表示中 2枠");
+  assert.equal(filteredSignupCount.textContent, "表示中 1名 / 2枠");
+  assert.equal(filterSummary.textContent, "絞り込み中：1件表示");
+
+  client.setMobileDisplayMode("overview");
+  assert.equal(filteredAvailableCount.textContent, "");
+  assert.equal(filteredSignupCount.textContent, "");
+  assert.equal(filterSummary.textContent, "");
+
+  client.setMobileDisplayMode("signup");
+  assert.equal(filteredAvailableCount.textContent, "表示中 2枠");
+  assert.equal(filteredSignupCount.textContent, "表示中 1名 / 2枠");
+  assert.equal(filterSummary.textContent, "絞り込み中：1件表示");
+
+  client.setMobileKeywordSearchQuery("no matching activity");
+  assert.equal(filteredAvailableCount.textContent, "表示中 0枠");
+  assert.equal(filteredSignupCount.textContent, "表示中 0名 / 0枠");
+  assert.equal(filterSummary.textContent, "絞り込み中：0件表示");
+  assert.equal(client.getMobileRoleFilter(), "__all__");
+
+  client.setMobileKeywordSearchQuery("");
+  assert.equal(filteredAvailableCount.textContent, "");
+  assert.equal(filteredSignupCount.textContent, "");
+  assert.equal(filterSummary.textContent, "");
+  assert.equal(filterSummary.classList.has("is-visible"), false);
+  assert.equal(filterSummary.getAttribute("aria-hidden"), "true");
+
+  client.setMobileActivityFilter("Hall Monitor");
+  assert.equal(filteredAvailableCount.textContent, "表示中 2枠");
+  assert.equal(filteredSignupCount.textContent, "表示中 2名 / 4枠");
+  assert.equal(filterSummary.textContent, "絞り込み中：1件表示");
+
+  client.setMobileDisplayMode("overview");
+  assert.equal(filteredAvailableCount.textContent, "表示中 2枠");
+  assert.equal(filterSummary.textContent, "絞り込み中：1件表示");
+
+  client.setMobileActivityFilter("__all__");
+  assert.equal(filteredAvailableCount.textContent, "");
+  assert.equal(filterSummary.textContent, "");
+});
+
+test("desktop registration summary counts only the selected role", () => {
+  const availableCount = createElement("strong");
+  const signupCount = createElement("strong");
+  const signupCapacityCount = createElement("span");
+  const filteredAvailableCount = createElement("span");
+  const filteredSignupCount = createElement("span");
+  const filterSummary = createElement("div");
+  const { exports: client } = loadClient({
+    elements: {
+      desktopAvailableCount: availableCount,
+      desktopSignupCount: signupCount,
+      desktopSignupCapacityCount: signupCapacityCount,
+      desktopFilteredAvailableCount: filteredAvailableCount,
+      desktopFilteredSignupCount: filteredSignupCount,
+      desktopFilterSummary: filterSummary,
+    },
+  });
+
+  client.setMobileRoleFilter("general");
+
+  assert.equal(client.getMobileRoleFilter(), "general");
+  assert.equal(signupCount.textContent, "2名");
+  assert.equal(signupCapacityCount.textContent, "/ 6枠");
+  assert.equal(filteredAvailableCount.textContent, "表示中 3枠");
+  assert.equal(filteredSignupCount.textContent, "表示中 1名 / 3枠");
+  assert.equal(filterSummary.textContent, "絞り込み中：2件表示");
+
+  client.setMobileRoleFilter("orgCommittee");
+
+  assert.equal(client.getMobileRoleFilter(), "orgCommittee");
+  assert.equal(filteredAvailableCount.textContent, "表示中 2枠");
+  assert.equal(filteredSignupCount.textContent, "表示中 0名 / 1枠");
+  assert.equal(filterSummary.textContent, "絞り込み中：1件表示");
+
+  client.setMobileActivityFilter("Hall Monitor");
+  client.setMobileDisplayMode("overview");
+
+  assert.equal(filteredAvailableCount.textContent, "表示中 2枠");
+  assert.equal(filteredSignupCount.textContent, "表示中 2名 / 4枠");
+  assert.equal(filterSummary.textContent, "絞り込み中：1件表示");
+
+  client.setMobileDisplayMode("signup");
+
+  assert.equal(client.getMobileRoleFilter(), "orgCommittee");
+  assert.equal(filteredSignupCount.textContent, "表示中 0名 / 1枠");
+
+  client.setMobileActivityFilter("Library Desk");
+
+  assert.equal(client.getMobileRoleFilter(), "__all__");
+  assert.equal(filteredAvailableCount.textContent, "表示中 1枠");
+  assert.equal(filteredSignupCount.textContent, "表示中 0名 / 2枠");
+  assert.equal(filterSummary.textContent, "絞り込み中：1件表示");
+});
+
+test("desktop registration summary applies selected time filters", () => {
+  const filteredAvailableCount = createElement("span");
+  const filteredSignupCount = createElement("span");
+  const filterSummary = createElement("div");
+  const { exports: client } = loadClient({
+    gridData: {
+      activities: ["Gate", "Cleanup"],
+      times: ["09:00", "10:00"],
+      events: [
+        {
+          eventId: 1,
+          activity: "Gate",
+          subtitle: "",
+          startTime: "09:00",
+          endTime: "10:00",
+          location: "Front",
+          description: "",
+          slots: {
+            general: { max: 2, filled: 1 },
+            classRep: { max: 0, filled: 0 },
+            steeringCommittee: { max: 0, filled: 0 },
+            orgCommittee: { max: 0, filled: 0 },
+          },
+          signups: [
+            { name: "Alice", cls: "1-1", role: "一般保護者" },
+          ],
+        },
+        {
+          eventId: 2,
+          activity: "Cleanup",
+          subtitle: "",
+          startTime: "10:00",
+          endTime: "11:00",
+          location: "Gym",
+          description: "",
+          slots: {
+            general: { max: 0, filled: 0 },
+            classRep: { max: 3, filled: 2 },
+            steeringCommittee: { max: 0, filled: 0 },
+            orgCommittee: { max: 0, filled: 0 },
+          },
+          signups: [
+            { name: "Bob", cls: "1-2", role: "学年委員" },
+            { name: "Carol", cls: "1-3", role: "学年委員" },
+          ],
+        },
+      ],
+    },
+    elements: {
+      desktopFilteredAvailableCount: filteredAvailableCount,
+      desktopFilteredSignupCount: filteredSignupCount,
+      desktopFilterSummary: filterSummary,
+    },
+  });
+
+  client.setMobileAvailableTimeFilter(["09:00"]);
+
+  assert.deepEqual(Array.from(client.getMobileAvailableTimeFilters()), [
+    "09:00",
+  ]);
+  assert.equal(filteredAvailableCount.textContent, "表示中 1枠");
+  assert.equal(filteredSignupCount.textContent, "表示中 1名 / 2枠");
+  assert.equal(filterSummary.textContent, "絞り込み中：1件表示");
+
+  client.setMobileAvailableTimeFilter(["10:00"]);
+
+  assert.deepEqual(Array.from(client.getMobileAvailableTimeFilters()), [
+    "10:00",
+  ]);
+  assert.equal(filteredAvailableCount.textContent, "表示中 1枠");
+  assert.equal(filteredSignupCount.textContent, "表示中 2名 / 3枠");
+  assert.equal(filterSummary.textContent, "絞り込み中：1件表示");
+
+  client.setMobileAvailableTimeFilter(["09:00", "10:00"]);
+
+  assert.equal(filteredAvailableCount.textContent, "表示中 2枠");
+  assert.equal(filteredSignupCount.textContent, "表示中 3名 / 5枠");
+  assert.equal(filterSummary.textContent, "絞り込み中：2件表示");
+});
+
+test("desktop insight scopes reuse current filters and reset to overall", () => {
+  const panel = createElement("div");
+  panel.hidden = true;
+  const title = createElement("h2");
+  const description = createElement("p");
+  const content = createElement("div");
+  const scopeControl = createElement("div");
+  scopeControl.hidden = true;
+  const overallButton = createElement("button");
+  overallButton.setAttribute("data-desktop-insight-scope", "overall");
+  const filteredButton = createElement("button");
+  filteredButton.setAttribute("data-desktop-insight-scope", "filtered");
+  const overallCount = createElement("span");
+  const filteredCount = createElement("span");
+  overallButton.appendChild(overallCount);
+  filteredButton.appendChild(filteredCount);
+  scopeControl.appendChild(overallButton);
+  scopeControl.appendChild(filteredButton);
+  panel.appendChild(scopeControl);
+  panel.appendChild(content);
+
+  const { exports: client } = loadClient({
+    elements: {
+      desktopInsightsPanel: panel,
+      desktopInsightsTitle: title,
+      desktopInsightsDescription: description,
+      desktopInsightsContent: content,
+      desktopInsightScopeControl: scopeControl,
+      desktopInsightScopeOverall: overallButton,
+      desktopInsightScopeFiltered: filteredButton,
+      desktopInsightScopeOverallCount: overallCount,
+      desktopInsightScopeFilteredCount: filteredCount,
+    },
+  });
+
+  client.setDesktopInsightView("vacancies");
+  assert.equal(panel.hidden, false);
+  assert.equal(scopeControl.hidden, false);
+  assert.equal(scopeControl.getAttribute("aria-label"), "空き枠の表示範囲");
+  assert.equal(overallCount.textContent, "2件");
+  assert.equal(filteredCount.textContent, "0件");
+  assert.equal(filteredButton.hidden, true);
+  assert.equal(overallButton.classList.has("is-active"), true);
+  assert.equal(overallButton.getAttribute("aria-pressed"), "true");
+  assert.equal(content.children.length, 2);
+
+  client.setMobileKeywordSearchQuery("Library Desk");
+  assert.equal(filteredButton.hidden, false);
+  assert.equal(overallCount.textContent, "2件");
+  assert.equal(filteredCount.textContent, "1件");
+  assert.equal(content.children.length, 2);
+
+  panel.dispatchEvent({
+    type: "click",
+    target: filteredButton,
+    stopPropagation() {},
+  });
+  assert.equal(overallButton.classList.has("is-active"), false);
+  assert.equal(filteredButton.classList.has("is-active"), true);
+  assert.equal(filteredButton.getAttribute("aria-pressed"), "true");
+  assert.match(description.textContent, /現在の絞り込み/);
+  assert.equal(content.children.length, 1);
   assert.equal(
-    location.style.cssText,
-    "font-weight:400;color:#999;margin-top:3px;font-size:0.88em;",
+    content.children[0].getAttribute("data-insight-eventid"),
+    "2",
+  );
+
+  client.setDesktopInsightView("registrations");
+  assert.equal(title.textContent, "現在の登録");
+  assert.equal(overallButton.classList.has("is-active"), true);
+  assert.equal(filteredButton.classList.has("is-active"), false);
+  assert.equal(overallCount.textContent, "1件");
+  assert.equal(filteredCount.textContent, "0件");
+  assert.equal(content.children.length, 1);
+  assert.equal(
+    content.children[0].getAttribute("data-insight-eventid"),
+    "1",
+  );
+
+  client.setDesktopInsightView("vacancies");
+  assert.equal(title.textContent, "空き枠の一覧");
+  assert.equal(overallButton.classList.has("is-active"), true);
+  assert.equal(content.children.length, 2);
+  panel.dispatchEvent({
+    type: "click",
+    target: filteredButton,
+    stopPropagation() {},
+  });
+  assert.equal(filteredButton.classList.has("is-active"), true);
+
+  client.setMobileKeywordSearchQuery("no matching vacancy");
+  assert.equal(filteredCount.textContent, "0件");
+  assert.equal(content.children.length, 1);
+  assert.equal(content.children[0].className, "desktop-insight-empty");
+  assert.match(content.children[0].textContent, /現在の絞り込み/);
+
+  client.setMobileKeywordSearchQuery("");
+  assert.equal(filteredButton.hidden, true);
+  assert.equal(overallButton.classList.has("is-active"), true);
+  assert.equal(content.children.length, 2);
+
+  client.setMobileKeywordSearchQuery("Library Desk");
+  panel.dispatchEvent({
+    type: "click",
+    target: filteredButton,
+    stopPropagation() {},
+  });
+  assert.equal(content.children.length, 1);
+
+  client.setDesktopInsightView("vacancies");
+  assert.equal(panel.hidden, true);
+  client.setDesktopInsightView("vacancies");
+  assert.equal(panel.hidden, false);
+  assert.equal(filteredButton.hidden, false);
+  assert.equal(overallButton.classList.has("is-active"), true);
+  assert.equal(filteredButton.classList.has("is-active"), false);
+  assert.equal(content.children.length, 2);
+
+  client.setDesktopInsightView("registrations");
+  assert.equal(panel.hidden, false);
+  assert.equal(title.textContent, "現在の登録");
+  assert.equal(scopeControl.hidden, false);
+  assert.equal(scopeControl.getAttribute("aria-label"), "登録の表示範囲");
+  assert.equal(overallCount.textContent, "1件");
+  assert.equal(filteredCount.textContent, "0件");
+  assert.equal(filteredButton.hidden, false);
+  assert.equal(overallButton.classList.has("is-active"), true);
+  assert.equal(content.children.length, 1);
+  assert.equal(
+    content.children[0].getAttribute("data-insight-eventid"),
+    "1",
+  );
+
+  panel.dispatchEvent({
+    type: "click",
+    target: filteredButton,
+    stopPropagation() {},
+  });
+  assert.equal(filteredButton.classList.has("is-active"), true);
+  assert.match(description.textContent, /現在の絞り込みに合う募集枠の登録/);
+  assert.equal(content.children.length, 1);
+  assert.equal(content.children[0].className, "desktop-insight-empty");
+  assert.match(content.children[0].textContent, /募集枠には、登録がありません/);
+
+  client.setMobileKeywordSearchQuery("Alice");
+  assert.equal(filteredCount.textContent, "1件");
+  assert.equal(content.children.length, 1);
+  assert.equal(
+    content.children[0].getAttribute("data-insight-eventid"),
+    "1",
+  );
+  const filteredNames = content.children[0].children.find(function (child) {
+    return child.className === "desktop-insight-names";
+  });
+  assert.ok(filteredNames);
+  assert.match(filteredNames.textContent, /Alice/);
+  assert.match(filteredNames.textContent, /Bob/);
+
+  client.setMobileDisplayMode("overview");
+  assert.equal(filteredButton.hidden, true);
+  assert.equal(overallButton.classList.has("is-active"), true);
+  assert.match(description.textContent, /全体の登録/);
+
+  client.setMobileDisplayMode("signup");
+  assert.equal(filteredButton.hidden, false);
+  assert.equal(filteredCount.textContent, "1件");
+  assert.equal(overallButton.classList.has("is-active"), true);
+
+  client.setMobileKeywordSearchQuery("");
+  assert.equal(filteredButton.hidden, true);
+  assert.equal(overallButton.classList.has("is-active"), true);
+  assert.equal(content.children.length, 1);
+});
+
+test("desktop insight cards render useful views and reuse existing actions", () => {
+  const stats = createElement("div");
+  const vacancyButton = createElement("button");
+  vacancyButton.setAttribute("data-desktop-insight", "vacancies");
+  const registrationButton = createElement("button");
+  registrationButton.setAttribute("data-desktop-insight", "registrations");
+  stats.appendChild(vacancyButton);
+  stats.appendChild(registrationButton);
+
+  const panel = createElement("div");
+  panel.hidden = true;
+  const title = createElement("h2");
+  const description = createElement("p");
+  const content = createElement("div");
+
+  const { exports: client, context } = loadClient({
+    elements: {
+      desktopScheduleStats: stats,
+      desktopInsightsPanel: panel,
+      desktopInsightsTitle: title,
+      desktopInsightsDescription: description,
+      desktopInsightsContent: content,
+    },
+  });
+
+  client.setDesktopInsightView("vacancies");
+  assert.equal(panel.hidden, false);
+  assert.equal(title.textContent, "空き枠の一覧");
+  assert.match(description.textContent, /全体/);
+  assert.equal(content.className, "desktop-insights-content is-vacancies");
+  assert.equal(content.children.length, 2);
+  const vacancyEventOne = content.children.find(function (item) {
+    return item.getAttribute("data-insight-eventid") === "1";
+  });
+  const vacancyEventTwo = content.children.find(function (item) {
+    return item.getAttribute("data-insight-eventid") === "2";
+  });
+  assert.equal(
+    vacancyEventOne.className,
+    "desktop-insight-item has-activity-ribbon activity-accent-0",
+  );
+  assert.equal(
+    vacancyEventTwo.className,
+    "desktop-insight-item has-activity-ribbon activity-accent-1",
+  );
+  assert.equal(vacancyButton.classList.has("is-active"), true);
+  assert.equal(vacancyButton.getAttribute("aria-expanded"), "true");
+
+  client.setDesktopInsightView("registrations");
+  assert.equal(title.textContent, "現在の登録");
+  assert.match(description.textContent, /全体/);
+  assert.equal(content.className, "desktop-insights-content is-registrations");
+  assert.equal(content.children.length, 1);
+  const names = content.children[0].children.find(function (child) {
+    return child.className === "desktop-insight-names";
+  });
+  assert.ok(names);
+  assert.match(names.textContent, /Alice/);
+  assert.match(names.textContent, /Bob/);
+
+  client.setDesktopInsightView("registrations");
+  assert.equal(panel.hidden, true);
+  assert.equal(registrationButton.getAttribute("aria-expanded"), "false");
+
+  client.setDesktopInsightView("vacancies");
+  const eventOneButton = content.children.find(function (item) {
+    return item.getAttribute("data-insight-eventid") === "1";
+  });
+  panel.dispatchEvent({
+    type: "click",
+    target: eventOneButton,
+    stopPropagation() {},
+  });
+  assert.equal(String(context.currentEventId), "1");
+  assert.equal(panel.hidden, true);
+});
+
+test("mobile role filter active pills keep their role colour families", () => {
+  const htmlSource = fs.readFileSync(
+    path.resolve(__dirname, "..", "index.html"),
+    "utf8",
+  );
+
+  assert.match(
+    htmlSource,
+    /\.mobile-role-filter-pill\.role-general\.is-active\s*{[\s\S]*?background:\s*#267a32;/,
+  );
+  assert.match(
+    htmlSource,
+    /\.mobile-role-filter-pill\.role-classrep\.is-active\s*{[\s\S]*?background:\s*#b26a00;/,
+  );
+  assert.match(
+    htmlSource,
+    /\.mobile-role-filter-pill\.role-steeringcommittee\.is-active\s*{[\s\S]*?background:\s*#155fae;/,
+  );
+  assert.match(
+    htmlSource,
+    /\.mobile-role-filter-pill\.role-orgcommittee\.is-active\s*{[\s\S]*?background:\s*#681c8d;/,
   );
 });
+
+test("desktop vacancy insights reuse the activity ribbons", () => {
+  const htmlSource = fs.readFileSync(
+    path.resolve(__dirname, "..", "index.html"),
+    "utf8",
+  );
+
+  assert.match(
+    htmlSource,
+    /\.desktop-insight-item\.has-activity-ribbon\s*{[\s\S]*?position:\s*relative;[\s\S]*?overflow:\s*hidden;/,
+  );
+  assert.match(
+    htmlSource,
+    /\.desktop-insight-item\.has-activity-ribbon::before\s*{[\s\S]*?height:\s*4px;/,
+  );
+});
+
+test("mobile tab and filter controls stay sticky in compact layout", () => {
+  const htmlSource = fs.readFileSync(
+    path.resolve(__dirname, "..", "index.html"),
+    "utf8",
+  );
+
+  assert.match(
+    htmlSource,
+    /body\.compact-layout \.mobile-display-mode-control\s*{[\s\S]*?position:\s*sticky;[\s\S]*?top:\s*0;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.compact-layout \.mobile-availability-control\s*{[\s\S]*?position:\s*sticky;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.compact-layout \.mobile-availability-control\s*{[\s\S]*?top:\s*80px;/,
+  );
+});
+
+test("mobile sticky controls use opaque backing so cards do not show through", () => {
+  const htmlSource = fs.readFileSync(
+    path.resolve(__dirname, "..", "index.html"),
+    "utf8",
+  );
+
+  assert.match(
+    htmlSource,
+    /body\.compact-layout \.mobile-availability-control\s*{[\s\S]*?isolation:\s*isolate;[\s\S]*?background:\s*#faf8f5;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.compact-layout \.mobile-availability-control::before\s*{[\s\S]*?right:\s*-14px;[\s\S]*?left:\s*-14px;[\s\S]*?background:\s*#f5f2ee;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.compact-layout \.mobile-display-mode-control\s*{[\s\S]*?position:\s*sticky;[\s\S]*?isolation:\s*isolate;[\s\S]*?background:\s*#efebe5;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.compact-layout \.mobile-display-mode-control::before\s*{[\s\S]*?right:\s*-14px;[\s\S]*?left:\s*-14px;[\s\S]*?background:\s*#efebe5;/,
+  );
+});
+
 
 test("buildMobileAgenda groups mobile signup names by role", () => {
   const mobileNode = createElement("div");
@@ -716,11 +2319,11 @@ test("buildMobileAgenda groups mobile signup names by role", () => {
   });
 
   client.buildGridIndexes();
-  client.setMobileDisplayMode("activity");
+  client.setMobileDisplayMode("signup");
   client.buildMobileAgenda();
 
   const firstSection = mobileNode.children[0];
-  const firstCard = firstSection.children[0];
+  const firstCard = firstSection.children[1];
   const summary = firstCard.children[1];
   const namesList = firstCard.children[2];
 
@@ -741,8 +2344,9 @@ test("buildMobileAgenda groups mobile signup names by role", () => {
   assert.equal(namesList.children[1].children[1].textContent, "Bob");
 });
 
-test("buildMobileAgenda groups mobile cards by activity and sorts each group by time", () => {
+test("buildMobileDayOverview renders a time-based day timeline", () => {
   const mobileNode = createElement("div");
+  mobileNode.className = "mobile-agenda";
   mobileNode.style = {};
   const { exports: client } = loadClient({
     gridData: {
@@ -805,40 +2409,54 @@ test("buildMobileAgenda groups mobile cards by activity and sorts each group by 
   });
 
   client.buildGridIndexes();
-  client.setMobileDisplayMode("activity");
+  client.setMobileDisplayMode("overview");
   client.buildMobileAgenda();
 
-  function getTitleWrap(card) {
-    return card.children[0].children[0];
-  }
+  const timeline = mobileNode.children[0];
+  const firstTimeBlock = timeline.children[0];
+  const secondTimeBlock = timeline.children[1];
+  const firstItem = firstTimeBlock.children[1].children[0];
+  const secondItem = secondTimeBlock.children[1].children[0];
 
-  const bakeSaleSection = mobileNode.children[0];
-  const gamesSection = mobileNode.children[1];
-  const firstBakeSaleCard = bakeSaleSection.children[0];
-  const secondBakeSaleCard = bakeSaleSection.children[1];
-  const firstGamesCard = gamesSection.children[0];
+  assert.equal(mobileNode.className, "mobile-agenda mobile-display-by-overview");
+  assert.equal(timeline.className, "mobile-overview-timeline");
+  assert.equal(timeline.children.length, 3);
+  assert.equal(firstTimeBlock.children[0].textContent, "9:30 am - 10:00 am");
+  assert.equal(firstItem.className.includes("mobile-overview-item"), true);
+  assert.equal(firstItem.className.includes("activity-accent-0"), true);
+  assert.equal(secondItem.className.includes("activity-accent-1"), true);
+  assert.equal(firstItem.children[0].children[0].textContent, "Bake Sale");
+  assert.equal(firstItem.children[1].className, "mobile-overview-role-chips");
+  assert.equal(firstItem.children[1].children[0].textContent, "\u52DF\u96C6\u4E2D");
+  assert.equal(
+    firstItem.children[1].children[1].className,
+    "mobile-overview-role-chip role-general",
+  );
+  assert.equal(
+    firstItem.children[1].children[1].textContent,
+    client.ROLE_KEYS[0].label + " 1",
+  );
+  assert.equal(secondTimeBlock.children[0].textContent, "10:00 am - 10:30 am");
+  assert.equal(secondItem.children[0].children[0].textContent, "Games");
+});
 
-  assert.equal(mobileNode.children.length, 2);
-  assert.equal(bakeSaleSection.children.length, 2);
-  assert.equal(
-    getTitleWrap(firstBakeSaleCard).children[0].textContent,
-    "Bake Sale",
+test("mobile day overview keeps activity accent colours in compact layout", () => {
+  const htmlSource = fs.readFileSync(
+    path.resolve(__dirname, "..", "index.html"),
+    "utf8",
   );
-  assert.equal(
-    getTitleWrap(firstBakeSaleCard).children[1].textContent,
-    "9:30 am - 10:00 am",
+
+  assert.match(
+    htmlSource,
+    /body\.compact-layout \.mobile-overview-item\.activity-accent-0\s*{[\s\S]*?border-left-color:\s*#e87b45;/,
   );
-  assert.equal(
-    getTitleWrap(secondBakeSaleCard).children[1].textContent,
-    "11:00 am - 11:30 am",
-  );
-  assert.equal(
-    getTitleWrap(firstGamesCard).children[0].textContent,
-    "Games",
+  assert.match(
+    htmlSource,
+    /body\.compact-layout \.mobile-overview-item\.activity-accent-1\s*{[\s\S]*?border-left-color:\s*#3b82a0;/,
   );
 });
 
-test("mobile display mode restores saved preference and updates the control", () => {
+test("mobile display mode maps the old activity preference to overview", () => {
   const activityBtn = createElement("button");
   const timeBtn = createElement("button");
   const storage = createLocalStorage({
@@ -855,14 +2473,14 @@ test("mobile display mode restores saved preference and updates the control", ()
     },
   });
 
-  assert.equal(client.getMobileDisplayMode(), "activity");
+  assert.equal(client.getMobileDisplayMode(), "overview");
   assert.equal(activityBtn.getAttribute("aria-pressed"), "true");
   assert.equal(timeBtn.getAttribute("aria-pressed"), "false");
   assert.equal(activityBtn.classList.has("active"), true);
   assert.equal(timeBtn.classList.has("active"), false);
 });
 
-test("mobile display mode defaults to time when no preference is saved", () => {
+test("mobile display mode defaults to signup when no preference is saved", () => {
   const activityBtn = createElement("button");
   const timeBtn = createElement("button");
 
@@ -876,7 +2494,7 @@ test("mobile display mode defaults to time when no preference is saved", () => {
     },
   });
 
-  assert.equal(client.getMobileDisplayMode(), "time");
+  assert.equal(client.getMobileDisplayMode(), "signup");
   assert.equal(activityBtn.getAttribute("aria-pressed"), "false");
   assert.equal(timeBtn.getAttribute("aria-pressed"), "true");
   assert.equal(activityBtn.classList.has("active"), false);
@@ -969,8 +2587,8 @@ test("buildMobileAgenda can group mobile cards by time with headings", () => {
   const firstCard = firstTimeSection.children[1];
   const secondCard = firstTimeSection.children[2];
 
-  assert.equal(storage.getItem("signupApp.mobileDisplayMode"), "time");
-  assert.equal(mobileNode.className, "mobile-agenda mobile-display-by-time");
+  assert.equal(storage.getItem("signupApp.mobileDisplayMode"), "signup");
+  assert.equal(mobileNode.className, "mobile-agenda mobile-display-by-signup");
   assert.equal(mobileNode.children.length, 2);
   assert.equal(firstTimeSection.children[0].className, "mobile-time-heading");
   assert.equal(firstTimeSection.children[0].textContent, "9:30 am - 10:00 am");
@@ -982,17 +2600,8 @@ test("buildMobileAgenda can group mobile cards by time with headings", () => {
   assert.equal(secondTimeSection.children[0].textContent, "10:00 am - 10:30 am");
 });
 
-test("renderResponsiveView toggles layout classes and target visibility", () => {
-  const desktopNode = createElement("div");
-  desktopNode.style = {};
-  const mobileNode = createElement("div");
-  mobileNode.style = {};
-
+test("renderResponsiveView only changes responsive classes for the shared view", () => {
   const { exports: client, context } = loadClient({
-    elements: {
-      desktopGridWrapper: desktopNode,
-      mobileAgenda: mobileNode,
-    },
     windowOverrides: {
       innerWidth: 800,
       screen: { width: 820 },
@@ -1000,21 +2609,16 @@ test("renderResponsiveView toggles layout classes and target visibility", () => 
     },
   });
 
-  let mobileBuilds = 0;
-  let gridBuilds = 0;
-  context.buildMobileAgenda = function () {
-    mobileBuilds += 1;
-  };
-  context.buildGrid = function () {
-    gridBuilds += 1;
-  };
-  context.lastCompactLayout = null;
-
   client.renderResponsiveView();
 
-  assert.equal(desktopNode.style.display, "none");
-  assert.equal(mobileNode.style.display, "block");
-  assert.equal(mobileBuilds, 1);
-  assert.equal(gridBuilds, 0);
   assert.equal(context.document.body.classList.has("compact-layout"), true);
+  assert.equal(context.document.body.classList.has("desktop-layout"), false);
+
+  context.window.innerWidth = 1200;
+  context.window.screen.width = 1280;
+  context.window.visualViewport.width = 1100;
+  client.renderResponsiveView();
+
+  assert.equal(context.document.body.classList.has("compact-layout"), false);
+  assert.equal(context.document.body.classList.has("desktop-layout"), true);
 });

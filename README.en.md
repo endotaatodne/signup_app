@@ -8,26 +8,31 @@ A free, open-source volunteer signup app built on Google Apps Script and Google 
 
 ## Features
 
-- Desktop grid view — activities across the top, time slots down the side
-- Mobile card view — switch between grouping by time and grouping by activity
+- Responsive card-based schedule on desktop and mobile
+- Switch between a searchable さがす view and a compact まとめ day-summary timeline
+- Shared filters for activity, role, multiple available time slots, and keyword search
+- Sticky schedule controls keep the relevant tabs and filters available while scrolling
+- Desktop summary cards show total vacancies and current registrations/capacity, with clickable detail lists
+- Role-coloured 募集中 chips and activity accents make open slots easy to scan
 - Time ranges displayed per slot/card (e.g. 9:00 am - 10:00 am)
 - Four volunteer roles per slot — General, Class Rep, Steering Committee, Org Committee (fully configurable)
 - Role-based slot limits — each role has its own quota
 - Roles with zero quota are hidden automatically
 - Colour-coded roles — green (General), amber (Class Rep), blue (Steering Committee), purple (Org Committee)
-- Names displayed in role colour in each grid cell
+- Names displayed by role in each schedule card
 - Users sign up with name and class — no Google account required
-- Users can cancel their own signup via the modal
+- Japanese names are stored and matched without spaces, while non-Japanese name spacing is preserved
+- Users can select and cancel their own signup via the modal
 - Names grouped by role in the signup modal
 - Notes shown in the modal when clicking a slot
 - Slot limits enforced server-side with race condition protection
 - Duplicate name prevention per slot
 - Subtitle and location shown for each activity/card (e.g. responsible person and room)
-- Notes/description shown per time slot and card
+- Notes/description shown per schedule card
 - Hint text shown on slots with existing signups
 - Page title driven dynamically by the Google Sheet name
 - Multiple events supported via a URL parameter — no redeployment needed
-- Works on mobile — display preference is remembered, with signup and cancellation via a clean modal popup
+- The selected schedule view is remembered between visits
 - Fully Unicode-compatible — supports any language
 - Data stored in Google Sheets — easy to view and manage
 - Free to run — no hosting costs beyond a Google account
@@ -217,6 +222,18 @@ Visiting the URL without a parameter shows a friendly "No event specified" messa
 
 ---
 
+## Using the Schedule
+
+- **さがす** shows full signup cards grouped by time. Filter by activity, volunteer role, one or more available start times, or a keyword that matches the activity details or a registered volunteer's name.
+- **まとめ** shows a compact, time-ordered overview of the day. Activity accents identify related slots, and role-coloured chips show the remaining vacancies.
+- On desktop, the summary cards above the filters show overall vacancies and current registrations/capacity. When filters are active, they also show counts for the visible results.
+- Click either desktop summary card to see its time-ordered detail list. If filters are active, switch between **Overall** and **Current filters**; selecting a detail opens that slot's registration/cancellation modal.
+- The schedule controls remain available while scrolling. The selected さがす/まとめ view is saved in the browser for the next visit.
+
+When a name containing Japanese characters is submitted, spaces (including full-width spaces) are removed consistently by both the browser and backend. For example, `山田 太郎` is stored as `山田太郎`. Names without Japanese characters keep a single normalised space between words.
+
+---
+
 ## Managing Events
 
 ### Adding a New Event
@@ -258,8 +275,9 @@ Users can cancel their own signup from the app:
 
 1. Click the slot they signed up for
 2. Switch to the **Cancel** tab in the modal
-3. Select their role, enter their name and class
-4. Click **Find my signup** → confirm cancellation
+3. Select their registration from the list of names, classes, and roles
+4. Click **Cancel selected registration**
+5. Check the highlighted registration details and confirm the cancellation
 
 ---
 
@@ -268,12 +286,12 @@ Users can cancel their own signup from the app:
 | Column | Field          | Description                                                        |
 | ------ | -------------- | ------------------------------------------------------------------ |
 | A      | EventID        | Unique number per row (e.g. 1, 2, 3)                               |
-| B      | Activity       | Activity name — shown as desktop grid header and mobile card title |
+| B      | Activity       | Activity name — shown as the schedule card title                    |
 | C      | SubTitle       | Subtitle shown below the activity name where space allows          |
 | D      | Date           | Date in YYYY-MM-DD format                                          |
 | E      | StartTime      | Start time in HH:MM format (e.g. 09:00)                            |
 | F      | EndTime        | End time in HH:MM format (e.g. 10:00)                              |
-| G      | Description    | Short notes shown in the grid, mobile cards, and modal             |
+| G      | Description    | Short notes shown in schedule cards and the modal                  |
 | H      | Location       | Room or location name shown in headers/cards and the modal         |
 | I      | GeneralSlots   | Max General volunteer spots (0 = not needed)                       |
 | J      | ClassRepSlots  | Max Class Rep spots (0 = not needed)                               |
@@ -384,7 +402,7 @@ npm run deploy
 - `LockService` prevents race conditions when multiple users sign up simultaneously
 - Role validation is enforced server-side using canonical values — clients cannot submit invalid roles
 - All user-supplied data is sanitised before embedding in the page
-- Cancellation requires matching name, class and role — reduces risk of accidental cancellation
+- Backend cancellation requires the selected signup's name, class, and role to match an existing row
 - Error messages shown to users are generic — internal details are logged privately
 
 ---
@@ -394,7 +412,7 @@ npm run deploy
 ```
 signup_app/
 ├── Code.gs          # Backend — reads/writes Google Sheets, serves web app (no secrets hardcoded)
-├── index.html       # Frontend — desktop grid, mobile cards, modal signup and cancellation form
+├── index.html       # Frontend — responsive schedule, filters, summaries, and signup/cancellation modal
 ├── appsscript.json  # Apps Script configuration
 ├── .claspignore     # Excludes local test/dev files from Apps Script deployments
 ├── test/            # Unit tests for backend and frontend logic
@@ -429,8 +447,8 @@ npm test
 Current test coverage includes:
 
 - `Code.gs` backend logic such as config loading, signup/cancellation flows, rate limiting, sanitisation, and normalization
-- Shared normalization behavior for names, classes, digits, and class separators
-- `index.html` client-side utility and state logic such as event indexing, layout decisions, mobile display mode, message rendering, and client normalization
+- Shared normalization behavior for names (including Japanese spacing), classes, digits, and class separators
+- `index.html` client-side utility and state logic such as event indexing, responsive layouts, schedule filters and views, desktop summaries, cancellation selection, message rendering, and client normalization
 
 Testing strategy:
 
