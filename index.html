@@ -2329,6 +2329,21 @@
         box-shadow: 0 5px 14px rgba(52, 43, 34, 0.09);
       }
 
+      body.desktop-layout .desktop-insight-item.has-activity-ribbon {
+        position: relative;
+        overflow: hidden;
+        padding-top: 17px;
+      }
+
+      body.desktop-layout .desktop-insight-item.has-activity-ribbon::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        right: 0;
+        left: 0;
+        height: 4px;
+      }
+
       body.desktop-layout .desktop-insight-item:focus-visible,
       body.desktop-layout .desktop-insight-role:focus-visible {
         outline: 3px solid #8b6840;
@@ -3960,7 +3975,11 @@
       function createDesktopInsightEventItem(event, view) {
         var item = document.createElement("button");
         item.type = "button";
-        item.className = "desktop-insight-item";
+        item.className =
+          "desktop-insight-item" +
+          (view === "vacancies"
+            ? " has-activity-ribbon " + getActivityAccentClass(event.activity)
+            : "");
         item.setAttribute("data-insight-eventid", event.eventId);
 
         var heading = document.createElement("div");

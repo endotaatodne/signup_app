@@ -1763,10 +1763,19 @@ test("desktop insight cards render useful views and reuse existing actions", () 
   assert.equal(title.textContent, "空き枠の一覧");
   assert.equal(content.className, "desktop-insights-content is-vacancies");
   assert.equal(content.children.length, 2);
-  assert.ok(
-    content.children.find(function (item) {
-      return item.getAttribute("data-insight-eventid") === "1";
-    }),
+  const vacancyEventOne = content.children.find(function (item) {
+    return item.getAttribute("data-insight-eventid") === "1";
+  });
+  const vacancyEventTwo = content.children.find(function (item) {
+    return item.getAttribute("data-insight-eventid") === "2";
+  });
+  assert.equal(
+    vacancyEventOne.className,
+    "desktop-insight-item has-activity-ribbon activity-accent-0",
+  );
+  assert.equal(
+    vacancyEventTwo.className,
+    "desktop-insight-item has-activity-ribbon activity-accent-1",
   );
   assert.equal(vacancyButton.classList.has("is-active"), true);
   assert.equal(vacancyButton.getAttribute("aria-expanded"), "true");
@@ -1877,6 +1886,22 @@ test("desktop position insights keep the existing role colour families", () => {
   assert.match(
     htmlSource,
     /\.desktop-insight-role\.role-orgcommittee\s*{[\s\S]*?background:\s*#f4eafd;/,
+  );
+});
+
+test("desktop vacancy insights reuse the activity ribbons", () => {
+  const htmlSource = fs.readFileSync(
+    path.resolve(__dirname, "..", "index.html"),
+    "utf8",
+  );
+
+  assert.match(
+    htmlSource,
+    /\.desktop-insight-item\.has-activity-ribbon\s*{[\s\S]*?position:\s*relative;[\s\S]*?overflow:\s*hidden;/,
+  );
+  assert.match(
+    htmlSource,
+    /\.desktop-insight-item\.has-activity-ribbon::before\s*{[\s\S]*?height:\s*4px;/,
   );
 });
 
