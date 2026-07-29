@@ -13,6 +13,7 @@ A free, open-source volunteer signup app built on Google Apps Script and Google 
 - Shared filters for activity, role, multiple available time slots, and keyword search
 - Sticky schedule controls keep the relevant tabs and filters available while scrolling
 - Desktop summary cards show total vacancies and current registrations/capacity, with clickable detail lists
+- Activity-coloured ribbons identify related activities in both vacancy and current-registration detail lists
 - Role-coloured 募集中 chips and activity accents make open slots easy to scan
 - Time ranges displayed per slot/card (e.g. 9:00 am - 10:00 am)
 - Four volunteer roles per slot — General, Class Rep, Steering Committee, Org Committee (fully configurable)
