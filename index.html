@@ -4143,10 +4143,8 @@
         var item = document.createElement("button");
         item.type = "button";
         item.className =
-          "desktop-insight-item" +
-          (view === "vacancies"
-            ? " has-activity-ribbon " + getActivityAccentClass(event.activity)
-            : "");
+          "desktop-insight-item has-activity-ribbon " +
+          getActivityAccentClass(event.activity);
         item.setAttribute("data-insight-eventid", event.eventId);
 
         var heading = document.createElement("div");

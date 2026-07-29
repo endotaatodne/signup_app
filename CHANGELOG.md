@@ -10,7 +10,7 @@
   - Restyles schedule cards and time headings to make individual signup slots more prominent and readable.
   - Adds desktop summary cards for total vacancies and current registrations/capacity, including counts for the currently filtered results.
   - Makes the desktop summary cards open time-ordered vacancy and registration details, with switches between overall and currently filtered results.
-  - Makes vacancy and registration detail items open the relevant signup/cancellation modal and uses activity ribbons and role-coloured status chips for easier scanning.
+  - Makes vacancy and registration detail items open the relevant signup/cancellation modal, with activity ribbons on both views and role-coloured status chips for easier scanning.
   - Replaces cancellation lookup fields with a selectable list of the slot's existing registrations.
   - Improves cancellation selection, scrolling, disabled states, and confirmation so the selected name, class, and role are clearly shown before removal.
   - Removes spaces from Japanese names consistently in the client and backend before signup storage and cancellation matching, preserves normal spacing in non-Japanese names, and removes the now-unnecessary manual-spacing helper text.

@@ -2200,7 +2200,14 @@ test("desktop insight cards render useful views and reuse existing actions", () 
   assert.match(description.textContent, /全体/);
   assert.equal(content.className, "desktop-insights-content is-registrations");
   assert.equal(content.children.length, 1);
-  const names = content.children[0].children.find(function (child) {
+  const registrationEventOne = content.children.find(function (item) {
+    return item.getAttribute("data-insight-eventid") === "1";
+  });
+  assert.equal(
+    registrationEventOne.className,
+    "desktop-insight-item has-activity-ribbon activity-accent-0",
+  );
+  const names = registrationEventOne.children.find(function (child) {
     return child.className === "desktop-insight-names";
   });
   assert.ok(names);
@@ -2248,7 +2255,7 @@ test("mobile role filter active pills keep their role colour families", () => {
   );
 });
 
-test("desktop vacancy insights reuse the activity ribbons", () => {
+test("desktop insights reuse the activity ribbons", () => {
   const htmlSource = fs.readFileSync(
     path.resolve(__dirname, "..", "index.html"),
     "utf8",
