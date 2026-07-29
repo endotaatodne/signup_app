@@ -1776,6 +1776,18 @@ test("desktop insight cards render useful views and reuse existing actions", () 
   assert.equal(content.className, "desktop-insights-content is-positions");
   assert.equal(content.children.length, 3);
   assert.equal(content.children[0].getAttribute("data-insight-role"), "general");
+  assert.equal(
+    content.children[0].className,
+    "desktop-insight-role role-general",
+  );
+  assert.equal(
+    content.children[1].className,
+    "desktop-insight-role role-steeringcommittee",
+  );
+  assert.equal(
+    content.children[2].className,
+    "desktop-insight-role role-orgcommittee",
+  );
   assert.match(content.children[0].children[1].textContent, /1件の募集/);
 
   client.setDesktopInsightView("registrations");
@@ -1841,6 +1853,30 @@ test("mobile role filter active pills keep their role colour families", () => {
   assert.match(
     htmlSource,
     /\.mobile-role-filter-pill\.role-orgcommittee\.is-active\s*{[\s\S]*?background:\s*#681c8d;/,
+  );
+});
+
+test("desktop position insights keep the existing role colour families", () => {
+  const htmlSource = fs.readFileSync(
+    path.resolve(__dirname, "..", "index.html"),
+    "utf8",
+  );
+
+  assert.match(
+    htmlSource,
+    /\.desktop-insight-role\.role-general\s*{[\s\S]*?background:\s*#edf7ee;/,
+  );
+  assert.match(
+    htmlSource,
+    /\.desktop-insight-role\.role-classrep\s*{[\s\S]*?background:\s*#fff4da;/,
+  );
+  assert.match(
+    htmlSource,
+    /\.desktop-insight-role\.role-steeringcommittee\s*{[\s\S]*?background:\s*#eaf3ff;/,
+  );
+  assert.match(
+    htmlSource,
+    /\.desktop-insight-role\.role-orgcommittee\s*{[\s\S]*?background:\s*#f4eafd;/,
   );
 });
 

@@ -2370,6 +2370,82 @@
         line-height: 1.35;
       }
 
+      body.desktop-layout .desktop-insight-role.role-general {
+        border-color: #c7dfcb;
+        background: #edf7ee;
+      }
+
+      body.desktop-layout .desktop-insight-role.role-general:hover {
+        border-color: #94c49c;
+        background: #e2f2e5;
+      }
+
+      body.desktop-layout .desktop-insight-role.role-classrep {
+        border-color: #ead3a2;
+        background: #fff4da;
+      }
+
+      body.desktop-layout .desktop-insight-role.role-classrep:hover {
+        border-color: #d8b875;
+        background: #ffedc4;
+      }
+
+      body.desktop-layout .desktop-insight-role.role-steeringcommittee {
+        border-color: #c5d9ef;
+        background: #eaf3ff;
+      }
+
+      body.desktop-layout .desktop-insight-role.role-steeringcommittee:hover {
+        border-color: #91b9df;
+        background: #deecfc;
+      }
+
+      body.desktop-layout .desktop-insight-role.role-orgcommittee {
+        border-color: #dcc7ec;
+        background: #f4eafd;
+      }
+
+      body.desktop-layout .desktop-insight-role.role-orgcommittee:hover {
+        border-color: #c5a2dd;
+        background: #eadcf6;
+      }
+
+      body.desktop-layout
+        .desktop-insight-role.role-general
+        .desktop-insight-role-title,
+      body.desktop-layout
+        .desktop-insight-role.role-general
+        .desktop-insight-role-count {
+        color: #2e7d32;
+      }
+
+      body.desktop-layout
+        .desktop-insight-role.role-classrep
+        .desktop-insight-role-title,
+      body.desktop-layout
+        .desktop-insight-role.role-classrep
+        .desktop-insight-role-count {
+        color: #a85f00;
+      }
+
+      body.desktop-layout
+        .desktop-insight-role.role-steeringcommittee
+        .desktop-insight-role-title,
+      body.desktop-layout
+        .desktop-insight-role.role-steeringcommittee
+        .desktop-insight-role-count {
+        color: #1565c0;
+      }
+
+      body.desktop-layout
+        .desktop-insight-role.role-orgcommittee
+        .desktop-insight-role-title,
+      body.desktop-layout
+        .desktop-insight-role.role-orgcommittee
+        .desktop-insight-role-count {
+        color: #6a1b9a;
+      }
+
       body.desktop-layout .desktop-insight-chips {
         display: flex;
         flex-wrap: wrap;
@@ -4009,7 +4085,8 @@
 
           var roleButton = document.createElement("button");
           roleButton.type = "button";
-          roleButton.className = "desktop-insight-role";
+          roleButton.className =
+            "desktop-insight-role role-" + roleMeta.classSuffix;
           roleButton.setAttribute("data-insight-role", roleMeta.key);
 
           var heading = document.createElement("div");
