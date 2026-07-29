@@ -1,13 +1,22 @@
-## v0.2.4 - 2026-06-26
+## v0.2.4 - 2026-07-29
 
 - Patch
-  - Renames the mobile primary tab to さがす and adds a separate まとめ summary tab for the day overview.
-  - Adds mobile activity, role, multi-select available-time, and keyword filters for finding open signup slots.
-  - Keeps the mobile tab switcher and filter controls sticky while scrolling.
-  - Adds activity filter pills to the mobile summary tab.
-  - Updates the mobile summary timeline to show role-coloured 募集中 availability chips instead of a single total remaining-slots badge.
+  - Replaces the separate desktop grid with the same responsive, card-based schedule used on mobile.
+  - Renames the primary schedule tab to さがす and adds a separate まとめ timeline for the day overview on both desktop and mobile.
+  - Adds shared activity, role, multi-select available-time, and keyword filters for finding signup slots and existing volunteer names.
+  - Keeps the mobile tab switcher and filters sticky while scrolling, and keeps the desktop title and schedule controls visible.
+  - Adds activity filter pills and activity-coloured accents to the compact まとめ timeline.
+  - Updates the まとめ timeline to show role-coloured 募集中 availability chips instead of a single total remaining-slots badge.
+  - Restyles schedule cards and time headings to make individual signup slots more prominent and readable.
+  - Adds desktop summary cards for total vacancies and current registrations/capacity, including counts for the currently filtered results.
+  - Makes the desktop summary cards open time-ordered vacancy and registration details, with switches between overall and currently filtered results.
+  - Makes vacancy and registration detail items open the relevant signup/cancellation modal and uses activity ribbons and role-coloured status chips for easier scanning.
+  - Replaces cancellation lookup fields with a selectable list of the slot's existing registrations.
+  - Improves cancellation selection, scrolling, disabled states, and confirmation so the selected name, class, and role are clearly shown before removal.
+  - Removes spaces from Japanese names consistently in the client and backend before signup storage and cancellation matching, preserves normal spacing in non-Japanese names, and removes the now-unnecessary manual-spacing helper text.
+  - Closes the available-time menu when clicking outside it and prevents unintended page positioning when opening desktop registration details.
   - Updates the Steering Committee role wording to 役員、運営・実行委員.
-  - Expands frontend tests for mobile filtering, display modes, and summary rendering.
+  - Expands backend and frontend tests for responsive layouts, filters, desktop summaries and detail views, cancellation selection, and name normalization.
   - Bumps the app version to 0.2.4.
 
 ## v0.2.3 - 2026-06-24
