@@ -1,10 +1,11 @@
-## v0.2.6 - 2026-07-30
+## v0.2.6 - 2026-07-31
 
 - Patch
   - Compacts the desktop title, schedule summary, and filter area so signup cards appear higher in the viewport.
   - Uses a single-row desktop filter toolbar where space permits, with a two-row fallback on narrow desktop widths.
   - Replaces native desktop activity and role selects with compact popovers containing the existing pill-style choices.
   - Keeps each choice popover open while selections are changed and closes it on click-away or Escape.
+  - Lists matching full time slots as well as open time slots in the time filter.
   - Preserves the existing mobile controls and layout.
   - Updates the English and Japanese schedule documentation for the compact desktop filters.
   - Bumps the app version to 0.2.6.

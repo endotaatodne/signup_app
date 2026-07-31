@@ -449,7 +449,7 @@ test("hasAnyAvailable reports whether at least one role still has capacity", () 
   );
 });
 
-test("mobile availability control lists activity pills and open time slots", () => {
+test("mobile availability control lists activity pills and all matching time slots", () => {
   const timeFilter = createElement("div");
   const timeToggle = createElement("button");
   const activityFilter = createElement("div");
@@ -525,7 +525,7 @@ test("mobile availability control lists activity pills and open time slots", () 
   assert.equal(timeToggle.textContent, "\u3059\u3079\u3066\u306E\u6642\u9593\u5E2F");
   assert.equal(timeToggle.getAttribute("aria-expanded"), "false");
   assert.equal(timeFilter.hidden, true);
-  assert.equal(timeFilter.children.length, 3);
+  assert.equal(timeFilter.children.length, 4);
   assert.equal(timeFilter.children[0].className.includes("is-active"), true);
   assert.equal(
     timeFilter.children[0].getAttribute("data-mobile-time-filter"),
@@ -547,8 +547,19 @@ test("mobile availability control lists activity pills and open time slots", () 
   );
   assert.equal(
     timeFilter.children[2].getAttribute("data-mobile-time-filter"),
+    "10:00",
+  );
+  assert.equal(
+    timeFilter.children[3].getAttribute("data-mobile-time-filter"),
     "11:00",
   );
+  const timeOptions = Array.from(client.getMobileAvailableTimeOptions());
+  assert.deepEqual(
+    timeOptions.map((option) => option.time),
+    ["09:00", "10:00", "11:00"],
+  );
+  assert.equal(timeOptions[1].availableSlots, 0);
+  assert.equal(timeOptions[1].fullEvents, 1);
 });
 
 test("mobile filters render directly without collapsed summary state", () => {
@@ -567,7 +578,7 @@ test("mobile filters render directly without collapsed summary state", () => {
   );
 });
 
-test("mobile available time filter narrows the mobile agenda", () => {
+test("mobile time filter can select a full time slot", () => {
   const mobileNode = createElement("div");
   mobileNode.className = "mobile-agenda";
   mobileNode.style = {};
@@ -585,7 +596,7 @@ test("mobile available time filter narrows the mobile agenda", () => {
           location: "Front",
           description: "",
           slots: {
-            general: { max: 1, filled: 0 },
+            general: { max: 1, filled: 1 },
             classRep: { max: 0, filled: 0 },
             steeringCommittee: { max: 0, filled: 0 },
             orgCommittee: { max: 0, filled: 0 },
@@ -617,21 +628,21 @@ test("mobile available time filter narrows the mobile agenda", () => {
   });
 
   client.buildGridIndexes();
-  client.setMobileAvailableTimeFilter("11:00");
+  client.setMobileAvailableTimeFilter("09:00");
   client.buildMobileAgenda();
 
   const onlySection = mobileNode.children[0];
   const onlyCard = onlySection.children[1];
   const titleWrap = onlyCard.children[0].children[0];
 
-  assert.deepEqual(Array.from(client.getMobileAvailableTimeFilters()), ["11:00"]);
+  assert.deepEqual(Array.from(client.getMobileAvailableTimeFilters()), ["09:00"]);
   assert.equal(mobileNode.children.length, 1);
-  assert.equal(onlySection.children[0].textContent, "11:00 am - 12:00 pm");
-  assert.equal(titleWrap.children[0].textContent, "Cleanup");
+  assert.equal(onlySection.children[0].textContent, "9:00 am - 10:00 am");
+  assert.equal(titleWrap.children[0].textContent, "Gate");
   assert.equal(client.getMobileFilteredEvents().length, 1);
 });
 
-test("mobile available time filter supports multiple selected time slots", () => {
+test("mobile time filter supports multiple selected time slots", () => {
   const mobileNode = createElement("div");
   mobileNode.className = "mobile-agenda";
   mobileNode.style = {};
@@ -1040,15 +1051,28 @@ test("mobile role filter updates pill state and time availability labels", () =>
   assert.equal(roleFilter.children[1].className.includes("is-active"), true);
   assert.equal(roleFilter.children[2].getAttribute("data-mobile-role-filter"), "classRep");
   assert.deepEqual(Array.from(client.getMobileAvailableTimeFilters()), ["09:00"]);
-  assert.equal(timeFilter.children.length, 2);
+  assert.equal(timeFilter.children.length, 3);
   assert.equal(
     timeFilter.children[1].getAttribute("data-mobile-time-filter"),
     "09:00",
   );
   assert.equal(timeFilter.children[1].className.includes("is-active"), true);
   assert.equal(timeFilter.children[1].children[1].textContent, "9:00 am - 10:00 am");
+  assert.equal(
+    timeFilter.children[2].getAttribute("data-mobile-time-filter"),
+    "10:00",
+  );
   assert.equal(timeToggle.textContent, "9:00 am - 10:00 am");
   assert.ok(detail.textContent.includes(client.ROLE_KEYS[0].label));
+
+  client.setMobileAvailableTimeFilter("__all__");
+  assert.equal(client.getMobileFilteredEvents().length, 2);
+
+  client.setMobileAvailableTimeFilter("10:00");
+  assert.equal(client.getMobileRoleFilter(), "general");
+  assert.equal(client.getMobileFilteredEvents().length, 1);
+  assert.equal(client.getMobileFilteredEvents()[0].activity, "Shop");
+  assert.match(detail.textContent, /空きなし/);
 
   client.setMobileAvailableTimeFilter("__all__");
   assert.equal(client.getMobileFilteredEvents().length, 2);

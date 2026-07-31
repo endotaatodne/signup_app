@@ -3249,7 +3249,7 @@
                   id="mobileTimeAvailabilityFilter"
                   class="mobile-time-filter-menu"
                   role="group"
-                  aria-label="Filter by available time slots"
+                  aria-label="Filter by time slots"
                   hidden
                 ></div>
               </div>
@@ -3925,8 +3925,11 @@
           });
 
         return orderedTimes
+          .filter(function (time) {
+            return (eventGroups[String(time)] || []).length > 0;
+          })
           .map(function (time) {
-            var matchingEvents = eventGroups[time] || [];
+            var matchingEvents = eventGroups[String(time)] || [];
             var roleSummaries = getAvailableRoleSummariesForEvents(
               matchingEvents,
               roleKey,
@@ -3941,9 +3944,6 @@
               fullEvents: getFullEventCount(matchingEvents, roleKey),
               roleSummaries: roleSummaries,
             };
-          })
-          .filter(function (option) {
-            return option.availableSlots > 0;
           });
       }
 
@@ -3953,7 +3953,7 @@
       }
 
       function getMobileSelectedTimeLabel(selectedTimes, options) {
-        if (!options || options.length === 0) return "空き時間なし";
+        if (!options || options.length === 0) return "時間帯なし";
         if (!selectedTimes || selectedTimes.length === 0) {
           return "すべての時間帯";
         }
@@ -3980,14 +3980,16 @@
         } else if (value && value !== MOBILE_TIME_FILTER_ALL) {
           requestedValues = [value];
         }
-        var availableTimes = getMobileAvailableTimeOptions().map(function (option) {
-          return String(option.time);
-        });
+        var selectableTimes = getMobileAvailableTimeOptions().map(
+          function (option) {
+            return String(option.time);
+          },
+        );
         var selected = [];
         requestedValues.forEach(function (item) {
           var requested = String(item);
           if (
-            availableTimes.indexOf(requested) !== -1 &&
+            selectableTimes.indexOf(requested) !== -1 &&
             selected.indexOf(requested) === -1
           ) {
             selected.push(requested);
@@ -4177,11 +4179,28 @@
             return r.key === roleKey;
           })
         ) {
-          mobileRoleAvailabilityFilter = MOBILE_ROLE_FILTER_ALL;
-          roleKey = MOBILE_ROLE_FILTER_ALL;
-          options = getMobileAvailableTimeOptions();
-          selectedTimes = getMobileAvailableTimeFilters();
-          availableRoleOptions = getMobileAvailableRoleOptions();
+          var selectedRoleStillApplies = getMobileRoleFilterOptionEvents().some(
+            function (event) {
+              return eventHasRoleSlot(event, roleKey);
+            },
+          );
+
+          if (selectedRoleStillApplies) {
+            availableRoleOptions = ROLE_KEYS.filter(function (r) {
+              return (
+                r.key === roleKey ||
+                availableRoleOptions.some(function (availableRole) {
+                  return availableRole.key === r.key;
+                })
+              );
+            });
+          } else {
+            mobileRoleAvailabilityFilter = MOBILE_ROLE_FILTER_ALL;
+            roleKey = MOBILE_ROLE_FILTER_ALL;
+            options = getMobileAvailableTimeOptions();
+            selectedTimes = getMobileAvailableTimeFilters();
+            availableRoleOptions = getMobileAvailableRoleOptions();
+          }
         }
 
         updateDesktopChoiceFilter(
@@ -4400,10 +4419,9 @@
                 getAvailableRoleSummariesForEvents(selectedEvents, roleKey),
               );
           } else if (options.length > 0) {
-            timeDetail.textContent = "すべての空き時間帯を表示中";
+            timeDetail.textContent = "すべての時間帯を表示中";
           } else {
-            timeDetail.textContent =
-              "条件に合う空き時間帯はありません";
+            timeDetail.textContent = "条件に合う時間帯はありません";
           }
         }
       }
