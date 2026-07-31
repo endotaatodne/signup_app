@@ -78,9 +78,9 @@ Recommended: Use a dedicated Google account for this app rather than your person
 3. Create a tab called **Config** (capital C)
 4. Add these headers in row 1:
 
-| A           | B        |
-| ----------- | -------- |
-| Event Alias | Sheet ID |
+| A           | B        | C      |
+| ----------- | -------- | ------ |
+| Event Alias | Sheet ID | Status |
 
 5. Note the Sheet ID from the URL:
 
@@ -125,9 +125,11 @@ Add one row for each activity that should have a per-person limit. For example, 
 1. Open your **Master Admin Sheet** → **Config tab**
 2. Add a new row:
 
-| Event Alias | Sheet ID            |
-| ----------- | ------------------- |
-| myevent     | YOUR_EVENT_SHEET_ID |
+| Event Alias | Sheet ID            | Status |
+| ----------- | ------------------- | ------ |
+| myevent     | YOUR_EVENT_SHEET_ID | OPEN   |
+
+Set a Google Sheets dropdown on the **Status** column with the exact values `OPEN` and `READ_ONLY`. Protect the Config tab or Status column so only administrators can change it. A missing or invalid Status fails closed to `READ_ONLY`: the schedule remains visible, but public signup and cancellation requests are rejected.
 
 ### Step 4 — Enable Apps Script API
 
@@ -256,7 +258,7 @@ For duplicate, overlapping-time, and activity-limit checks, the participant is i
 4. Review, replace, or remove any copied **ActivityLimits** rules so they match the new event
 5. Note the new Sheet ID
 6. Open the **Master Admin Sheet** → **Config tab**
-7. Add a new row with the alias and Sheet ID
+7. Add a new row with the alias, Sheet ID, and an initial Status of `OPEN`
 8. Share the new URL with users — no redeployment needed
 
 ### Editing Events
@@ -278,6 +280,17 @@ The optional **ActivityLimits** tab is read and validated on the server during e
 When a participant reaches a limit, the app explains that the named activity is limited to the configured number of slots per person. If the attempted signup also overlaps another signup, this more specific activity-limit message is shown first. Existing same-slot duplicate and overlapping-time checks continue to apply independently when the activity limit has not been reached.
 
 If the tab has invalid headers, an unknown activity, a duplicate activity, or an invalid limit, new signups are stopped with a generic message asking the participant to contact the organiser. Schedule viewing and cancellation continue to work, and the detailed configuration error is recorded in the Apps Script execution log for the administrator.
+
+### Making an Event Read-Only
+
+In the Master Admin Sheet's **Config tab**, change the event's **Status** value:
+
+- `OPEN` allows public signup and cancellation.
+- `READ_ONLY` keeps the schedule and existing signup information visible, but blocks both new signups and cancellations.
+
+The status is enforced by the backend, including a fresh check immediately before adding or deleting a signup row. People with an already-open page cannot bypass the lock. The browser also displays a read-only banner and removes the signup and cancellation controls. Changing the value back to `OPEN` reopens the event without a code deployment.
+
+Use a dropdown containing only the two supported values. Blank, misspelled, or unsupported values are treated as `READ_ONLY` and logged privately. Before deploying this version over an existing installation, add the `Status` header in column C and set every event that should remain writable to `OPEN`.
 
 ### Removing Events
 
@@ -435,6 +448,7 @@ npm run deploy
 - `MASTER_SHEET_ID` is stored in Script Properties
 - `.clasp.json` is local-only CLASP configuration containing the Apps Script project script ID; it is included in `.gitignore` and should not be version controlled or shared
 - Only Sheet IDs registered in the Config tab can be loaded — arbitrary Sheet IDs are rejected
+- Event Status is validated and enforced server-side; missing or invalid values default to `READ_ONLY`
 - The sheet identifier is derived server-side from the event alias — clients never supply a sheet ID directly
 - Input length and characters are validated both client-side and server-side
 - `eventId` is validated as a strict positive integer before use

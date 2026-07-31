@@ -76,9 +76,9 @@ function createEventRows() {
 
 function createConfigRows() {
   return [
-    ["Alias", "SheetId"],
-    ["Spring-Fete", EVENT_SHEET_ID],
-    ["bad", "short"],
+    ["Alias", "SheetId", "Status"],
+    ["Spring-Fete", EVENT_SHEET_ID, "OPEN"],
+    ["bad", "short", "OPEN"],
   ];
 }
 
@@ -132,6 +132,7 @@ function loadBackend(options = {}) {
       "cancelSignup",
       "checkRateLimit_",
       "getEventConfig_",
+      "getEventSettings_",
       "sanitiseForScript_",
       "getCanonicalRole_",
       "normaliseWhitespace_",
@@ -223,6 +224,9 @@ test("doGet returns rendered template output for a valid alias", () => {
   const result = app.doGet({ parameter: { event: "Spring-Fete" } });
   const decodedTitle = Buffer.from(result.titleData, "base64").toString("utf8");
   const decodedAlias = Buffer.from(result.alias, "base64").toString("utf8");
+  const decodedEventStatus = Buffer.from(result.eventStatus, "base64").toString(
+    "utf8",
+  );
   const decodedGridData = JSON.parse(
     Buffer.from(result.gridData, "base64").toString("utf8"),
   );
@@ -231,7 +235,26 @@ test("doGet returns rendered template output for a valid alias", () => {
   assert.equal(result.title, "Spring Fete");
   assert.equal(decodedTitle, "Spring Fete");
   assert.equal(decodedAlias, "Spring-Fete");
+  assert.equal(decodedEventStatus, "OPEN");
   assert.equal(decodedGridData.events[0].activity, "Hall Monitor");
+});
+
+test("doGet keeps an event viewable when Status fails closed", () => {
+  const { app, logs } = loadBackend({
+    configRows: [
+      ["Alias", "SheetId"],
+      ["Spring-Fete", EVENT_SHEET_ID],
+    ],
+  });
+
+  const result = app.doGet({ parameter: { event: "Spring-Fete" } });
+  const decodedEventStatus = Buffer.from(result.eventStatus, "base64").toString(
+    "utf8",
+  );
+
+  assert.equal(result.kind, "template");
+  assert.equal(decodedEventStatus, "READ_ONLY");
+  assert.ok(logs.some((entry) => /Status header/.test(entry.message)));
 });
 
 test("doGet returns an error page when the alias is invalid", () => {
@@ -251,6 +274,7 @@ test("getGridDataForAlias returns fresh public grid data for a valid alias", () 
   assert.equal(result.success, true);
   assert.equal(result.gridData.events[0].activity, "Hall Monitor");
   assert.equal(result.gridData.events[0].slots.general.filled, 0);
+  assert.equal(result.eventStatus, "OPEN");
 });
 
 test("getGridDataForAlias rejects invalid aliases safely", () => {
@@ -351,6 +375,29 @@ test("submitSignup appends a normalised signup row on success", () => {
   assert.equal(lock.released, true);
 });
 
+test("submitSignup rejects READ_ONLY events without appending a row", () => {
+  const { app, spreadsheets, lock } = loadBackend({
+    configRows: [
+      ["Alias", "SheetId", "Status"],
+      ["Spring-Fete", EVENT_SHEET_ID, "READ_ONLY"],
+    ],
+  });
+  const signupsSheet = spreadsheets[EVENT_SHEET_ID].getSheetByName("Signups");
+
+  const result = app.submitSignup(
+    "1",
+    "Alice",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+
+  assert.equal(result.success, false);
+  assert.equal(result.code, "event_read_only");
+  assert.equal(signupsSheet.getDataRange().getValues().length, 1);
+  assert.equal(lock.released, true);
+});
+
 test("submitSignup accepts org committee role using OrgCommitteeSlots capacity", () => {
   const { app, spreadsheets } = loadBackend();
   const signupsSheet = spreadsheets[EVENT_SHEET_ID].getSheetByName("Signups");
@@ -397,9 +444,9 @@ test("submitSignup rate limits are isolated for aliases backed by different shee
   const { app } = loadBackend({
     cacheStore,
     configRows: [
-      ["Alias", "SheetId"],
-      ["Spring-Fete", EVENT_SHEET_ID],
-      ["Summer-Fete", SECOND_EVENT_SHEET_ID],
+      ["Alias", "SheetId", "Status"],
+      ["Spring-Fete", EVENT_SHEET_ID, "OPEN"],
+      ["Summer-Fete", SECOND_EVENT_SHEET_ID, "OPEN"],
     ],
     extraSpreadsheets: {
       [SECOND_EVENT_SHEET_ID]: secondSpreadsheet,
@@ -976,6 +1023,51 @@ test("cancelling a signup restores its activity-limit allowance", () => {
   });
 });
 
+test("getEventSettings_ normalises supported status values", () => {
+  const { app } = loadBackend({
+    configRows: [
+      ["Alias", "SheetId", "Status"],
+      ["Spring-Fete", EVENT_SHEET_ID, " read_only "],
+    ],
+  });
+
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(app.getEventSettings_()["spring-fete"])),
+    {
+      sheetId: EVENT_SHEET_ID,
+      status: "READ_ONLY",
+    },
+  );
+});
+
+test("getEventSettings_ fails closed when Status is missing or invalid", () => {
+  const { app: missingHeaderApp, logs: missingHeaderLogs } = loadBackend({
+    configRows: [
+      ["Alias", "SheetId"],
+      ["Spring-Fete", EVENT_SHEET_ID],
+    ],
+  });
+  const { app: invalidStatusApp, logs: invalidStatusLogs } = loadBackend({
+    configRows: [
+      ["Alias", "SheetId", "Status"],
+      ["Spring-Fete", EVENT_SHEET_ID, "UNKNOWN"],
+    ],
+  });
+
+  assert.equal(
+    missingHeaderApp.getEventSettings_()["spring-fete"].status,
+    "READ_ONLY",
+  );
+  assert.ok(missingHeaderLogs.some((entry) => /Status header/.test(entry.message)));
+  assert.equal(
+    invalidStatusApp.getEventSettings_()["spring-fete"].status,
+    "READ_ONLY",
+  );
+  assert.ok(
+    invalidStatusLogs.some((entry) => /Invalid or missing Status/.test(entry.message)),
+  );
+});
+
 test("malformed ActivityLimits do not affect page rendering or cancellation", () => {
   const signupRows = [
     ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
@@ -1036,6 +1128,35 @@ test("cancelSignup matches normalised class values and deletes the correct row",
 
   assert.equal(result.success, true);
   assert.deepEqual(signupsSheet.__state.deletedRows, [2]);
+  assert.equal(lock.released, true);
+});
+
+test("cancelSignup rejects READ_ONLY events without deleting a row", () => {
+  const signupRows = [
+    ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
+    ["s1", 1, "Alice", "1-1", appRoleGeneral(), new Date()],
+  ];
+  const { app, spreadsheets, lock } = loadBackend({
+    configRows: [
+      ["Alias", "SheetId", "Status"],
+      ["Spring-Fete", EVENT_SHEET_ID, "READ_ONLY"],
+    ],
+    signupRows,
+  });
+  const signupsSheet = spreadsheets[EVENT_SHEET_ID].getSheetByName("Signups");
+
+  const result = app.cancelSignup(
+    "1",
+    "Alice",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+
+  assert.equal(result.success, false);
+  assert.equal(result.code, "event_read_only");
+  assert.deepEqual(signupsSheet.__state.deletedRows, []);
+  assert.equal(signupsSheet.getDataRange().getValues().length, 2);
   assert.equal(lock.released, true);
 });
 

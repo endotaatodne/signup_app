@@ -95,6 +95,7 @@ function createHtmlService() {
             fileName,
             gridData: this.gridData,
             alias: this.alias,
+            eventStatus: this.eventStatus,
             roles: this.roles,
             titleData: this.title,
             setTitle(title) {

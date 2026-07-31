@@ -21,6 +21,19 @@
         margin-bottom: 1.2rem;
         color: #222;
       }
+      .read-only-banner {
+        max-width: 1100px;
+        margin: -0.35rem auto 1rem;
+        padding: 12px 14px;
+        border: 1px solid #d6a84b;
+        border-radius: 8px;
+        background: #fff8e1;
+        color: #6d4c00;
+        font-size: 14px;
+        font-weight: 700;
+        line-height: 1.5;
+        text-align: center;
+      }
 
       /* Role colours */
       .name-role-general {
@@ -213,6 +226,18 @@
         color: #666;
         margin: 10px 0 8px;
         line-height: 1.5;
+      }
+      .modal-read-only-notice {
+        margin: 12px 0 16px;
+        padding: 12px;
+        border: 1px solid #d6a84b;
+        border-radius: 8px;
+        background: #fff8e1;
+        color: #6d4c00;
+        font-size: 14px;
+        font-weight: 700;
+        line-height: 1.5;
+        text-align: center;
       }
 
       .names-section {
@@ -1327,6 +1352,13 @@
         color: #6b7280;
         margin-bottom: 18px;
       }
+
+      body.compact-layout .modal-read-only-notice {
+        padding: 18px 16px;
+        font-size: 28px;
+        line-height: 1.5;
+      }
+
       body.compact-layout .modal-tabs {
         margin-top: 4px;
         margin-bottom: 18px;
@@ -1740,6 +1772,28 @@
         top: 80px;
       }
 
+      body.compact-layout .read-only-banner {
+        position: sticky;
+        top: 0;
+        z-index: 30;
+        max-width: none;
+        margin: 0;
+        border-right: 0;
+        border-left: 0;
+        border-radius: 0;
+        font-size: 24px;
+        line-height: 1.45;
+        box-shadow: 0 3px 10px rgba(52, 43, 34, 0.1);
+      }
+
+      body.compact-layout.event-read-only .mobile-display-mode-control {
+        top: var(--event-read-only-banner-height, 0px);
+      }
+
+      body.compact-layout.event-read-only .mobile-availability-control {
+        top: calc(80px + var(--event-read-only-banner-height, 0px));
+      }
+
       body.compact-layout .mobile-agenda {
         padding: 8px 14px 80px;
       }
@@ -2068,7 +2122,7 @@
         margin: 0 -32px;
         padding: 14px 32px 13px;
         border-bottom: 1px solid #e4ddd4;
-        background: rgba(255, 255, 255, 0.96);
+        background: #ffffff;
         color: #211d1a;
         font-size: clamp(26px, 2.2vw, 34px);
         font-weight: 900;
@@ -2095,11 +2149,40 @@
         display: grid;
         grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
         gap: 8px 12px;
-        margin-bottom: 14px;
-        padding: 10px 0;
+        margin-bottom: 0;
+        padding: 10px 0 24px;
+        isolation: isolate;
         border-bottom: 1px solid #ded7ce;
         background: #f5f2ee;
         box-shadow: 0 8px 18px rgba(52, 43, 34, 0.07);
+      }
+
+      body.desktop-layout .schedule-controls::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        right: calc(50% - 50vw);
+        bottom: 0;
+        left: calc(50% - 50vw);
+        z-index: -1;
+        background: #f5f2ee;
+        pointer-events: none;
+      }
+
+      body.desktop-layout .read-only-banner {
+        position: sticky;
+        top: 68px;
+        z-index: 29;
+        max-width: none;
+        margin: 0 -32px;
+        border-right: 0;
+        border-left: 0;
+        border-radius: 0;
+        box-shadow: 0 4px 14px rgba(52, 43, 34, 0.1);
+      }
+
+      body.desktop-layout.event-read-only .schedule-controls {
+        top: calc(68px + var(--event-read-only-banner-height, 0px));
       }
 
       body.desktop-layout .mobile-display-mode-control {
@@ -3009,6 +3092,15 @@
   </head>
   <body>
     <h1 id="pageTitle"></h1>
+    <div
+      id="readOnlyBanner"
+      class="read-only-banner"
+      role="status"
+      aria-live="polite"
+      hidden
+    >
+      現在、このページは閲覧専用です。登録やキャンセルはできません。
+    </div>
     <main class="schedule-shell">
       <div class="schedule-controls">
         <div
@@ -3284,6 +3376,14 @@
           <div id="namesGroups"></div>
         </div>
 
+        <div
+          class="modal-read-only-notice"
+          id="modalReadOnlyNotice"
+          style="display: none"
+        >
+          現在、このページは閲覧専用です。登録やキャンセルはできません。
+        </div>
+
         <div class="modal-tabs" id="modalTabs" style="display: none">
           <button class="modal-tab active-signup" id="tabSignup">
             登録する
@@ -3388,6 +3488,9 @@
       var SIGNUP_BTN_TEXT = "登録する";
       var gridData = JSON.parse(b64decode("<?!= gridData ?>"));
       var alias = b64decode("<?!= alias ?>");
+      var EVENT_STATUS_OPEN = "OPEN";
+      var EVENT_STATUS_READ_ONLY = "READ_ONLY";
+      var eventStatus = b64decode("<?!= eventStatus ?>");
       var ROLES = JSON.parse(b64decode("<?!= roles ?>"));
       var PAGE_TITLE = b64decode("<?!= title ?>");
       var currentEventId = null;
@@ -3409,6 +3512,43 @@
       var activeDesktopInsightView = null;
       var DESKTOP_INSIGHT_SCOPE_OVERALL = "overall";
       var DESKTOP_INSIGHT_SCOPE_FILTERED = "filtered";
+
+      function isEventReadOnly() {
+        return eventStatus !== EVENT_STATUS_OPEN;
+      }
+
+      function setEventStatus(status) {
+        var normalisedStatus = String(status || "")
+          .trim()
+          .toUpperCase();
+        eventStatus =
+          normalisedStatus === EVENT_STATUS_OPEN
+            ? EVENT_STATUS_OPEN
+            : EVENT_STATUS_READ_ONLY;
+        applyEventAccessState();
+      }
+
+      function updateReadOnlyBannerOffset() {
+        var banner = document.getElementById("readOnlyBanner");
+        var bannerHeight =
+          banner && !banner.hidden ? Math.ceil(Number(banner.offsetHeight) || 0) : 0;
+        var rootStyle =
+          document.documentElement && document.documentElement.style;
+        if (rootStyle && rootStyle.setProperty) {
+          rootStyle.setProperty(
+            "--event-read-only-banner-height",
+            bannerHeight + "px",
+          );
+        }
+      }
+
+      function applyEventAccessState() {
+        var banner = document.getElementById("readOnlyBanner");
+        var readOnly = isEventReadOnly();
+        if (banner) banner.hidden = !readOnly;
+        document.body.classList.toggle("event-read-only", readOnly);
+        updateReadOnlyBannerOffset();
+      }
       var desktopInsightScope = DESKTOP_INSIGHT_SCOPE_OVERALL;
 
       var ROLE_KEYS = [
@@ -5297,6 +5437,7 @@
         var compact = isCompactLayout();
         document.body.classList.toggle("compact-layout", compact);
         document.body.classList.toggle("desktop-layout", !compact);
+        updateReadOnlyBannerOffset();
         if (compact) {
           closeDesktopInsightsPanel(false);
           if (desktopFilterPopoverOpen) {
@@ -5440,6 +5581,7 @@
 
         currentEventId = eventId;
         currentRole = null;
+        var readOnly = isEventReadOnly();
 
         document.getElementById("modalTitle").textContent = event.activity;
         var subtitle =
@@ -5491,45 +5633,47 @@
         while (roleButtons.firstChild) {
           roleButtons.removeChild(roleButtons.firstChild);
         }
-        ROLE_KEYS.forEach(function (r) {
-          var s = event.slots[r.key];
-          if (s.max === 0) return;
-          var btn = document.createElement("button");
-          btn.className = "role-btn " + r.btnClass;
-          btn.setAttribute("data-role", r.label);
-          var remaining = s.max - s.filled;
-          var isFull = remaining <= 0;
-          if (isFull) {
-            btn.classList.add("role-btn-full");
-            btn.disabled = true;
-          } else {
-            btn.addEventListener("click", function () {
-              selectRole(r.label, btn);
-            });
-          }
-          var labelDiv = document.createElement("div");
-          labelDiv.className = "role-btn-label";
-          labelDiv.textContent = r.label;
-          var countDiv = document.createElement("div");
-          countDiv.className = "role-btn-count";
-          countDiv.textContent = isFull
-            ? "Full"
-            : formatRemainingSlots(remaining);
-          btn.appendChild(labelDiv);
-          btn.appendChild(countDiv);
-          roleButtons.appendChild(btn);
-        });
+        if (!readOnly) {
+          ROLE_KEYS.forEach(function (r) {
+            var s = event.slots[r.key];
+            if (s.max === 0) return;
+            var btn = document.createElement("button");
+            btn.className = "role-btn " + r.btnClass;
+            btn.setAttribute("data-role", r.label);
+            var remaining = s.max - s.filled;
+            var isFull = remaining <= 0;
+            if (isFull) {
+              btn.classList.add("role-btn-full");
+              btn.disabled = true;
+            } else {
+              btn.addEventListener("click", function () {
+                selectRole(r.label, btn);
+              });
+            }
+            var labelDiv = document.createElement("div");
+            labelDiv.className = "role-btn-label";
+            labelDiv.textContent = r.label;
+            var countDiv = document.createElement("div");
+            countDiv.className = "role-btn-count";
+            countDiv.textContent = isFull
+              ? "Full"
+              : formatRemainingSlots(remaining);
+            btn.appendChild(labelDiv);
+            btn.appendChild(countDiv);
+            roleButtons.appendChild(btn);
+          });
 
-        var allFull = ROLE_KEYS.every(function (r) {
-          var s = event.slots[r.key];
-          return s.max === 0 || s.filled >= s.max;
-        });
-        if (allFull) {
-          var fullMsg = document.createElement("div");
-          fullMsg.className = "modal-full-message";
-          fullMsg.textContent =
-            "この枠はおかげさまで定員に達しました。ありがとうございます。";
-          roleButtons.appendChild(fullMsg);
+          var allFull = ROLE_KEYS.every(function (r) {
+            var s = event.slots[r.key];
+            return s.max === 0 || s.filled >= s.max;
+          });
+          if (allFull) {
+            var fullMsg = document.createElement("div");
+            fullMsg.className = "modal-full-message";
+            fullMsg.textContent =
+              "この枠はおかげさまで定員に達しました。ありがとうございます。";
+            roleButtons.appendChild(fullMsg);
+          }
         }
 
         document.getElementById("modalForm").className = "modal-form";
@@ -5540,20 +5684,32 @@
         document.getElementById("submitBtn").textContent = SIGNUP_BTN_TEXT;
 
         var modalTabs = document.getElementById("modalTabs");
-        modalTabs.style.display = event.signups.length > 0 ? "flex" : "none";
+        modalTabs.style.display =
+          !readOnly && event.signups.length > 0 ? "flex" : "none";
 
         resetCancelSignupSelection();
         clearElement(document.getElementById("cancelSignupList"));
-        switchTab("signup");
+        document.getElementById("modalReadOnlyNotice").style.display = readOnly
+          ? "block"
+          : "none";
+        if (readOnly) {
+          document.getElementById("signupHelper").style.display = "none";
+          roleButtons.style.display = "none";
+          document.getElementById("modalForm").className = "modal-form";
+          document.getElementById("cancelForm").className = "cancel-form";
+        } else {
+          switchTab("signup");
+        }
 
         document.getElementById("modalOverlay").classList.add("active");
         document.body.style.overflow = "hidden";
-        if (!isCompactLayout()) {
+        if (!readOnly && !isCompactLayout()) {
           document.getElementById("inputName").focus();
         }
       }
 
       function selectRole(roleLabel, btn) {
+        if (isEventReadOnly()) return;
         currentRole = roleLabel;
         document.querySelectorAll(".role-btn").forEach(function (b) {
           b.classList.remove("selected");
@@ -5770,6 +5926,13 @@
       }
 
       function confirmCancel() {
+        if (isEventReadOnly()) {
+          showCancelMessage(
+            "現在、このページは閲覧専用です。登録やキャンセルはできません。",
+            false,
+          );
+          return;
+        }
         if (!currentCancelSignup) {
           showCancelMessage("キャンセルする登録を選んでください。", false);
           return;
@@ -5788,6 +5951,12 @@
 
         google.script.run
           .withSuccessHandler(function (result) {
+            if (result && result.code === "event_read_only") {
+              var eventId = currentEventId;
+              setEventStatus(EVENT_STATUS_READ_ONLY);
+              if (eventId !== null) openModal(eventId);
+              return;
+            }
             if (result.success) {
               showCancelMessage(result.message, true);
               setTimeout(function () {
@@ -5870,6 +6039,7 @@
             if (!result || !result.success || !result.gridData) return;
 
             gridData = result.gridData;
+            if (result.eventStatus) setEventStatus(result.eventStatus);
             buildGridIndexes();
             rebuildCurrentView();
 
@@ -5887,6 +6057,13 @@
       }
 
       function submitSignup() {
+        if (isEventReadOnly()) {
+          showModalMessage(
+            "現在、このページは閲覧専用です。登録やキャンセルはできません。",
+            false,
+          );
+          return;
+        }
         // This is intentionally only a low-friction client-side filter. Real
         // abuse protection is enforced server-side via rate limiting.
         if (document.getElementById("honeypot").value !== "") return;
@@ -5936,6 +6113,12 @@
 
         google.script.run
           .withSuccessHandler(function (result) {
+            if (result && result.code === "event_read_only") {
+              var eventId = currentEventId;
+              setEventStatus(EVENT_STATUS_READ_ONLY);
+              if (eventId !== null) openModal(eventId);
+              return;
+            }
             showModalMessage(result.message, result.success);
             if (result.success) {
               var event = getEventById(currentEventId);
@@ -6263,6 +6446,7 @@
       });
 
       document.getElementById("pageTitle").textContent = PAGE_TITLE;
+      setEventStatus(eventStatus);
       updateMobileDisplayModeControl();
       updateMobileAvailabilityControl();
 

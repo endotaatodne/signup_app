@@ -134,6 +134,11 @@ function createDocument(elements = {}) {
     },
     documentElement: {
       clientWidth: 0,
+      style: {
+        setProperty(name, value) {
+          this[name] = value;
+        },
+      },
     },
     getElementById(id) {
       if (elements[id]) return withElementId(id, elements[id]);
@@ -224,6 +229,7 @@ function loadClient(options = {}) {
       times: ["09:30"],
       activities: ["Hall Monitor", "Library Desk"],
     },
+    eventStatus = "OPEN",
     elements = {},
     windowOverrides = {},
     extraGlobals = {},
@@ -271,7 +277,12 @@ function loadClient(options = {}) {
       "ROLE_KEYS",
       "ROLE_META_BY_LABEL",
       "gridData",
+      "eventStatus",
       "b64decode",
+      "isEventReadOnly",
+      "setEventStatus",
+      "applyEventAccessState",
+      "updateReadOnlyBannerOffset",
       "buildGridIndexes",
       "getEventById",
       "getRoleMetaByLabel",
@@ -330,6 +341,7 @@ function loadClient(options = {}) {
     ],
     {
       gridData,
+      eventStatus,
       globals: {
         window,
         document,
@@ -355,6 +367,10 @@ test("server template data is injected only as quoted base64 values", () => {
 
   assert.match(htmlSource, /JSON\.parse\(b64decode\("<\?!= gridData \?>"\)\)/);
   assert.match(htmlSource, /var alias = b64decode\("<\?!= alias \?>"\);/);
+  assert.match(
+    htmlSource,
+    /var eventStatus = b64decode\("<\?!= eventStatus \?>"\);/,
+  );
   assert.match(htmlSource, /JSON\.parse\(b64decode\("<\?!= roles \?>"\)\)/);
   assert.match(htmlSource, /var PAGE_TITLE = b64decode\("<\?!= title \?>"\);/);
 });
@@ -368,6 +384,96 @@ test("buildGridIndexes creates the event lookup and groups signups by role", () 
   assert.equal(firstEvent.activity, "Hall Monitor");
   assert.equal(firstEvent.signupsByRole["一般保護者"].length, 1);
   assert.equal(firstEvent.signupsByRole["学年委員"].length, 1);
+});
+
+test("READ_ONLY status shows the banner and removes modal write controls", () => {
+  const readOnlyBanner = createElement("div");
+  readOnlyBanner.hidden = true;
+  readOnlyBanner.offsetHeight = 64;
+  const roleButtons = createElement("div");
+  const modalTabs = createElement("div");
+  const modalReadOnlyNotice = createElement("div");
+  const modalForm = createElement("div");
+  const cancelForm = createElement("div");
+  const { exports: client, context } = loadClient({
+    eventStatus: "READ_ONLY",
+    elements: {
+      readOnlyBanner,
+      roleButtons,
+      modalTabs,
+      modalReadOnlyNotice,
+      modalForm,
+      cancelForm,
+    },
+  });
+
+  client.openModal(1);
+
+  assert.equal(client.isEventReadOnly(), true);
+  assert.equal(readOnlyBanner.hidden, false);
+  assert.equal(context.document.body.classList.has("event-read-only"), true);
+  assert.equal(
+    context.document.documentElement.style["--event-read-only-banner-height"],
+    "64px",
+  );
+  assert.equal(roleButtons.children.length, 0);
+  assert.equal(roleButtons.style.display, "none");
+  assert.equal(modalTabs.style.display, "none");
+  assert.equal(modalReadOnlyNotice.style.display, "block");
+  assert.equal(modalForm.className, "modal-form");
+  assert.equal(cancelForm.className, "cancel-form");
+});
+
+test("read-only banner and displaced controls stay sticky on mobile and desktop", () => {
+  const htmlSource = fs.readFileSync(
+    path.resolve(__dirname, "..", "index.html"),
+    "utf8",
+  );
+
+  assert.match(
+    htmlSource,
+    /body\.compact-layout \.read-only-banner\s*{[\s\S]*?position:\s*sticky;[\s\S]*?top:\s*0;[\s\S]*?z-index:\s*30;[\s\S]*?font-size:\s*24px;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.compact-layout \.modal-read-only-notice\s*{[\s\S]*?padding:\s*18px 16px;[\s\S]*?font-size:\s*28px;[\s\S]*?line-height:\s*1\.5;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout \.read-only-banner\s*{[\s\S]*?position:\s*sticky;[\s\S]*?top:\s*68px;[\s\S]*?z-index:\s*29;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.compact-layout\.event-read-only \.mobile-display-mode-control\s*{[\s\S]*?top:\s*var\(--event-read-only-banner-height,\s*0px\);/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout\.event-read-only \.schedule-controls\s*{[\s\S]*?top:\s*calc\(68px \+ var\(--event-read-only-banner-height,\s*0px\)\);/,
+  );
+});
+
+test("desktop sticky surfaces fully obscure scrolling cards", () => {
+  const htmlSource = fs.readFileSync(
+    path.resolve(__dirname, "..", "index.html"),
+    "utf8",
+  );
+
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout #pageTitle\s*{[\s\S]*?background:\s*#ffffff;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout \.schedule-controls\s*{[\s\S]*?margin-bottom:\s*0;[\s\S]*?padding:\s*10px 0 24px;[\s\S]*?isolation:\s*isolate;[\s\S]*?background:\s*#f5f2ee;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout \.schedule-controls::before\s*{[\s\S]*?right:\s*calc\(50% - 50vw\);[\s\S]*?left:\s*calc\(50% - 50vw\);[\s\S]*?background:\s*#f5f2ee;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout \.read-only-banner\s*{[\s\S]*?max-width:\s*none;[\s\S]*?margin:\s*0 -32px;[\s\S]*?border-radius:\s*0;/,
+  );
 });
 
 test("getRoleMetaByLabel returns metadata for known role labels", () => {

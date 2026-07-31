@@ -23,6 +23,13 @@ const SHEET_NAMES = {
 };
 
 const CONFIG_HEADER_ALIASES = [["alias", "eventalias"], ["sheetid"]];
+const CONFIG_STATUS_HEADER_ALIASES = ["status"];
+const EVENT_STATUSES = {
+  open: "OPEN",
+  readOnly: "READ_ONLY",
+};
+const EVENT_READ_ONLY_MESSAGE =
+  "現在、このページは閲覧専用です。登録やキャンセルはできません。";
 const ACTIVITY_LIMIT_HEADER_ALIASES = [["activity"], ["maxperperson"]];
 const EVENT_HEADER_ALIASES = [
   ["eventid"],
@@ -81,8 +88,8 @@ function doGet(e) {
       );
     }
 
-    const config = getEventConfig_();
-    const sheetId = config[alias.toLowerCase()];
+    const eventSettings = getEventSettings_()[alias.toLowerCase()];
+    const sheetId = eventSettings && eventSettings.sheetId;
 
     if (!sheetId) {
       return HtmlService.createHtmlOutput(
@@ -100,6 +107,10 @@ function doGet(e) {
       Utilities.Charset.UTF_8,
     );
     const encodedAlias = Utilities.base64Encode(alias, Utilities.Charset.UTF_8);
+    const encodedEventStatus = Utilities.base64Encode(
+      eventSettings.status,
+      Utilities.Charset.UTF_8,
+    );
     const encodedRoles = Utilities.base64Encode(
       JSON.stringify(ROLES),
       Utilities.Charset.UTF_8,
@@ -109,6 +120,7 @@ function doGet(e) {
     const template = HtmlService.createTemplateFromFile("index");
     template.gridData = encodedGridData;
     template.alias = encodedAlias;
+    template.eventStatus = encodedEventStatus;
     template.roles = encodedRoles;
     template.title = encodedTitle;
 
@@ -220,7 +232,7 @@ function getGridData_(spreadsheet) {
 /**
  * Fetches fresh public grid data for an event alias.
  * @param {string} alias - Event alias from the URL
- * @returns {{success: boolean, gridData?: Object, message?: string}}
+ * @returns {{success: boolean, gridData?: Object, eventStatus?: string, message?: string}}
  */
 function getGridDataForAlias(alias) {
   try {
@@ -228,14 +240,18 @@ function getGridDataForAlias(alias) {
       return { success: false, message: "不正なリクエストです。" };
     }
 
-    const config = getEventConfig_();
-    const sheetId = config[alias.toLowerCase()];
+    const eventSettings = getEventSettings_()[alias.toLowerCase()];
+    const sheetId = eventSettings && eventSettings.sheetId;
     if (!sheetId) {
       return { success: false, message: "不正なリクエストです。" };
     }
 
     const spreadsheet = SpreadsheetApp.openById(sheetId);
-    return { success: true, gridData: getGridData_(spreadsheet) };
+    return {
+      success: true,
+      gridData: getGridData_(spreadsheet),
+      eventStatus: eventSettings.status,
+    };
   } catch (e) {
     console.error("getGridDataForAlias error: " + e.message);
     return {
@@ -284,13 +300,7 @@ function eventRangesOverlap_(a, b) {
   return a.startMinutes < b.endMinutes && b.startMinutes < a.endMinutes;
 }
 
-function findConcurrentSignup_(
-  eventRows,
-  signupRows,
-  eventId,
-  name,
-  eventRow,
-) {
+function findConcurrentSignup_(eventRows, signupRows, eventId, name, eventRow) {
   const targetRange = getEventRange_(eventRow);
   const normalisedName = normaliseComparable_(name);
   const eventById = {};
@@ -310,12 +320,7 @@ function findConcurrentSignup_(
   });
 }
 
-function countPersonSignupsForActivity_(
-  eventRows,
-  signupRows,
-  activity,
-  name,
-) {
+function countPersonSignupsForActivity_(eventRows, signupRows, activity, name) {
   const targetActivity = normaliseActivityKey_(activity);
   const normalisedName = normaliseComparable_(name);
   const activityByEventId = Object.create(null);
@@ -370,10 +375,13 @@ function submitSignup(eventId, name, cls, role, alias) {
     eventId = parsedEventId;
 
     // Derive sheetId server-side
-    const config = getEventConfig_();
-    const sheetId = config[alias.toLowerCase()];
+    const eventSettings = getEventSettings_()[alias.toLowerCase()];
+    const sheetId = eventSettings && eventSettings.sheetId;
     if (!sheetId) {
       return { success: false, message: "不正なリクエストです。" };
+    }
+    if (eventSettings.status !== EVENT_STATUSES.open) {
+      return getEventReadOnlyResult_();
     }
 
     // Validate name
@@ -517,6 +525,12 @@ function submitSignup(eventId, name, cls, role, alias) {
       };
     }
 
+    // Re-read the policy immediately before writing so an already-open page,
+    // or a request that began while the event was open, cannot bypass a lock.
+    if (!isEventOpenForWrite_(alias, sheetId)) {
+      return getEventReadOnlyResult_();
+    }
+
     const signupId = Utilities.getUuid();
     signupsSheet.appendRow([
       signupId,
@@ -603,10 +617,13 @@ function cancelSignup(eventId, name, cls, role, alias) {
     }
 
     // Derive sheetId server-side
-    const config = getEventConfig_();
-    const sheetId = config[alias.toLowerCase()];
+    const eventSettings = getEventSettings_()[alias.toLowerCase()];
+    const sheetId = eventSettings && eventSettings.sheetId;
     if (!sheetId) {
       return { success: false, message: "不正なリクエストです。" };
+    }
+    if (eventSettings.status !== EVENT_STATUSES.open) {
+      return getEventReadOnlyResult_();
     }
 
     if (!checkRateLimit_(parsedEventId, name, cls, "cancel", sheetId)) {
@@ -660,6 +677,12 @@ function cancelSignup(eventId, name, cls, role, alias) {
         message:
           "お名前とクラスの登録が見つかりません。入力内容をご確認ください。",
       };
+    }
+
+    // Re-read the policy immediately before deleting for the same reason as
+    // the final check in submitSignup.
+    if (!isEventOpenForWrite_(alias, sheetId)) {
+      return getEventReadOnlyResult_();
     }
 
     // Delete the matching row
@@ -730,11 +753,11 @@ function checkRateLimit_(eventId, name, cls, action, scope) {
 }
 
 /**
- * Reads allowed event aliases and Sheet IDs from the Config tab.
- * Validates Sheet ID format before trusting.
- * @returns {Object} Map of alias to Sheet ID
+ * Reads allowed event aliases, Sheet IDs, and access status from the Config
+ * tab. Invalid or missing statuses fail closed without hiding public data.
+ * @returns {Object} Map of alias to event settings
  */
-function getEventConfig_() {
+function getEventSettings_() {
   if (!MASTER_SHEET_ID) {
     console.error("MASTER_SHEET_ID not set in Script Properties");
     return {};
@@ -744,6 +767,16 @@ function getEventConfig_() {
     SHEET_NAMES.config,
     CONFIG_HEADER_ALIASES,
   ).values;
+  const hasValidStatusHeader =
+    rows[0].length >= 3 &&
+    CONFIG_STATUS_HEADER_ALIASES.indexOf(normaliseHeaderValue_(rows[0][2])) !==
+      -1;
+  if (!hasValidStatusHeader) {
+    console.error(
+      'The "Config" sheet Status header is missing or invalid. Events default to READ_ONLY.',
+    );
+  }
+
   const config = {};
   rows.slice(1).forEach(function (row) {
     const alias = String(row[0] || "")
@@ -756,10 +789,63 @@ function getEventConfig_() {
       sheetId &&
       /^[a-zA-Z0-9_\-]{20,60}$/.test(sheetId)
     ) {
-      config[alias] = sheetId;
+      const parsedStatus = hasValidStatusHeader
+        ? parseEventStatus_(row[2])
+        : null;
+      if (!parsedStatus) {
+        console.error(
+          'Invalid or missing Status for event alias "' +
+            alias +
+            '". Defaulting to READ_ONLY.',
+        );
+      }
+      config[alias] = {
+        sheetId: sheetId,
+        status: parsedStatus || EVENT_STATUSES.readOnly,
+      };
     }
   });
   return config;
+}
+
+/**
+ * Backwards-compatible alias-to-Sheet-ID map used by existing integrations.
+ * Access decisions must use getEventSettings_ instead.
+ * @returns {Object} Map of alias to Sheet ID
+ */
+function getEventConfig_() {
+  const settings = getEventSettings_();
+  const config = {};
+  Object.keys(settings).forEach(function (alias) {
+    config[alias] = settings[alias].sheetId;
+  });
+  return config;
+}
+
+function parseEventStatus_(value) {
+  const status = String(value == null ? "" : value)
+    .trim()
+    .toUpperCase();
+  if (status === EVENT_STATUSES.open) return EVENT_STATUSES.open;
+  if (status === EVENT_STATUSES.readOnly) return EVENT_STATUSES.readOnly;
+  return null;
+}
+
+function isEventOpenForWrite_(alias, expectedSheetId) {
+  const eventSettings = getEventSettings_()[String(alias || "").toLowerCase()];
+  return Boolean(
+    eventSettings &&
+    eventSettings.sheetId === expectedSheetId &&
+    eventSettings.status === EVENT_STATUSES.open,
+  );
+}
+
+function getEventReadOnlyResult_() {
+  return {
+    success: false,
+    code: "event_read_only",
+    message: EVENT_READ_ONLY_MESSAGE,
+  };
 }
 
 /**
@@ -916,9 +1002,7 @@ function getOptionalActivityLimits_(spreadsheet, eventRows) {
     if (!activity && !limitText) return;
     if (!activity) {
       throw new Error(
-        'Activity is required in "ActivityLimits" sheet row ' +
-          rowNumber +
-          ".",
+        'Activity is required in "ActivityLimits" sheet row ' + rowNumber + ".",
       );
     }
     if (!limitText) {
@@ -934,9 +1018,7 @@ function getOptionalActivityLimits_(spreadsheet, eventRows) {
     const limit = Number(rawLimit);
     if (!hasSupportedLimitType || !Number.isInteger(limit) || limit <= 0) {
       throw new Error(
-        'Invalid MaxPerPerson in "ActivityLimits" sheet row ' +
-          rowNumber +
-          ".",
+        'Invalid MaxPerPerson in "ActivityLimits" sheet row ' + rowNumber + ".",
       );
     }
     if (!eventActivities[activity]) {
@@ -1040,7 +1122,9 @@ function validateEventRow_(row, rowNumber) {
   );
   parseNonNegativeIntegerCell_(
     row[10],
-    'Invalid steering committee slot limit in "Events" sheet row ' + rowNumber + ".",
+    'Invalid steering committee slot limit in "Events" sheet row ' +
+      rowNumber +
+      ".",
   );
   parseNonNegativeIntegerCell_(
     row[11],

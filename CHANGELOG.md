@@ -8,6 +8,11 @@
   - Lists matching full time slots as well as open time slots in the time filter.
   - Preserves the existing mobile controls and layout.
   - Updates the English and Japanese schedule documentation for the compact desktop filters.
+  - Adds a per-event `Status` column to the master Config sheet with `OPEN` and `READ_ONLY` modes.
+  - Enforces read-only mode server-side for both signup creation and cancellation, with a fresh policy check immediately before each Sheet mutation.
+  - Treats missing or invalid status configuration as `READ_ONLY` while keeping schedule viewing available.
+  - Shows a sticky read-only banner on mobile and desktop, uses larger mobile warning text, keeps desktop scrolling content fully behind opaque sticky surfaces, and removes signup and cancellation controls when an event is locked.
+  - Documents the Config migration and administrator workflow in English and Japanese.
   - Bumps the app version to 0.2.6.
 
 ## v0.2.5 - 2026-07-29
