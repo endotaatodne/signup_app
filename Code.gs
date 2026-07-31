@@ -14,6 +14,12 @@ const ROLES = {
   steeringCommittee: "役員、運営・実行委員",
   orgCommittee: "実行委員",
 };
+const CANONICAL_ROLES = [
+  ROLES.general,
+  ROLES.classRep,
+  ROLES.steeringCommittee,
+  ROLES.orgCommittee,
+];
 
 const SHEET_NAMES = {
   config: "Config",
@@ -62,6 +68,10 @@ const SIGNUP_HEADER_ALIASES = [
 ];
 
 const APP_TIME_ZONE = "Australia/Brisbane";
+const RATE_LIMIT_WINDOW_SECONDS = 60;
+const RATE_LIMIT_PERSON_MAX_HITS = 3;
+const RATE_LIMIT_EVENT_MAX_HITS = 20;
+const RATE_LIMIT_PROPERTY_PREFIX = "signup_app_rate_limit_v2_";
 
 /**
  * Entry point for the web app. Called automatically by Google Apps Script
@@ -337,6 +347,21 @@ function countPersonSignupsForActivity_(eventRows, signupRows, activity, name) {
   }, 0);
 }
 
+function getEventRowForRequest_(spreadsheet, eventId) {
+  const eventRows = getSheetData_(
+    spreadsheet,
+    SHEET_NAMES.events,
+    EVENT_HEADER_ALIASES,
+  ).values;
+  // Use loose equality intentionally because Sheets can surface EventID cells
+  // as either numbers or strings depending on column formatting.
+  const eventRow = eventRows.slice(1).find((row) => row[0] == eventId);
+  if (eventRow) {
+    validateEventRow_(eventRow, eventRows.indexOf(eventRow) + 1);
+  }
+  return eventRow || null;
+}
+
 /**
  * Submits a new signup for a given event and role.
  * SheetId is derived server-side from the alias — never trusted from client.
@@ -348,20 +373,9 @@ function countPersonSignupsForActivity_(eventRows, signupRows, activity, name) {
  * @returns {{success: boolean, message: string}}
  */
 function submitSignup(eventId, name, cls, role, alias) {
-  const lock = LockService.getScriptLock();
+  let lock = null;
   let lockAcquired = false;
   try {
-    // Acquire lock with graceful timeout handling
-    try {
-      lock.waitLock(5000);
-      lockAcquired = true;
-    } catch (e) {
-      return {
-        success: false,
-        message: "システムがビジー状態です。もう少し待ってから試してください。",
-      };
-    }
-
     // Validate alias
     if (!isValidAlias_(alias)) {
       return { success: false, message: "不正なリクエストです。" };
@@ -404,16 +418,31 @@ function submitSignup(eventId, name, cls, role, alias) {
       return { success: false, message: "ポジションを選択してください。" };
     }
 
-    // Rate limiting — composite key prevents bypass by name variation,
-    // global event cap prevents flood attacks
-    if (!checkRateLimit_(eventId, name, cls, "signup", sheetId)) {
+    const spreadsheet = SpreadsheetApp.openById(sheetId);
+    const initialEventRow = getEventRowForRequest_(spreadsheet, eventId);
+    if (!initialEventRow) {
+      return { success: false, message: "イベントが見つかりません。" };
+    }
+
+    const initialEventDate = new Date(initialEventRow[3]);
+    const initialToday = new Date();
+    initialToday.setHours(0, 0, 0, 0);
+    if (initialEventDate < initialToday) {
+      return { success: false, message: "このイベントは既に終了しています。" };
+    }
+
+    // Only valid, writable requests may contend for the global mutation lock.
+    lock = LockService.getScriptLock();
+    try {
+      lock.waitLock(5000);
+      lockAcquired = true;
+    } catch (e) {
       return {
         success: false,
-        message: "使用回数を超過しました。少し待ってからお試しください。",
+        message: "システムがビジー状態です。もう少し待ってから試してください。",
       };
     }
 
-    const spreadsheet = SpreadsheetApp.openById(sheetId);
     const data = getValidatedEventSpreadsheetData_(spreadsheet);
     const eventRows = data.eventRows;
     const signupsSheet = data.signupsSheet;
@@ -429,6 +458,15 @@ function submitSignup(eventId, name, cls, role, alias) {
     today.setHours(0, 0, 0, 0);
     if (eventDate < today) {
       return { success: false, message: "このイベントは既に終了しています。" };
+    }
+
+    // Run the limiter only after confirming that EventID exists. The durable
+    // layer must never create persistent counters for arbitrary request IDs.
+    if (!checkRateLimit_(eventId, name, cls, "signup", sheetId)) {
+      return {
+        success: false,
+        message: "使用回数を超過しました。少し待ってからお試しください。",
+      };
     }
 
     // Get max slots for the selected role
@@ -571,20 +609,9 @@ function submitSignup(eventId, name, cls, role, alias) {
  * @returns {{success: boolean, message: string}}
  */
 function cancelSignup(eventId, name, cls, role, alias) {
-  const lock = LockService.getScriptLock();
+  let lock = null;
   let lockAcquired = false;
   try {
-    // Acquire lock
-    try {
-      lock.waitLock(5000);
-      lockAcquired = true;
-    } catch (e) {
-      return {
-        success: false,
-        message: "システムがビジー状態です。もう少し待ってから試してください。",
-      };
-    }
-
     // Validate alias
     if (!isValidAlias_(alias)) {
       return { success: false, message: "不正なリクエストです。" };
@@ -626,14 +653,23 @@ function cancelSignup(eventId, name, cls, role, alias) {
       return getEventReadOnlyResult_();
     }
 
-    if (!checkRateLimit_(parsedEventId, name, cls, "cancel", sheetId)) {
+    const spreadsheet = SpreadsheetApp.openById(sheetId);
+    if (!getEventRowForRequest_(spreadsheet, parsedEventId)) {
+      return { success: false, message: "イベントが見つかりません。" };
+    }
+
+    // Only valid, writable requests may contend for the global mutation lock.
+    lock = LockService.getScriptLock();
+    try {
+      lock.waitLock(5000);
+      lockAcquired = true;
+    } catch (e) {
       return {
         success: false,
-        message: "使用回数を超過しました。少し待ってからお試しください。",
+        message: "システムがビジー状態です。もう少し待ってから試してください。",
       };
     }
 
-    const spreadsheet = SpreadsheetApp.openById(sheetId);
     const data = getValidatedEventSpreadsheetData_(spreadsheet);
     const eventExists = data.eventRows
       .slice(1)
@@ -641,6 +677,14 @@ function cancelSignup(eventId, name, cls, role, alias) {
     if (!eventExists) {
       return { success: false, message: "イベントが見つかりません。" };
     }
+
+    if (!checkRateLimit_(parsedEventId, name, cls, "cancel", sheetId)) {
+      return {
+        success: false,
+        message: "使用回数を超過しました。少し待ってからお試しください。",
+      };
+    }
+
     const signupsSheet = data.signupsSheet;
     const signupRows = data.signupRows;
     const signupDisplayRows = data.signupDisplayRows;
@@ -706,8 +750,10 @@ function cancelSignup(eventId, name, cls, role, alias) {
 }
 
 /**
- * Rate limiter — composite key prevents bypass by name variation.
- * Global event cap prevents flood attacks.
+ * Two-layer rate limiter. CacheService cheaply limits repeated person actions,
+ * while Script Properties durably enforces the shared event cap even if cache
+ * entries are evicted early. Callers hold the script lock, making the durable
+ * read/update atomic across concurrent requests.
  * @param {number} eventId - The event being signed up for
  * @param {string} name - The participant's name
  * @param {string} cls - The participant's class
@@ -722,8 +768,8 @@ function checkRateLimit_(eventId, name, cls, action, scope) {
     String(scope || "default")
       .replace(/[\s\u3000]+/g, "")
       .substring(0, 80) || "default";
-  const namePart = normaliseCompact_(name).substring(0, 3);
-  const clsPart = normaliseCompact_(cls).substring(0, 3);
+  const namePart = normaliseCompact_(name);
+  const clsPart = normaliseCompact_(cls);
   const key =
     "rl_" +
     actionKey +
@@ -737,19 +783,66 @@ function checkRateLimit_(eventId, name, cls, action, scope) {
     clsPart;
 
   const hits = cache.get(key);
-  if (hits && parseInt(hits, 10) >= 3) return false;
-  cache.put(key, hits ? String(parseInt(hits, 10) + 1) : "1", 60);
-
-  const eventKey = "rl_" + actionKey + "_event_" + scopeKey + "_" + eventId;
-  const eventHits = cache.get(eventKey);
-  if (eventHits && parseInt(eventHits, 10) >= 20) return false;
+  if (hits && parseInt(hits, 10) >= RATE_LIMIT_PERSON_MAX_HITS) return false;
   cache.put(
-    eventKey,
-    eventHits ? String(parseInt(eventHits, 10) + 1) : "1",
-    60,
+    key,
+    hits ? String(parseInt(hits, 10) + 1) : "1",
+    RATE_LIMIT_WINDOW_SECONDS,
   );
 
-  return true;
+  const eventKey =
+    RATE_LIMIT_PROPERTY_PREFIX +
+    actionKey +
+    "_" +
+    scopeKey +
+    "_" +
+    eventId;
+  return consumePersistentRateLimit_(
+    eventKey,
+    RATE_LIMIT_EVENT_MAX_HITS,
+    RATE_LIMIT_WINDOW_SECONDS * 1000,
+  );
+}
+
+function consumePersistentRateLimit_(key, maxHits, windowMilliseconds) {
+  try {
+    const properties = PropertiesService.getScriptProperties();
+    const now = Date.now();
+    const storedValue = properties.getProperty(key);
+    let windowStart = now;
+    let hits = 0;
+
+    if (storedValue) {
+      try {
+        const stored = JSON.parse(storedValue);
+        if (
+          Number.isFinite(stored.windowStart) &&
+          Number.isInteger(stored.hits) &&
+          stored.hits >= 0 &&
+          now >= stored.windowStart &&
+          now - stored.windowStart < windowMilliseconds
+        ) {
+          windowStart = stored.windowStart;
+          hits = stored.hits;
+        }
+      } catch (e) {
+        console.error("Invalid persistent rate-limit state for key: " + key);
+      }
+    }
+
+    if (hits >= maxHits) return false;
+
+    properties.setProperty(
+      key,
+      JSON.stringify({ windowStart: windowStart, hits: hits + 1 }),
+    );
+    return true;
+  } catch (e) {
+    // Fail closed: losing durable abuse protection must not silently allow an
+    // unlimited write path under the deployer's spreadsheet authority.
+    console.error("Persistent rate limiter error: " + e.message);
+    return false;
+  }
 }
 
 /**
@@ -866,13 +959,8 @@ function sanitiseForScript_(str) {
 }
 
 function getCanonicalRole_(role) {
-  const roleKeyMap = {
-    [ROLES.general]: ROLES.general,
-    [ROLES.classRep]: ROLES.classRep,
-    [ROLES.steeringCommittee]: ROLES.steeringCommittee,
-    [ROLES.orgCommittee]: ROLES.orgCommittee,
-  };
-  return roleKeyMap[role];
+  if (typeof role !== "string") return undefined;
+  return CANONICAL_ROLES.indexOf(role) === -1 ? undefined : role;
 }
 
 function isValidAlias_(alias) {

@@ -135,7 +135,9 @@ function createLock(shouldFailWait) {
   return {
     released: false,
     releaseCount: 0,
+    waitCount: 0,
     waitLock() {
+      this.waitCount += 1;
       if (shouldFailWait) {
         throw new Error("Lock wait failed");
       }
@@ -156,6 +158,7 @@ function createGasMocks(options = {}) {
     deployedUrl = "https://example.com/app",
     nowValue = "2026-04-19T00:00:00Z",
     lockWaitFails = false,
+    propertyStore = new Map(),
   } = options;
 
   let uuidIndex = 0;
@@ -165,6 +168,7 @@ function createGasMocks(options = {}) {
   return {
     logs,
     lock,
+    propertyStore,
     globals: {
       console: {
         error(message) {
@@ -178,7 +182,11 @@ function createGasMocks(options = {}) {
               if (key === "MASTER_SHEET_ID") {
                 return masterSheetId;
               }
-              return null;
+              return propertyStore.has(key) ? propertyStore.get(key) : null;
+            },
+            setProperty(key, value) {
+              propertyStore.set(key, String(value));
+              return this;
             },
           };
         },

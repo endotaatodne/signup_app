@@ -93,6 +93,7 @@ function loadBackend(options = {}) {
     extraSpreadsheets = {},
     nowValue,
     cacheStore,
+    propertyStore,
     lockWaitFails = false,
   } = options;
 
@@ -119,6 +120,7 @@ function loadBackend(options = {}) {
     spreadsheets,
     nowValue,
     cacheStore,
+    propertyStore,
     lockWaitFails,
   });
 
@@ -151,6 +153,7 @@ function loadBackend(options = {}) {
     spreadsheets,
     lock: mockEnv.lock,
     logs: mockEnv.logs,
+    propertyStore: mockEnv.propertyStore,
   };
 }
 
@@ -352,6 +355,70 @@ test("checkRateLimit_ limits global event flooding for cancellation attempts", (
   assert.equal(app.checkRateLimit_(1, "Overflow", "9", "cancel"), false);
 });
 
+test("checkRateLimit_ durable event cap survives transient cache eviction", () => {
+  const propertyStore = new Map();
+  const { app } = loadBackend({ cacheStore: new Map(), propertyStore });
+
+  for (let i = 0; i < 20; i += 1) {
+    assert.equal(app.checkRateLimit_(1, `User${i}`, `${i}`), true);
+  }
+
+  const { app: freshApp } = loadBackend({
+    cacheStore: new Map(),
+    propertyStore,
+  });
+  assert.equal(freshApp.checkRateLimit_(1, "Overflow", "9"), false);
+});
+
+test("checkRateLimit_ resets durable event counters after the window", () => {
+  const propertyStore = new Map();
+  const { app } = loadBackend({
+    cacheStore: new Map(),
+    propertyStore,
+    nowValue: "2026-04-19T00:00:00Z",
+  });
+
+  for (let i = 0; i < 20; i += 1) {
+    assert.equal(app.checkRateLimit_(1, `User${i}`, `${i}`), true);
+  }
+
+  const { app: laterApp } = loadBackend({
+    cacheStore: new Map(),
+    propertyStore,
+    nowValue: "2026-04-19T00:01:01Z",
+  });
+  assert.equal(laterApp.checkRateLimit_(1, "AfterWindow", "9"), true);
+});
+
+test("checkRateLimit_ uses complete normalised identity keys", () => {
+  const { app } = loadBackend({ cacheStore: new Map() });
+
+  for (let i = 0; i < 3; i += 1) {
+    assert.equal(app.checkRateLimit_(1, "Alice", "1-1"), true);
+    assert.equal(app.checkRateLimit_(1, "Alina", "1-1"), true);
+  }
+  assert.equal(app.checkRateLimit_(1, "Alice", "1-1"), false);
+  assert.equal(app.checkRateLimit_(1, "Alina", "1-1"), false);
+});
+
+test("checkRateLimit_ fails closed when durable state cannot be written", () => {
+  const propertyStore = {
+    has() {
+      return false;
+    },
+    get() {
+      return undefined;
+    },
+    set() {
+      throw new Error("Property write failed");
+    },
+  };
+  const { app, logs } = loadBackend({ propertyStore });
+
+  assert.equal(app.checkRateLimit_(1, "Alice", "1-1"), false);
+  assert.ok(logs.some((entry) => /Persistent rate limiter error/.test(entry.message)));
+});
+
 test("submitSignup appends a normalised signup row on success", () => {
   const { app, spreadsheets, lock } = loadBackend();
   const signupsSheet = spreadsheets[EVENT_SHEET_ID].getSheetByName("Signups");
@@ -395,7 +462,45 @@ test("submitSignup rejects READ_ONLY events without appending a row", () => {
   assert.equal(result.success, false);
   assert.equal(result.code, "event_read_only");
   assert.equal(signupsSheet.getDataRange().getValues().length, 1);
-  assert.equal(lock.released, true);
+  assert.equal(lock.waitCount, 0);
+  assert.equal(lock.released, false);
+});
+
+test("submitSignup rejects malformed requests before waiting for the lock", () => {
+  const invalidRequests = [
+    ["1", "Alice", "1-1", appRoleGeneral(), "<bad>"],
+    ["not-an-id", "Alice", "1-1", appRoleGeneral(), "spring-fete"],
+    ["1", "Alice<", "1-1", appRoleGeneral(), "spring-fete"],
+    ["1", "Alice", "1-1", "toString", "spring-fete"],
+  ];
+
+  invalidRequests.forEach((request) => {
+    const { app, lock } = loadBackend({ lockWaitFails: true });
+    const result = app.submitSignup(...request);
+
+    assert.equal(result.success, false);
+    assert.equal(lock.waitCount, 0);
+    assert.equal(lock.released, false);
+  });
+});
+
+test("submitSignup does not persist rate-limit keys for unknown EventIDs", () => {
+  const propertyStore = new Map();
+  const { app, lock } = loadBackend({ propertyStore });
+
+  const result = app.submitSignup(
+    "999",
+    "Alice",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+
+  assert.equal(result.success, false);
+  assert.match(result.message, /イベントが見つかりません/);
+  assert.equal(propertyStore.size, 0);
+  assert.equal(lock.waitCount, 0);
+  assert.equal(lock.released, false);
 });
 
 test("submitSignup accepts org committee role using OrgCommitteeSlots capacity", () => {
@@ -1157,7 +1262,45 @@ test("cancelSignup rejects READ_ONLY events without deleting a row", () => {
   assert.equal(result.code, "event_read_only");
   assert.deepEqual(signupsSheet.__state.deletedRows, []);
   assert.equal(signupsSheet.getDataRange().getValues().length, 2);
-  assert.equal(lock.released, true);
+  assert.equal(lock.waitCount, 0);
+  assert.equal(lock.released, false);
+});
+
+test("cancelSignup rejects malformed requests before waiting for the lock", () => {
+  const invalidRequests = [
+    ["1", "Alice", "1-1", appRoleGeneral(), "<bad>"],
+    ["not-an-id", "Alice", "1-1", appRoleGeneral(), "spring-fete"],
+    ["1", "Alice<", "1-1", appRoleGeneral(), "spring-fete"],
+    ["1", "Alice", "1-1", "constructor", "spring-fete"],
+  ];
+
+  invalidRequests.forEach((request) => {
+    const { app, lock } = loadBackend({ lockWaitFails: true });
+    const result = app.cancelSignup(...request);
+
+    assert.equal(result.success, false);
+    assert.equal(lock.waitCount, 0);
+    assert.equal(lock.released, false);
+  });
+});
+
+test("cancelSignup rejects unknown EventIDs before waiting for the lock", () => {
+  const propertyStore = new Map();
+  const { app, lock } = loadBackend({ propertyStore });
+
+  const result = app.cancelSignup(
+    "999",
+    "Alice",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+
+  assert.equal(result.success, false);
+  assert.match(result.message, /イベントが見つかりません/);
+  assert.equal(propertyStore.size, 0);
+  assert.equal(lock.waitCount, 0);
+  assert.equal(lock.released, false);
 });
 
 test("cancelSignup matches Japanese names with or without spaces", () => {
@@ -1454,7 +1597,8 @@ test("submitSignup fails safely when the events sheet is missing", () => {
   );
 
   assert.equal(result.success, false);
-  assert.equal(lock.released, true);
+  assert.equal(lock.waitCount, 0);
+  assert.equal(lock.released, false);
   assert.ok(logs.some((entry) => /Events/.test(entry.message)));
 });
 

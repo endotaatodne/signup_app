@@ -12,6 +12,9 @@
   - Enforces read-only mode server-side for both signup creation and cancellation, with a fresh policy check immediately before each Sheet mutation.
   - Treats missing or invalid status configuration as `READ_ONLY` while keeping schedule viewing available.
   - Shows a sticky read-only banner on mobile and desktop, uses larger mobile warning text, keeps desktop scrolling content fully behind opaque sticky surfaces, and removes signup and cancellation controls when an event is locked.
+  - Rejects malformed and read-only write requests before they can contend for the global mutation lock.
+  - Hardens role validation against inherited JavaScript object properties.
+  - Adds a durable Script Properties event-rate limit that survives transient cache eviction, while retaining per-person cache throttling with complete normalized identity keys.
   - Documents the Config migration and administrator workflow in English and Japanese.
   - Bumps the app version to 0.2.6.
 
