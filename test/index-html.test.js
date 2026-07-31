@@ -1655,7 +1655,7 @@ test("desktop reuses the responsive filters and card schedule", () => {
   );
   assert.match(
     htmlSource,
-    /body\.desktop-layout \.desktop-filter-summary\s*{[\s\S]*?visibility:\s*hidden;[\s\S]*?display:\s*inline-flex;/,
+    /body\.desktop-layout \.desktop-filter-summary\s*{[\s\S]*?position:\s*absolute;[\s\S]*?width:\s*1px;[\s\S]*?clip-path:\s*inset\(50%\);/,
   );
   assert.match(
     htmlSource,
@@ -1667,27 +1667,67 @@ test("desktop reuses the responsive filters and card schedule", () => {
   );
   assert.match(
     htmlSource,
-    /body\.desktop-layout \.mobile-availability-control\s*{[\s\S]*?display:\s*block;[\s\S]*?border-radius:\s*16px;/,
+    /body\.desktop-layout \.mobile-availability-control\s*{[\s\S]*?display:\s*block;[\s\S]*?padding:\s*8px;[\s\S]*?border-radius:\s*8px;/,
   );
   assert.match(
     htmlSource,
-    /body\.desktop-layout \.schedule-controls\s*{[\s\S]*?position:\s*sticky;[\s\S]*?top:\s*84px;[\s\S]*?z-index:\s*20;/,
+    /body\.desktop-layout #pageTitle\s*{[\s\S]*?min-height:\s*68px;/,
   );
   assert.match(
     htmlSource,
-    /body\.desktop-layout \.mobile-activity-filter-field\s*{[\s\S]*?grid-column:\s*1\s*\/\s*span 7;/,
+    /body\.desktop-layout \.schedule-controls\s*{[\s\S]*?position:\s*sticky;[\s\S]*?top:\s*68px;[\s\S]*?z-index:\s*20;/,
   );
   assert.match(
     htmlSource,
-    /body\.desktop-layout \.mobile-role-filter-field\s*{[\s\S]*?grid-column:\s*8\s*\/\s*-1;/,
+    /body\.desktop-layout \.mobile-filter-row-secondary\s*{[\s\S]*?minmax\(150px,\s*0\.8fr\)[\s\S]*?minmax\(260px,\s*1\.5fr\)\s*40px;/,
   );
   assert.match(
     htmlSource,
-    /body\.desktop-layout \.mobile-activity-filter-pills,[\s\S]*?body\.desktop-layout \.mobile-role-filter-pills\s*{[\s\S]*?flex-wrap:\s*wrap;/,
+    /body\.desktop-layout \.mobile-activity-filter-field\s*{[\s\S]*?grid-column:\s*1;/,
   );
   assert.match(
     htmlSource,
-    /body\.desktop-layout \.mobile-activity-filter-pill,[\s\S]*?body\.desktop-layout \.mobile-role-filter-pill\s*{[\s\S]*?flex:\s*0 0 auto;[\s\S]*?white-space:\s*nowrap;/,
+    /body\.desktop-layout \.mobile-role-filter-field\s*{[\s\S]*?grid-column:\s*2;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout \.mobile-time-filter-field\s*{[\s\S]*?grid-column:\s*3;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout \.mobile-keyword-filter-field\s*{[\s\S]*?grid-column:\s*4;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout \.mobile-activity-filter-pills,[\s\S]*?body\.desktop-layout \.mobile-role-filter-pills\s*{[\s\S]*?display:\s*none;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout \.desktop-choice-toggle\s*{[\s\S]*?display:\s*flex;[\s\S]*?min-height:\s*40px;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout \.desktop-choice-menu\s*{[\s\S]*?position:\s*absolute;[\s\S]*?display:\s*flex;[\s\S]*?max-width:\s*min\(560px,/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout \.desktop-choice-menu\[hidden\]\s*{[\s\S]*?display:\s*none;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout \.desktop-choice-option\s*{[\s\S]*?min-height:\s*36px;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout \.desktop-choice-toggle-label\s*{[\s\S]*?text-overflow:\s*ellipsis;[\s\S]*?white-space:\s*nowrap;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout \.desktop-filter-reset\s*{[\s\S]*?grid-column:\s*5;[\s\S]*?display:\s*grid;[\s\S]*?width:\s*40px;/,
+  );
+  assert.match(
+    htmlSource,
+    /@media \(min-width:\s*901px\) and \(max-width:\s*979px\)\s*{[\s\S]*?body\.desktop-layout \.mobile-time-filter-field\s*{[\s\S]*?grid-row:\s*2;/,
   );
   assert.match(
     htmlSource,
@@ -1710,6 +1750,13 @@ test("desktop reuses the responsive filters and card schedule", () => {
   assert.match(htmlSource, /id="desktopFilteredAvailableCount"/);
   assert.match(htmlSource, /id="desktopFilteredSignupCount"/);
   assert.match(htmlSource, /id="desktopFilterSummary"/);
+  assert.match(htmlSource, /id="desktopActivityFilterToggle"/);
+  assert.match(htmlSource, /id="desktopActivityFilterValue"/);
+  assert.match(htmlSource, /id="desktopActivityFilterMenu"/);
+  assert.match(htmlSource, /id="desktopRoleFilterToggle"/);
+  assert.match(htmlSource, /id="desktopRoleFilterValue"/);
+  assert.match(htmlSource, /id="desktopRoleFilterMenu"/);
+  assert.match(htmlSource, /id="desktopFilterReset"/);
   assert.match(htmlSource, /id="desktopInsightScopeControl"/);
   assert.match(htmlSource, /data-desktop-insight-scope="overall"/);
   assert.match(htmlSource, /data-desktop-insight-scope="filtered"/);
@@ -1731,6 +1778,120 @@ test("desktop reuses the responsive filters and card schedule", () => {
   assert.doesNotMatch(htmlSource, /id="desktopScheduleView"/);
   assert.doesNotMatch(htmlSource, /id="grid"/);
   assert.doesNotMatch(htmlSource, /function buildGrid\(\)/);
+});
+
+test("desktop choice popovers share state, close safely, and reset together", () => {
+  const activityToggle = createElement("button");
+  const activityValue = createElement("span");
+  const activityMenu = createElement("div");
+  const roleToggle = createElement("button");
+  const roleValue = createElement("span");
+  const roleMenu = createElement("div");
+  const keywordSearch = createElement("input");
+  const resetButton = createElement("button");
+  const { exports: client, context } = loadClient({
+    elements: {
+      desktopActivityFilterToggle: activityToggle,
+      desktopActivityFilterValue: activityValue,
+      desktopActivityFilterMenu: activityMenu,
+      desktopRoleFilterToggle: roleToggle,
+      desktopRoleFilterValue: roleValue,
+      desktopRoleFilterMenu: roleMenu,
+      desktopFilterReset: resetButton,
+      mobileKeywordSearch: keywordSearch,
+    },
+  });
+
+  client.buildGridIndexes();
+  client.updateMobileAvailabilityControl();
+
+  assert.deepEqual(
+    activityMenu.children.map((option) =>
+      option.getAttribute("data-desktop-activity-filter"),
+    ),
+    ["__all__", "Hall Monitor", "Library Desk"],
+  );
+  assert.equal(activityValue.textContent, "すべての募集枠");
+  assert.equal(activityToggle.getAttribute("aria-expanded"), "false");
+  assert.equal(activityMenu.hidden, true);
+  assert.equal(resetButton.disabled, true);
+
+  activityToggle.dispatchEvent({ type: "click" });
+  assert.equal(activityToggle.getAttribute("aria-expanded"), "true");
+  assert.equal(activityMenu.hidden, false);
+
+  roleToggle.dispatchEvent({ type: "click" });
+  assert.equal(activityMenu.hidden, true);
+  assert.equal(roleMenu.hidden, false);
+  roleToggle.dispatchEvent({ type: "click" });
+
+  activityToggle.dispatchEvent({ type: "click" });
+  context.document.dispatchEvent({
+    type: "click",
+    target: createElement("div"),
+  });
+  assert.equal(activityMenu.hidden, true);
+
+  activityToggle.dispatchEvent({ type: "click" });
+  activityMenu.dispatchEvent({
+    type: "click",
+    target: activityMenu.children[2],
+  });
+  assert.equal(client.getMobileActivityFilter(), "Library Desk");
+  assert.equal(activityValue.textContent, "Library Desk");
+  assert.equal(activityToggle.getAttribute("aria-expanded"), "true");
+  assert.equal(activityMenu.hidden, false);
+  assert.match(activityMenu.children[2].className, /activity-accent-1/);
+  assert.match(activityMenu.children[2].className, /is-active/);
+  assert.deepEqual(
+    roleMenu.children.map((option) =>
+      option.getAttribute("data-desktop-role-filter"),
+    ),
+    ["__all__", "steeringCommittee"],
+  );
+
+  roleToggle.dispatchEvent({ type: "click" });
+  assert.equal(roleMenu.hidden, false);
+  context.document.dispatchEvent({ type: "keydown", key: "Escape" });
+  assert.equal(roleMenu.hidden, true);
+
+  roleToggle.dispatchEvent({ type: "click" });
+  roleMenu.dispatchEvent({
+    type: "click",
+    target: roleMenu.children[1],
+  });
+  assert.equal(roleToggle.getAttribute("aria-expanded"), "true");
+  assert.equal(roleMenu.hidden, false);
+  assert.match(roleMenu.children[1].className, /role-steeringcommittee/);
+  assert.match(roleMenu.children[1].className, /is-active/);
+
+  context.document.dispatchEvent({
+    type: "click",
+    target: keywordSearch,
+  });
+  assert.equal(roleMenu.hidden, true);
+
+  keywordSearch.value = "Library";
+  keywordSearch.dispatchEvent({ type: "input" });
+  client.setMobileAvailableTimeFilter("09:30");
+
+  assert.equal(client.getMobileRoleFilter(), "steeringCommittee");
+  assert.equal(client.getMobileKeywordSearchQuery(), "library");
+  assert.equal(client.getMobileAvailableTimeFilters().join(","), "09:30");
+  assert.equal(resetButton.disabled, false);
+
+  resetButton.dispatchEvent({ type: "click" });
+
+  assert.equal(client.getMobileActivityFilter(), "__all__");
+  assert.equal(client.getMobileRoleFilter(), "__all__");
+  assert.equal(client.getMobileKeywordSearchQuery(), "");
+  assert.equal(client.getMobileAvailableTimeFilters().length, 0);
+  assert.equal(activityValue.textContent, "すべての募集枠");
+  assert.equal(roleValue.textContent, "すべてのポジション");
+  assert.equal(activityMenu.hidden, true);
+  assert.equal(roleMenu.hidden, true);
+  assert.equal(keywordSearch.value, "");
+  assert.equal(resetButton.disabled, true);
 });
 
 test("desktop schedule summary counts open slots, registrations, and capacity", () => {

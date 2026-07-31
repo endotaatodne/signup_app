@@ -11,7 +11,7 @@ A free, open-source volunteer signup app built on Google Apps Script and Google 
 - Responsive card-based schedule on desktop and mobile
 - Switch between a searchable さがす view and a compact まとめ day-summary timeline
 - Shared filters for activity, role, multiple available time slots, and keyword search
-- Sticky schedule controls keep the relevant tabs and filters available while scrolling
+- Sticky schedule controls keep the relevant tabs and filters available while scrolling, with a compact single-row filter toolbar on desktop where space permits
 - Desktop summary cards show total vacancies and current registrations/capacity, with clickable detail lists
 - Activity-coloured ribbons identify related activities in both vacancy and current-registration detail lists
 - Role-coloured 募集中 chips and activity accents make open slots easy to scan
@@ -234,11 +234,11 @@ Visiting the URL without a parameter shows a friendly "No event specified" messa
 
 ## Using the Schedule
 
-- **さがす** shows full signup cards grouped by time. Filter by activity, volunteer role, one or more available start times, or a keyword that matches the activity details or a registered volunteer's name.
+- **さがす** shows full signup cards grouped by time. Filter by activity, volunteer role, one or more available start times, or a keyword that matches the activity details or a registered volunteer's name. On desktop, the activity and role controls open compact panels of pill-style choices. After a choice is selected, its panel stays open until you click elsewhere or press Escape.
 - **まとめ** shows a compact, time-ordered overview of the day. Activity accents identify related slots, and role-coloured chips show the remaining vacancies.
 - On desktop, the summary cards above the filters show overall vacancies and current registrations/capacity. When filters are active, they also show counts for the visible results.
 - Click either desktop summary card to see its time-ordered detail list. If filters are active, switch between **Overall** and **Current filters**; selecting a detail opens that slot's registration/cancellation modal.
-- The schedule controls remain available while scrolling. The selected さがす/まとめ view is saved in the browser for the next visit.
+- The schedule controls remain available while scrolling. On desktop, the filters use one compact row where space permits and fall back to two rows on narrower screens. The selected さがす/まとめ view is saved in the browser for the next visit.
 
 When a name containing Japanese characters is submitted, spaces (including full-width spaces) are removed consistently by both the browser and backend. For example, `山田 太郎` is stored as `山田太郎`. Names without Japanese characters keep a single normalised space between words.
 
