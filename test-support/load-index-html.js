@@ -19,6 +19,7 @@ function loadIndexHtml(exportsList, options = {}) {
   const {
     gridData = { events: [], times: [], activities: [] },
     alias = "test-alias",
+    eventStatus = "OPEN",
     roles = {
       general: "一般保護者",
       classRep: "学年委員",
@@ -34,6 +35,7 @@ function loadIndexHtml(exportsList, options = {}) {
   const inlineScript = extractInlineScript(htmlSource)
     .replace(/<\?!= gridData \?>/g, encodeBase64(JSON.stringify(gridData)))
     .replace(/<\?!= alias \?>/g, encodeBase64(alias))
+    .replace(/<\?!= eventStatus \?>/g, encodeBase64(eventStatus))
     .replace(/<\?!= roles \?>/g, encodeBase64(JSON.stringify(roles)))
     .replace(/<\?!= title \?>/g, encodeBase64(title));
 

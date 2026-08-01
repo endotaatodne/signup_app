@@ -1,3 +1,30 @@
+## v0.2.6 - 2026-07-31
+
+- Patch
+  - Compacts the desktop title, schedule summary, and filter area so signup cards appear higher in the viewport.
+  - Uses a single-row desktop filter toolbar where space permits, with a two-row fallback on narrow desktop widths.
+  - Replaces native desktop activity and role selects with compact popovers containing the existing pill-style choices.
+  - Keeps each choice popover open while selections are changed and closes it on click-away or Escape.
+  - Lists matching full time slots as well as open time slots in the time filter.
+  - Preserves the existing mobile controls and layout.
+  - Updates the English and Japanese schedule documentation for the compact desktop filters.
+  - Adds a per-event `Status` column to the master Config sheet with `OPEN` and `READ_ONLY` modes.
+  - Enforces read-only mode server-side for both signup creation and cancellation, with a fresh policy check immediately before each Sheet mutation.
+  - Treats missing or invalid status configuration as `READ_ONLY` while keeping schedule viewing available.
+  - Shows a sticky read-only banner on mobile and desktop, uses larger mobile warning text, keeps desktop scrolling content fully behind opaque sticky surfaces, and removes signup and cancellation controls when an event is locked.
+  - Rejects malformed and read-only write requests before they can contend for the global mutation lock.
+  - Hardens role validation against inherited JavaScript object properties.
+  - Adds a durable Script Properties event-rate limit that survives transient cache eviction, while retaining per-person cache throttling with complete normalized identity keys.
+  - Documents the Config migration and administrator workflow in English and Japanese.
+  - Bumps the app version to 0.2.6.
+
+## v0.2.5 - 2026-07-29
+
+- Patch
+  - Shows activity-coloured ribbons on current-registration detail cards, matching the vacancy detail cards.
+  - Updates the English and Japanese feature documentation for consistent activity ribbons across both detail views.
+  - Bumps the app version to 0.2.5.
+
 ## v0.2.4 - 2026-07-29
 
 - Patch
@@ -10,13 +37,17 @@
   - Restyles schedule cards and time headings to make individual signup slots more prominent and readable.
   - Adds desktop summary cards for total vacancies and current registrations/capacity, including counts for the currently filtered results.
   - Makes the desktop summary cards open time-ordered vacancy and registration details, with switches between overall and currently filtered results.
-  - Makes vacancy and registration detail items open the relevant signup/cancellation modal and uses activity ribbons and role-coloured status chips for easier scanning.
+  - Makes vacancy and registration detail items open the relevant signup/cancellation modal, with activity ribbons on vacancy details and role-coloured status chips for easier scanning.
   - Replaces cancellation lookup fields with a selectable list of the slot's existing registrations.
   - Improves cancellation selection, scrolling, disabled states, and confirmation so the selected name, class, and role are clearly shown before removal.
   - Removes spaces from Japanese names consistently in the client and backend before signup storage and cancellation matching, preserves normal spacing in non-Japanese names, and removes the now-unnecessary manual-spacing helper text.
+  - Uses the normalised participant name without class for same-slot, overlapping-time, and restricted-activity duplicate checks, while retaining class for signup records and cancellation matching.
+  - Adds an optional ActivityLimits tab for server-enforced per-person signup limits on selected activities while leaving unlisted activities unrestricted.
+  - Prioritises the activity-specific limit message when a signup is blocked by both an activity limit and an overlapping-time rule.
+  - Validates ActivityLimits headers, activity references, duplicate rows, and positive whole-number limits; configuration errors block only new signups and remain hidden from participants.
   - Closes the available-time menu when clicking outside it and prevents unintended page positioning when opening desktop registration details.
   - Updates the Steering Committee role wording to 役員、運営・実行委員.
-  - Expands backend and frontend tests for responsive layouts, filters, desktop summaries and detail views, cancellation selection, and name normalization.
+  - Expands backend and frontend tests for responsive layouts, filters, desktop summaries and detail views, cancellation selection, name normalization, and activity limits.
   - Bumps the app version to 0.2.4.
 
 ## v0.2.3 - 2026-06-24

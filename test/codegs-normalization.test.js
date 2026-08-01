@@ -136,4 +136,9 @@ test("getCanonicalRole_ only accepts canonical role labels", () => {
   );
   assert.equal(getCanonicalRole_(ROLES.orgCommittee), ROLES.orgCommittee);
   assert.equal(getCanonicalRole_("general"), undefined);
+  assert.equal(getCanonicalRole_("toString"), undefined);
+  assert.equal(getCanonicalRole_("constructor"), undefined);
+  assert.equal(getCanonicalRole_("valueOf"), undefined);
+  assert.equal(getCanonicalRole_("__proto__"), undefined);
+  assert.equal(getCanonicalRole_(null), undefined);
 });
