@@ -1,3 +1,11 @@
+## v0.2.7 - 2026-08-02
+
+- Patch
+  - Lets the desktop page title scroll out of view while keeping the schedule controls pinned to the top, freeing vertical space for the schedule.
+  - Centres the desktop page title to match the mobile layout.
+  - Updates the responsive layout tests for the revised title and sticky-control behaviour.
+  - Bumps the app version to 0.2.7.
+
 ## v0.2.6 - 2026-07-31
 
 - Patch

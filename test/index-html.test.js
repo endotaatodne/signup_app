@@ -440,7 +440,7 @@ test("read-only banner and displaced controls stay sticky on mobile and desktop"
   );
   assert.match(
     htmlSource,
-    /body\.desktop-layout \.read-only-banner\s*{[\s\S]*?position:\s*sticky;[\s\S]*?top:\s*68px;[\s\S]*?z-index:\s*29;/,
+    /body\.desktop-layout \.read-only-banner\s*{[\s\S]*?position:\s*sticky;[\s\S]*?top:\s*0;[\s\S]*?z-index:\s*29;/,
   );
   assert.match(
     htmlSource,
@@ -448,7 +448,23 @@ test("read-only banner and displaced controls stay sticky on mobile and desktop"
   );
   assert.match(
     htmlSource,
-    /body\.desktop-layout\.event-read-only \.schedule-controls\s*{[\s\S]*?top:\s*calc\(68px \+ var\(--event-read-only-banner-height,\s*0px\)\);/,
+    /body\.desktop-layout\.event-read-only \.schedule-controls\s*{[\s\S]*?top:\s*var\(--event-read-only-banner-height,\s*0px\);/,
+  );
+});
+
+test("page title scrolls on desktop and stays centered across layouts", () => {
+  const htmlSource = fs.readFileSync(
+    path.resolve(__dirname, "..", "index.html"),
+    "utf8",
+  );
+
+  assert.match(
+    htmlSource,
+    /body\.desktop-layout #pageTitle\s*{[\s\S]*?position:\s*static;[\s\S]*?text-align:\s*center;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.compact-layout h1\s*{[\s\S]*?text-align:\s*center;/,
   );
 });
 
@@ -1805,7 +1821,7 @@ test("desktop reuses the responsive filters and card schedule", () => {
   );
   assert.match(
     htmlSource,
-    /body\.desktop-layout \.schedule-controls\s*{[\s\S]*?position:\s*sticky;[\s\S]*?top:\s*68px;[\s\S]*?z-index:\s*20;/,
+    /body\.desktop-layout \.schedule-controls\s*{[\s\S]*?position:\s*sticky;[\s\S]*?top:\s*0;[\s\S]*?z-index:\s*20;/,
   );
   assert.match(
     htmlSource,
