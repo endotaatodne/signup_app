@@ -227,9 +227,7 @@
         }
 
         setMobileAgendaModeClass(container, "signup");
-        while (container.firstChild) {
-          container.removeChild(container.firstChild);
-        }
+        clearElement(container);
 
         var filteredEvents = getMobileFilteredEvents();
         var times = getMobileFilteredTimes(filteredEvents);
@@ -292,9 +290,7 @@
         }
 
         setMobileAgendaModeClass(container, "overview");
-        while (container.firstChild) {
-          container.removeChild(container.firstChild);
-        }
+        clearElement(container);
 
         var timeline = document.createElement("div");
         timeline.className = "mobile-overview-timeline";

@@ -15,12 +15,29 @@ const ROLES = {
   steeringCommittee: "役員、運営・実行委員",
   orgCommittee: "実行委員",
 };
-const CANONICAL_ROLES = [
-  ROLES.general,
-  ROLES.classRep,
-  ROLES.steeringCommittee,
-  ROLES.orgCommittee,
-];
+
+/**
+ * Ordered role metadata shared by grid projection and capacity enforcement.
+ * Keep eventColumnIndex aligned with the Events sheet schema below.
+ * @type {ReadonlyArray<{key: string, label: string, eventColumnIndex: number}>}
+ */
+const ROLE_SLOT_DESCRIPTORS = Object.freeze([
+  Object.freeze({ key: "general", label: ROLES.general, eventColumnIndex: 8 }),
+  Object.freeze({ key: "classRep", label: ROLES.classRep, eventColumnIndex: 9 }),
+  Object.freeze({
+    key: "steeringCommittee",
+    label: ROLES.steeringCommittee,
+    eventColumnIndex: 10,
+  }),
+  Object.freeze({
+    key: "orgCommittee",
+    label: ROLES.orgCommittee,
+    eventColumnIndex: 11,
+  }),
+]);
+const CANONICAL_ROLES = ROLE_SLOT_DESCRIPTORS.map(function (descriptor) {
+  return descriptor.label;
+});
 
 const SHEET_NAMES = {
   config: "Config",

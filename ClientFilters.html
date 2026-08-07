@@ -202,7 +202,6 @@
         mobileAvailableTimeFilter = normaliseMobileAvailableTimeFilter(
           mobileAvailableTimeFilter,
         );
-        updateMobileAvailabilityControl();
         buildMobileAgenda();
       }
 
@@ -217,7 +216,6 @@
         mobileAvailableTimeFilter = normaliseMobileAvailableTimeFilter(
           mobileAvailableTimeFilter,
         );
-        updateMobileAvailabilityControl();
         buildMobileAgenda();
       }
 
@@ -232,7 +230,6 @@
         mobileAvailableTimeFilter = normaliseMobileAvailableTimeFilter(
           mobileAvailableTimeFilter,
         );
-        updateMobileAvailabilityControl();
         buildMobileAgenda();
       }
 
@@ -248,7 +245,6 @@
         mobileKeywordSearchQuery = "";
         mobileTimeFilterDropdownOpen = false;
         desktopFilterPopoverOpen = "";
-        updateMobileAvailabilityControl();
         buildMobileAgenda();
       }
 
@@ -572,7 +568,6 @@
               normaliseMobileAvailableTimeFilter(selectedTimes);
           }
         }
-        updateMobileAvailabilityControl();
         buildMobileAgenda();
       }
 
@@ -698,9 +693,7 @@
             (selectedOption ? selectedOption.label : ""),
         );
         menu.hidden = !open;
-        while (menu.firstChild) {
-          menu.removeChild(menu.firstChild);
-        }
+        clearElement(menu);
         options.forEach(function (item) {
           var active = item.value === selectedValue;
           var option = document.createElement("button");
@@ -870,9 +863,7 @@
         }
 
         if (timeFilter) {
-          while (timeFilter.firstChild) {
-            timeFilter.removeChild(timeFilter.firstChild);
-          }
+          clearElement(timeFilter);
           timeFilter.hidden = !mobileTimeFilterDropdownOpen || options.length === 0;
 
           var allTimeButton = document.createElement("button");
@@ -921,9 +912,7 @@
         }
 
         if (activityFilter) {
-          while (activityFilter.firstChild) {
-            activityFilter.removeChild(activityFilter.firstChild);
-          }
+          clearElement(activityFilter);
 
           var allActivityButton = document.createElement("button");
           allActivityButton.type = "button";
@@ -958,9 +947,7 @@
         }
 
         if (roleFilter) {
-          while (roleFilter.firstChild) {
-            roleFilter.removeChild(roleFilter.firstChild);
-          }
+          clearElement(roleFilter);
 
           var allRoleButton = document.createElement("button");
           allRoleButton.type = "button";

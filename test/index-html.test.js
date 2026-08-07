@@ -307,6 +307,7 @@ function loadClient(options = {}) {
       "setMobileRoleFilter",
       "getMobileKeywordSearchQuery",
       "setMobileKeywordSearchQuery",
+      "resetScheduleFilters",
       "getMobileVolunteerNameQuery",
       "setMobileVolunteerNameQuery",
       "getMobileFilteredEvents",
@@ -893,11 +894,17 @@ test("mobile time filter supports multiple selected time slots", () => {
   assert.equal(timeToggle.textContent, "\u3059\u3079\u3066\u306E\u6642\u9593\u5E2F");
 });
 
-test("activity filter refreshes the shared card renderer at desktop width", () => {
+test("schedule filter changes refresh controls and cards once at desktop width", () => {
   const mobileNode = createElement("div");
   mobileNode.className = "mobile-agenda";
   mobileNode.style = {};
   const activityFilter = createElement("div");
+  const appendActivityOption = activityFilter.appendChild;
+  let activityOptionAppendCount = 0;
+  activityFilter.appendChild = function (child) {
+    activityOptionAppendCount += 1;
+    return appendActivityOption.call(this, child);
+  };
   const { exports: client } = loadClient({
     gridData: {
       activities: ["Gate", "Cleanup"],
@@ -947,7 +954,9 @@ test("activity filter refreshes the shared card renderer at desktop width", () =
     },
   });
 
+  assert.equal(activityOptionAppendCount, 3);
   client.buildGridIndexes();
+  activityOptionAppendCount = 0;
   client.setMobileActivityFilter("Cleanup");
 
   const onlySection = mobileNode.children[0];
@@ -956,6 +965,7 @@ test("activity filter refreshes the shared card renderer at desktop width", () =
 
   assert.equal(client.getMobileActivityFilter(), "Cleanup");
   assert.equal(activityFilter.children.length, 3);
+  assert.equal(activityOptionAppendCount, 3);
   assert.equal(
     activityFilter.children[2].getAttribute("data-mobile-activity-filter"),
     "Cleanup",
@@ -963,6 +973,18 @@ test("activity filter refreshes the shared card renderer at desktop width", () =
   assert.equal(activityFilter.children[2].className.includes("is-active"), true);
   assert.equal(client.getMobileFilteredEvents().length, 1);
   assert.equal(titleWrap.children[0].textContent, "Cleanup");
+
+  [
+    ["activity reset", () => client.setMobileActivityFilter("__all__")],
+    ["role", () => client.setMobileRoleFilter("general")],
+    ["keyword", () => client.setMobileKeywordSearchQuery("Gate")],
+    ["time", () => client.setMobileAvailableTimeFilter("09:00")],
+    ["full reset", () => client.resetScheduleFilters()],
+  ].forEach(function ([label, changeFilter]) {
+    activityOptionAppendCount = 0;
+    changeFilter();
+    assert.equal(activityOptionAppendCount, 3, label);
+  });
 });
 
 test("mobile keyword search narrows the mobile agenda by volunteer name", () => {
@@ -2534,6 +2556,35 @@ test("desktop insight cards render useful views and reuse existing actions", () 
   });
   assert.equal(String(context.currentEventId), "1");
   assert.equal(panel.hidden, true);
+});
+
+test("desktop insight views preserve their overall empty messages", () => {
+  const panel = createElement("div");
+  panel.hidden = true;
+  const content = createElement("div");
+  const { exports: client } = loadClient({
+    gridData: { activities: [], times: [], events: [] },
+    elements: {
+      desktopInsightsPanel: panel,
+      desktopInsightsTitle: createElement("h2"),
+      desktopInsightsDescription: createElement("p"),
+      desktopInsightsContent: content,
+    },
+  });
+
+  client.setDesktopInsightView("vacancies");
+  assert.equal(content.children.length, 1);
+  assert.equal(
+    content.children[0].textContent,
+    "\u73FE\u5728\u3001\u7A7A\u3044\u3066\u3044\u308B\u52DF\u96C6\u67A0\u306F\u3042\u308A\u307E\u305B\u3093\u3002",
+  );
+
+  client.setDesktopInsightView("registrations");
+  assert.equal(content.children.length, 1);
+  assert.equal(
+    content.children[0].textContent,
+    "\u73FE\u5728\u306E\u767B\u9332\u306F\u3042\u308A\u307E\u305B\u3093\u3002",
+  );
 });
 
 test("mobile role filter active pills keep their role colour families", () => {

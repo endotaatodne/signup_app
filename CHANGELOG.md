@@ -1,3 +1,13 @@
+## v0.2.9 - 2026-08-08
+
+- Patch
+  - Removes redundant filter-control renders while preserving all filter state, matching, fallback, ordering, and display behaviour.
+  - Centralises role-slot metadata used by public grid data and signup capacity enforcement.
+  - Reuses the shared timezone, alias validator, and DOM-clearing helper.
+  - Consolidates common desktop insight scope and list rendering without changing either view's predicates, messages, or ordering.
+  - Adds regression coverage for single-pass filter rendering and every role-to-sheet-column mapping.
+  - Bumps the app version to 0.2.9.
+
 ## v0.2.8 - 2026-08-08
 
 - Patch

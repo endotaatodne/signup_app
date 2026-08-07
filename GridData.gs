@@ -33,12 +33,13 @@ function getGridData_(spreadsheet) {
     const role = sanitiseForScript_(row[4]);
     if (!signupsMap[eventId]) signupsMap[eventId] = [];
     if (!signupCountsMap[eventId]) {
-      signupCountsMap[eventId] = {
-        [ROLES.general]: 0,
-        [ROLES.classRep]: 0,
-        [ROLES.steeringCommittee]: 0,
-        [ROLES.orgCommittee]: 0,
-      };
+      // A null-prototype map preserves arbitrary configured role labels as
+      // ordinary keys (including names that overlap Object.prototype).
+      const signupCounts = Object.create(null);
+      ROLE_SLOT_DESCRIPTORS.forEach(function (descriptor) {
+        signupCounts[descriptor.label] = 0;
+      });
+      signupCountsMap[eventId] = signupCounts;
     }
     signupsMap[eventId].push({ name, cls, role });
     if (signupCountsMap[eventId][role] !== undefined) {
@@ -50,10 +51,13 @@ function getGridData_(spreadsheet) {
     const eventId = row[0];
     const allSignups = signupsMap[eventId] || [];
     const signupCounts = signupCountsMap[eventId] || {};
-    const generalMax = Number(row[8]) || 0;
-    const classRepMax = Number(row[9]) || 0;
-    const steeringCommitteeMax = Number(row[10]) || 0;
-    const orgCommitteeMax = Number(row[11]) || 0;
+    const slots = {};
+    ROLE_SLOT_DESCRIPTORS.forEach(function (descriptor) {
+      slots[descriptor.key] = {
+        max: Number(row[descriptor.eventColumnIndex]) || 0,
+        filled: signupCounts[descriptor.label] || 0,
+      };
+    });
 
     return {
       eventId: eventId,
@@ -61,39 +65,22 @@ function getGridData_(spreadsheet) {
       subtitle: sanitiseForScript_(String(row[2])),
       date: Utilities.formatDate(
         new Date(row[3]),
-        "Australia/Brisbane",
+        APP_TIME_ZONE,
         "dd MMM yyyy",
       ),
       startTime: Utilities.formatDate(
         new Date(row[4]),
-        "Australia/Brisbane",
+        APP_TIME_ZONE,
         "HH:mm",
       ),
       endTime: Utilities.formatDate(
         new Date(row[5]),
-        "Australia/Brisbane",
+        APP_TIME_ZONE,
         "HH:mm",
       ),
       description: sanitiseForScript_(String(row[6])),
       location: sanitiseForScript_(String(row[7])),
-      slots: {
-        general: {
-          max: generalMax,
-          filled: signupCounts[ROLES.general] || 0,
-        },
-        classRep: {
-          max: classRepMax,
-          filled: signupCounts[ROLES.classRep] || 0,
-        },
-        steeringCommittee: {
-          max: steeringCommitteeMax,
-          filled: signupCounts[ROLES.steeringCommittee] || 0,
-        },
-        orgCommittee: {
-          max: orgCommitteeMax,
-          filled: signupCounts[ROLES.orgCommittee] || 0,
-        },
-      },
+      slots: slots,
       signups: allSignups,
     };
   });

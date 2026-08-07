@@ -4,7 +4,7 @@
  * configuration and grid-building globals declared in the other server files,
  * plus HtmlService, SpreadsheetApp, Utilities, and ScriptApp.
  * @author endotaatodne
- * @version 0.2.8
+ * @version 0.2.9
  */
 
 /**
@@ -27,8 +27,8 @@ function doGet(e) {
       );
     }
 
-    // Sanitise alias — only allow alphanumeric and hyphens, max 50 chars
-    if (!/^[a-zA-Z0-9\-]{1,50}$/.test(alias)) {
+    // Validate alias — only allow alphanumeric and hyphens, max 50 chars
+    if (!isValidAlias_(alias)) {
       return HtmlService.createHtmlOutput(
         '<p style="font-family:Arial;padding:20px;">Invalid event link.</p>',
       );

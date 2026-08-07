@@ -243,6 +243,22 @@ test("getGridData_ uses display values for class text and computes role counts",
   assert.equal(event.description, "Guide \\u003cparents\\u003e \\u0026 \\u0022students\\u0022");
 });
 
+test("getGridData_ keeps every role tied to its public slot and sheet column", () => {
+  const eventRows = createEventRows();
+  eventRows[1][8] = 2;
+  eventRows[1][9] = 3;
+  eventRows[1][10] = 4;
+  eventRows[1][11] = 5;
+  const { app, spreadsheets } = loadBackend({ eventRows });
+
+  const event = app.getGridData_(spreadsheets[EVENT_SHEET_ID]).events[0];
+
+  assert.equal(event.slots.general.max, 2);
+  assert.equal(event.slots.classRep.max, 3);
+  assert.equal(event.slots.steeringCommittee.max, 4);
+  assert.equal(event.slots.orgCommittee.max, 5);
+});
+
 test("doGet returns rendered template output for a valid alias", () => {
   const { app } = loadBackend();
 
@@ -542,6 +558,46 @@ test("submitSignup accepts org committee role using OrgCommitteeSlots capacity",
   assert.equal(result.success, true);
   assert.equal(result.role, app.ROLES.orgCommittee);
   assert.equal(appendedRow[4], app.ROLES.orgCommittee);
+});
+
+test("submitSignup isolates every role capacity to its matching Events column", () => {
+  [
+    ["general", 8],
+    ["classRep", 9],
+    ["steeringCommittee", 10],
+    ["orgCommittee", 11],
+  ].forEach(([roleKey, columnIndex]) => {
+    const eventRows = createEventRows();
+    eventRows[1].fill(0, 8, 12);
+    eventRows[1][columnIndex] = 1;
+    const { app } = loadBackend({ eventRows });
+
+    const result = app.submitSignup(
+      "1",
+      `Role ${roleKey}`,
+      "1-1",
+      app.ROLES[roleKey],
+      "spring-fete",
+    );
+
+    assert.equal(result.success, true, roleKey);
+    assert.equal(result.role, app.ROLES[roleKey]);
+
+    const decoyRows = createEventRows();
+    decoyRows[1].fill(0, 8, 12);
+    decoyRows[1][columnIndex === 8 ? 9 : 8] = 1;
+    const { app: decoyApp } = loadBackend({ eventRows: decoyRows });
+
+    const decoyResult = decoyApp.submitSignup(
+      "1",
+      `Decoy ${roleKey}`,
+      "1-1",
+      decoyApp.ROLES[roleKey],
+      "spring-fete",
+    );
+
+    assert.equal(decoyResult.success, false, roleKey);
+  });
 });
 
 test("submitSignup does not release a lock that was not acquired", () => {

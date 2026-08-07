@@ -257,13 +257,18 @@ function submitSignup(eventId, name, cls, role, alias) {
     }
 
     // Get max slots for the selected role
-    const roleMaxMap = {
-      [ROLES.general]: Number(eventRow[8]) || 0,
-      [ROLES.classRep]: Number(eventRow[9]) || 0,
-      [ROLES.steeringCommittee]: Number(eventRow[10]) || 0,
-      [ROLES.orgCommittee]: Number(eventRow[11]) || 0,
-    };
-    const maxSlots = roleMaxMap[canonicalRole];
+    // Retain the former role-to-capacity map's last-match behaviour if a
+    // malformed configuration happens to reuse the same label.
+    const roleSlotDescriptor = ROLE_SLOT_DESCRIPTORS.reduce(function (
+      matchingDescriptor,
+      descriptor,
+    ) {
+      return descriptor.label === canonicalRole
+        ? descriptor
+        : matchingDescriptor;
+    }, null);
+    const maxSlots =
+      Number(eventRow[roleSlotDescriptor.eventColumnIndex]) || 0;
     if (maxSlots === 0) {
       return { success: false, message: "このボランティア枠は存在しません。" };
     }

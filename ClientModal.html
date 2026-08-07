@@ -39,9 +39,7 @@
         // Names grouped by role
         var namesSection = document.getElementById("namesSection");
         var namesGroups = document.getElementById("namesGroups");
-        while (namesGroups.firstChild) {
-          namesGroups.removeChild(namesGroups.firstChild);
-        }
+        clearElement(namesGroups);
         var hasAnySignups = false;
         ROLE_KEYS.forEach(function (r) {
           var roleSignups = event.signupsByRole[r.label] || [];
@@ -73,9 +71,7 @@
         namesSection.style.display = hasAnySignups ? "block" : "none";
 
         var roleButtons = document.getElementById("roleButtons");
-        while (roleButtons.firstChild) {
-          roleButtons.removeChild(roleButtons.firstChild);
-        }
+        clearElement(roleButtons);
         if (!readOnly) {
           ROLE_KEYS.forEach(function (r) {
             var s = event.slots[r.key];

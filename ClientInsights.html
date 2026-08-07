@@ -443,18 +443,34 @@
       }
 
       /**
-       * Renders vacancy items for the selected overall or filtered scope.
-       * Side effect: updates scope controls, description, and content children.
+       * Renders one desktop insight list for the selected overall or filtered
+       * scope.
+       * Side effect: normalises desktopInsightScope and updates scope controls,
+       * the insight description, and content children.
        * @param {HTMLElement} content Insight content container.
+       * @param {function(Object[]): Object[]} selectEvents View-specific event selector.
+       * @param {string} view Insight view identifier passed to item rendering.
+       * @param {string} overallDescription Description for the overall scope.
+       * @param {string} filteredDescription Description for the filtered scope.
+       * @param {string} overallEmptyMessage Empty message for the overall scope.
+       * @param {string} filteredEmptyMessage Empty message for the filtered scope.
        * @returns {void}
        */
-      function renderDesktopVacancyInsights(content) {
-        var overallEvents = getDesktopVacancyEvents(
+      function renderDesktopScopedInsights(
+        content,
+        selectEvents,
+        view,
+        overallDescription,
+        filteredDescription,
+        overallEmptyMessage,
+        filteredEmptyMessage,
+      ) {
+        var overallEvents = selectEvents(
           (gridData && gridData.events) || [],
         );
         var filtersActive = hasActiveScheduleFilters();
         var filteredEvents = filtersActive
-          ? getDesktopVacancyEvents(getVisibleScheduleEvents())
+          ? selectEvents(getVisibleScheduleEvents())
           : [];
         desktopInsightScope = normaliseDesktopInsightScope(
           desktopInsightScope,
@@ -474,21 +490,37 @@
         );
         if (description) {
           description.textContent = filteredScope
-            ? "現在の絞り込みに合う空き枠を時間順に表示しています。選択すると登録画面が開きます。"
-            : "全体の募集から、時間順に募集中の活動を表示しています。選択すると登録画面が開きます。";
+            ? filteredDescription
+            : overallDescription;
         }
 
         events.forEach(function (event) {
-          content.appendChild(createDesktopInsightEventItem(event, "vacancies"));
+          content.appendChild(createDesktopInsightEventItem(event, view));
         });
         if (events.length === 0) {
           renderDesktopInsightEmpty(
             content,
-            filteredScope
-              ? "現在の絞り込みに合う空き枠はありません。"
-              : "現在、空いている募集枠はありません。",
+            filteredScope ? filteredEmptyMessage : overallEmptyMessage,
           );
         }
+      }
+
+      /**
+       * Renders vacancy items for the selected overall or filtered scope.
+       * Side effect: updates scope controls, description, and content children.
+       * @param {HTMLElement} content Insight content container.
+       * @returns {void}
+       */
+      function renderDesktopVacancyInsights(content) {
+        renderDesktopScopedInsights(
+          content,
+          getDesktopVacancyEvents,
+          "vacancies",
+          "全体の募集から、時間順に募集中の活動を表示しています。選択すると登録画面が開きます。",
+          "現在の絞り込みに合う空き枠を時間順に表示しています。選択すると登録画面が開きます。",
+          "現在、空いている募集枠はありません。",
+          "現在の絞り込みに合う空き枠はありません。",
+        );
       }
 
       /**
@@ -512,48 +544,15 @@
        * @returns {void}
        */
       function renderDesktopRegistrationInsights(content) {
-        var overallEvents = getDesktopRegistrationEvents(
-          (gridData && gridData.events) || [],
+        renderDesktopScopedInsights(
+          content,
+          getDesktopRegistrationEvents,
+          "registrations",
+          "全体の登録を時間順に表示しています。選択すると登録・キャンセル画面が開きます。",
+          "現在の絞り込みに合う募集枠の登録を、時間順に表示しています。選択すると登録・キャンセル画面が開きます。",
+          "現在の登録はありません。",
+          "現在の絞り込みに合う募集枠には、登録がありません。",
         );
-        var filtersActive = hasActiveScheduleFilters();
-        var filteredEvents = filtersActive
-          ? getDesktopRegistrationEvents(getVisibleScheduleEvents())
-          : [];
-        desktopInsightScope = normaliseDesktopInsightScope(
-          desktopInsightScope,
-          filtersActive,
-        );
-        updateDesktopInsightScopeControl(
-          overallEvents.length,
-          filteredEvents.length,
-          filtersActive,
-        );
-
-        var filteredScope =
-          desktopInsightScope === DESKTOP_INSIGHT_SCOPE_FILTERED;
-        var events = filteredScope ? filteredEvents : overallEvents;
-        var description = document.getElementById(
-          "desktopInsightsDescription",
-        );
-        if (description) {
-          description.textContent = filteredScope
-            ? "現在の絞り込みに合う募集枠の登録を、時間順に表示しています。選択すると登録・キャンセル画面が開きます。"
-            : "全体の登録を時間順に表示しています。選択すると登録・キャンセル画面が開きます。";
-        }
-
-        events.forEach(function (event) {
-          content.appendChild(
-            createDesktopInsightEventItem(event, "registrations"),
-          );
-        });
-        if (events.length === 0) {
-          renderDesktopInsightEmpty(
-            content,
-            filteredScope
-              ? "現在の絞り込みに合う募集枠には、登録がありません。"
-              : "現在の登録はありません。",
-          );
-        }
       }
 
       /**
