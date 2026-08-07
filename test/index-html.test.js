@@ -1,9 +1,12 @@
-const fs = require("node:fs");
-const path = require("node:path");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { loadIndexHtml } = require("../test-support/load-index-html");
+const {
+  getHtmlPartialFileNames,
+  getIndexHtmlSource,
+  getRawIndexHtmlSource,
+  loadIndexHtml,
+} = require("../test-support/load-index-html");
 
 function elementMatchesSelector(element, selector) {
   if (!element || !selector) return false;
@@ -360,10 +363,7 @@ test("b64decode restores UTF-8 text", () => {
 });
 
 test("server template data is injected only as quoted base64 values", () => {
-  const htmlSource = fs.readFileSync(
-    path.resolve(__dirname, "..", "index.html"),
-    "utf8",
-  );
+  const htmlSource = getRawIndexHtmlSource();
 
   assert.match(htmlSource, /JSON\.parse\(b64decode\("<\?!= gridData \?>"\)\)/);
   assert.match(htmlSource, /var alias = b64decode\("<\?!= alias \?>"\);/);
@@ -373,6 +373,28 @@ test("server template data is injected only as quoted base64 values", () => {
   );
   assert.match(htmlSource, /JSON\.parse\(b64decode\("<\?!= roles \?>"\)\)/);
   assert.match(htmlSource, /var PAGE_TITLE = b64decode\("<\?!= title \?>"\);/);
+});
+
+test("index.html composes every static partial in dependency order", () => {
+  assert.deepEqual(getHtmlPartialFileNames(), [
+    "Styles",
+    "Schedule",
+    "SignupModal",
+    "ClientCore",
+    "ClientFilters",
+    "ClientInsights",
+    "ClientSchedule",
+    "ClientFormatting",
+    "ClientModal",
+    "ClientInit",
+  ]);
+
+  const htmlSource = getIndexHtmlSource();
+  assert.equal((htmlSource.match(/<style>/g) || []).length, 1);
+  assert.equal((htmlSource.match(/<\/style>/g) || []).length, 1);
+  assert.equal((htmlSource.match(/<script>/g) || []).length, 8);
+  assert.equal((htmlSource.match(/<\/script>/g) || []).length, 8);
+  assert.doesNotMatch(htmlSource, /<\?!=\s*include_\(/);
 });
 
 test("buildGridIndexes creates the event lookup and groups signups by role", () => {
@@ -425,10 +447,7 @@ test("READ_ONLY status shows the banner and removes modal write controls", () =>
 });
 
 test("read-only banner and displaced controls stay sticky on mobile and desktop", () => {
-  const htmlSource = fs.readFileSync(
-    path.resolve(__dirname, "..", "index.html"),
-    "utf8",
-  );
+  const htmlSource = getIndexHtmlSource();
 
   assert.match(
     htmlSource,
@@ -453,10 +472,7 @@ test("read-only banner and displaced controls stay sticky on mobile and desktop"
 });
 
 test("page title scrolls on desktop and stays centered across layouts", () => {
-  const htmlSource = fs.readFileSync(
-    path.resolve(__dirname, "..", "index.html"),
-    "utf8",
-  );
+  const htmlSource = getIndexHtmlSource();
 
   assert.match(
     htmlSource,
@@ -469,10 +485,7 @@ test("page title scrolls on desktop and stays centered across layouts", () => {
 });
 
 test("desktop sticky surfaces fully obscure scrolling cards", () => {
-  const htmlSource = fs.readFileSync(
-    path.resolve(__dirname, "..", "index.html"),
-    "utf8",
-  );
+  const htmlSource = getIndexHtmlSource();
 
   assert.match(
     htmlSource,
@@ -685,10 +698,7 @@ test("mobile availability control lists activity pills and all matching time slo
 });
 
 test("mobile filters render directly without collapsed summary state", () => {
-  const htmlSource = fs.readFileSync(
-    path.resolve(__dirname, "..", "index.html"),
-    "utf8",
-  );
+  const htmlSource = getIndexHtmlSource();
 
   assert.doesNotMatch(htmlSource, /mobileFilterSummaryBar/);
   assert.doesNotMatch(htmlSource, /mobileFilterSummaryText/);
@@ -1281,10 +1291,7 @@ test("showCancelMessage forwards to the cancel message target", () => {
 });
 
 test("index.html keeps signup validation inputs and uses a cancellation selection list", () => {
-  const htmlSource = fs.readFileSync(
-    path.resolve(__dirname, "..", "index.html"),
-    "utf8",
-  );
+  const htmlSource = getIndexHtmlSource();
   function getInputBlock(id) {
     const afterId = htmlSource.split(`id="${id}"`)[1];
     if (!afterId) return null;
@@ -1539,10 +1546,7 @@ test("registration tab restores role choices and resets retained modal scroll", 
 });
 
 test("cancellation list styling contains highlights inside the scroll area", () => {
-  const htmlSource = fs.readFileSync(
-    path.resolve(__dirname, "..", "index.html"),
-    "utf8",
-  );
+  const htmlSource = getIndexHtmlSource();
 
   assert.match(
     htmlSource,
@@ -1567,10 +1571,7 @@ test("cancellation list styling contains highlights inside the scroll area", () 
 });
 
 test("cancellation confirmation prominently centres the selected signup", () => {
-  const htmlSource = fs.readFileSync(
-    path.resolve(__dirname, "..", "index.html"),
-    "utf8",
-  );
+  const htmlSource = getIndexHtmlSource();
 
   assert.match(
     htmlSource,
@@ -1754,10 +1755,7 @@ test("submitSignup refreshes grid data after a stale full-slot rejection", () =>
 });
 
 test("desktop reuses the responsive filters and card schedule", () => {
-  const htmlSource = fs.readFileSync(
-    path.resolve(__dirname, "..", "index.html"),
-    "utf8",
-  );
+  const htmlSource = getIndexHtmlSource();
 
   assert.match(
     htmlSource,
@@ -2539,10 +2537,7 @@ test("desktop insight cards render useful views and reuse existing actions", () 
 });
 
 test("mobile role filter active pills keep their role colour families", () => {
-  const htmlSource = fs.readFileSync(
-    path.resolve(__dirname, "..", "index.html"),
-    "utf8",
-  );
+  const htmlSource = getIndexHtmlSource();
 
   assert.match(
     htmlSource,
@@ -2563,10 +2558,7 @@ test("mobile role filter active pills keep their role colour families", () => {
 });
 
 test("desktop insights reuse the activity ribbons", () => {
-  const htmlSource = fs.readFileSync(
-    path.resolve(__dirname, "..", "index.html"),
-    "utf8",
-  );
+  const htmlSource = getIndexHtmlSource();
 
   assert.match(
     htmlSource,
@@ -2579,10 +2571,7 @@ test("desktop insights reuse the activity ribbons", () => {
 });
 
 test("mobile tab and filter controls stay sticky in compact layout", () => {
-  const htmlSource = fs.readFileSync(
-    path.resolve(__dirname, "..", "index.html"),
-    "utf8",
-  );
+  const htmlSource = getIndexHtmlSource();
 
   assert.match(
     htmlSource,
@@ -2599,10 +2588,7 @@ test("mobile tab and filter controls stay sticky in compact layout", () => {
 });
 
 test("mobile sticky controls use opaque backing so cards do not show through", () => {
-  const htmlSource = fs.readFileSync(
-    path.resolve(__dirname, "..", "index.html"),
-    "utf8",
-  );
+  const htmlSource = getIndexHtmlSource();
 
   assert.match(
     htmlSource,
@@ -2755,10 +2741,7 @@ test("buildMobileDayOverview renders a time-based day timeline", () => {
 });
 
 test("mobile day overview keeps activity accent colours in compact layout", () => {
-  const htmlSource = fs.readFileSync(
-    path.resolve(__dirname, "..", "index.html"),
-    "utf8",
-  );
+  const htmlSource = getIndexHtmlSource();
 
   assert.match(
     htmlSource,

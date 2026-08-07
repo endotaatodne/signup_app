@@ -182,9 +182,9 @@ The Master Sheet ID is stored securely in Script Properties.
 
 4. Click **Save script properties**
 
-### Step 8b — Configure Role Names in Code.gs
+### Step 8b — Configure Role Names in Config.gs
 
-Open `Code.gs` and update the `ROLES` constant if you want to use different role names:
+Open `Config.gs` and update the `ROLES` constant if you want to use different role names:
 
 ```javascript
 const ROLES = {
@@ -357,7 +357,7 @@ The tab is optional. Keep only the header row, or remove the tab, when no activi
 
 ### Changing Role Names
 
-In `Code.gs`, update the `ROLES` constant:
+In `Config.gs`, update the `ROLES` constant:
 
 ```javascript
 const ROLES = {
@@ -372,7 +372,7 @@ The keys (`general`, `classRep`, `steeringCommittee`, `orgCommittee`) must stay 
 
 ### Changing Role Colours
 
-In `index.html`, find and update the role colour CSS:
+In `Styles.html`, find and update the role colour CSS:
 
 ```css
 .count-general {
@@ -391,7 +391,7 @@ In `index.html`, find and update the role colour CSS:
 
 ### Changing the Button Text
 
-At the top of the `<script>` block in `index.html`:
+In the bootstrap `<script>` block near the top of `index.html`:
 
 ```javascript
 var SIGNUP_BTN_TEXT = "Your Text Here";
@@ -466,26 +466,57 @@ npm run deploy
 
 ```
 signup_app/
-├── Code.gs          # Backend — reads/writes Google Sheets, serves web app (no secrets hardcoded)
-├── index.html       # Frontend — responsive schedule, filters, summaries, and signup/cancellation modal
-├── appsscript.json  # Apps Script configuration
-├── .claspignore     # Excludes local test/dev files from Apps Script deployments
-├── test/            # Unit tests for backend and frontend logic
-├── test-support/    # Test harnesses and Apps Script/browser mocks
-├── package.json     # Local test commands
-├── CHANGELOG.md     # Version history
-├── README.md        # Documentation index
-├── README.ja.md     # Japanese README
-└── README.en.md     # This file
+├── Code.gs                 # Web entry points and HTML partial inclusion
+├── Config.gs               # Roles, sheet schemas, event policy, and shared constants
+├── GridData.gs             # Public schedule data retrieval and shaping
+├── Normalisation.gs        # Shared name, class, and comparison normalisation
+├── RateLimit.gs            # Per-person and per-event write rate limiting
+├── SignupService.gs        # Signup/cancellation workflows and scheduling rules
+├── SpreadsheetData.gs      # Validated sheet reads and activity-limit loading
+├── Validation.gs           # Request, schema, row, and cell validation
+├── index.html              # Main page template and client bootstrap values
+├── Styles.html             # Page, responsive, schedule, and modal styles
+├── Schedule.html           # Schedule, filter, summary, and insight markup
+├── SignupModal.html        # Signup and cancellation modal markup
+├── ClientCore.html         # Client state, indexes, and shared helpers
+├── ClientFilters.html      # Activity, role, time, and keyword filtering
+├── ClientInsights.html     # Desktop summaries and detail panels
+├── ClientSchedule.html     # Schedule card and day-overview rendering
+├── ClientFormatting.html   # Client formatting and normalisation helpers
+├── ClientModal.html        # Signup and cancellation modal behaviour
+├── ClientInit.html         # DOM event binding and client startup
+├── appsscript.json         # Apps Script configuration
+├── .claspignore            # Excludes local test/dev files from Apps Script deployments
+├── test/                   # Unit tests for backend and frontend logic
+├── test-support/           # Multi-file test harnesses and Apps Script/browser mocks
+├── package.json            # Local test commands
+├── CHANGELOG.md            # Version history
+├── README.md               # Documentation index
+├── README.ja.md            # Japanese README
+└── README.en.md            # This file
 ```
 
 Sensitive values (`MASTER_SHEET_ID`) are stored in Script Properties — not in source code — so the entire repo is safe to share publicly.
+
+Apps Script loads every root `.gs` file into one shared global scope. These files are responsibility boundaries, not ES modules, so avoid cross-file top-level initialisation and duplicate global names. `index.html` defines the canonical HTML-partial order; `ClientInit.html` must remain last because it binds DOM events and starts client rendering.
+
+### Source responsibilities and flow
+
+Each production source file starts with an `@fileoverview` that describes its responsibility and important dependencies. Every named JavaScript function has adjacent JSDoc describing its inputs, result, and significant side effects. Keep those contracts current when behaviour changes; the source-documentation test checks that coverage is not accidentally lost.
+
+The main runtime paths are:
+
+- Page load: `doGet` resolves the event configuration, loads validated spreadsheet data, builds the public grid model, and renders `index.html`. The template composes the markup and scripts, then `ClientInit.html` binds the page controls and performs the first render.
+- Schedule interaction: `ClientFilters.html` owns filter state and matching, `ClientSchedule.html` renders the responsive schedule, and `ClientInsights.html` derives desktop summaries from the currently visible events.
+- Signup or cancellation: `ClientModal.html` validates the immediate browser input and calls the public Apps Script service. `SignupService.gs` repeats authoritative validation, checks event policy and rate limits, serialises the sheet mutation with `LockService`, and returns a safe result before the client refreshes the grid.
+
+Server helpers whose names end in `_` are internal conventions rather than browser entry points. The intended public server surface is limited to `doGet`, `getGridDataForAlias`, `submitSignup`, `cancelSignup`, and `getDeployedUrl`.
 
 ---
 
 ## Unit Tests
 
-This project includes local unit tests for the Google Apps Script backend and the testable logic inside `index.html`.
+This project includes local unit tests for the Google Apps Script backend distributed across the root `.gs` files and the composed frontend built from `index.html` and its HTML partials.
 
 Run all tests from the repository root:
 
@@ -501,14 +532,16 @@ npm test
 
 Current test coverage includes:
 
-- `Code.gs` backend logic such as config loading, signup/cancellation flows, rate limiting, sanitisation, and normalization
-- Shared normalization behavior for names (including Japanese spacing), classes, digits, and class separators
-- `index.html` client-side utility and state logic such as event indexing, responsive layouts, schedule filters and views, desktop summaries, cancellation selection, message rendering, and client normalization
+- Server-side `.gs` files covering config loading, signup/cancellation flows, rate limiting, spreadsheet validation, sanitisation, and normalisation
+- Shared normalisation behaviour for names (including Japanese spacing), classes, digits, and class separators
+- Composed client-side logic across `Client*.html`, including event indexing, responsive layouts, schedule filters and views, desktop summaries, cancellation selection, message rendering, and client normalisation
+- Source-documentation coverage for every production file and named function
 
 Testing strategy:
 
-- Run the full test suite after every meaningful change to `Code.gs`, `index.html`, or shared validation/normalization logic
+- Run the full test suite after every meaningful change to a production `.gs` or `.html` file, especially shared validation or normalisation logic
 - Update or add tests in the same change whenever expected behavior changes
+- Keep the test harness aligned with the deployed project by loading every root `.gs` file and resolving the HTML includes from `index.html`
 - Keep Apps Script-specific and browser-specific dependencies mocked in tests so production logic can be exercised without deploying
 - Treat unit tests as regression protection: if you fix a bug, add a test that would have failed before the fix
 

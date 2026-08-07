@@ -1,9 +1,11 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
 
-const { loadCodeGs } = require("../test-support/load-codegs");
+const {
+  getAppsScriptFileNames,
+  getAppsScriptSource,
+  loadCodeGs,
+} = require("../test-support/load-codegs");
 const {
   createSheet,
   createSpreadsheet,
@@ -128,6 +130,7 @@ function loadBackend(options = {}) {
     [
       "ROLES",
       "doGet",
+      "include_",
       "getGridData_",
       "getGridDataForAlias",
       "submitSignup",
@@ -158,7 +161,7 @@ function loadBackend(options = {}) {
 }
 
 test("only intended backend entry points are browser-callable", () => {
-  const source = fs.readFileSync(path.resolve(__dirname, "..", "Code.gs"), "utf8");
+  const source = getAppsScriptSource();
   const publicFunctions = [...source.matchAll(/^function\s+([A-Za-z0-9_]+)\s*\(/gm)]
     .map((match) => match[1])
     .filter((name) => !name.endsWith("_"))
@@ -171,6 +174,25 @@ test("only intended backend entry points are browser-callable", () => {
     "getGridDataForAlias",
     "submitSignup",
   ]);
+});
+
+test("backend source loader includes every responsibility-focused script", () => {
+  assert.deepEqual(getAppsScriptFileNames(), [
+    "Code.gs",
+    "Config.gs",
+    "GridData.gs",
+    "Normalisation.gs",
+    "RateLimit.gs",
+    "SignupService.gs",
+    "SpreadsheetData.gs",
+    "Validation.gs",
+  ]);
+});
+
+test("include_ returns the requested static HTML partial", () => {
+  const { app } = loadBackend();
+
+  assert.equal(app.include_("Styles"), "<!-- included:Styles -->");
 });
 
 test("getEventConfig_ normalises aliases and filters invalid sheet IDs", () => {

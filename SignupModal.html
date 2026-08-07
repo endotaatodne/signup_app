@@ -1,0 +1,111 @@
+    <!--
+      @fileoverview Signup and cancellation modal markup. Client scripts populate
+      event details, role availability, existing signups, and workflow feedback.
+    -->
+    <div class="modal-overlay" id="modalOverlay">
+      <div class="modal">
+        <!-- Event context, existing signup names, and access-state notice. -->
+        <div class="modal-title" id="modalTitle"></div>
+        <div class="modal-subtitle" id="modalSubtitle"></div>
+
+        <div class="names-section" id="namesSection" style="display: none">
+          <div id="namesGroups"></div>
+        </div>
+
+        <div
+          class="modal-read-only-notice"
+          id="modalReadOnlyNotice"
+          style="display: none"
+        >
+          現在、このページは閲覧専用です。登録やキャンセルはできません。
+        </div>
+
+        <!-- Workflow tabs are shown only when cancellation is available. -->
+        <div class="modal-tabs" id="modalTabs" style="display: none">
+          <button class="modal-tab active-signup" id="tabSignup">
+            登録する
+          </button>
+          <button class="modal-tab" id="tabCancel">登録をキャンセルする</button>
+        </div>
+
+        <div class="modal-helper" id="signupHelper">
+          登録するポジションを選んでください
+        </div>
+
+        <!-- Signup role selection and validated participant inputs. -->
+        <div class="role-buttons" id="roleButtons"></div>
+
+        <div class="modal-form" id="modalForm">
+          <input
+            type="text"
+            id="inputName"
+            placeholder="保護者名"
+          />
+          <input
+            type="text"
+            id="inputClass"
+            placeholder="クラス"
+            maxlength="10"
+          />
+          <input
+            type="text"
+            id="honeypot"
+            name="email_confirm"
+            autocomplete="off"
+            tabindex="-1"
+            aria-hidden="true"
+            style="
+              opacity: 0;
+              position: absolute;
+              top: 0;
+              left: 0;
+              height: 0;
+              width: 0;
+              z-index: -1;
+            "
+          />
+          <button class="modal-submit" id="submitBtn"></button>
+          <div
+            class="modal-message"
+            id="modalMessage"
+            style="display: none"
+          ></div>
+        </div>
+
+        <!-- Cancellation selection, confirmation, and feedback. -->
+        <div class="cancel-form" id="cancelForm">
+          <div class="cancel-helper">
+            キャンセルする登録を選んでください。
+          </div>
+          <div
+            class="cancel-signup-list"
+            id="cancelSignupList"
+            role="group"
+            aria-label="キャンセルする登録"
+          ></div>
+          <div class="confirm-box" id="confirmBox" style="display: none">
+            <div id="confirmText"></div>
+            <div class="confirm-buttons">
+              <button class="confirm-yes" id="confirmYes">
+                はい、キャンセルします。
+              </button>
+              <button class="confirm-no" id="confirmNo">いいえ</button>
+            </div>
+          </div>
+          <button
+            class="cancel-submit"
+            id="cancelSubmitBtn"
+            style="display: block"
+          >
+            選択した登録をキャンセル
+          </button>
+          <div
+            class="modal-message"
+            id="cancelMessage"
+            style="display: none"
+          ></div>
+        </div>
+
+        <button class="modal-cancel" id="closeBtn">閉じる</button>
+      </div>
+    </div>

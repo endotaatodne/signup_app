@@ -1,0 +1,437 @@
+    <script>
+      /**
+       * @fileoverview Responsive schedule-card and day-overview rendering.
+       * Loaded after ClientCore.html, ClientFilters.html, and
+       * ClientInsights.html, and before ClientInit.html. Its render functions
+       * also call formatting helpers loaded immediately afterward from
+       * ClientFormatting.html; initialization starts only after all modules load.
+       */
+      /**
+       * Formats a numeric vacancy count for schedule chips.
+       * @param {number} remaining Number of available slots.
+       * @returns {string} Japanese remaining-slot label.
+       */
+      function formatRemainingSlots(remaining) {
+        return "残り" + remaining + "枠";
+      }
+
+      /**
+       * Replaces the schedule container's display-mode class.
+       * Side effect: updates the supplied container's className.
+       * @param {HTMLElement} container Responsive schedule container.
+       * @param {*} mode Candidate display mode.
+       * @returns {void}
+       */
+      function setMobileAgendaModeClass(container, mode) {
+        var baseClass = String(container.className || "")
+          .replace(/\bmobile-display-by-(activity|time|signup|overview)\b/g, "")
+          .replace(/\s+/g, " ")
+          .trim();
+        container.className = (
+          baseClass +
+          " mobile-display-by-" +
+          normaliseMobileDisplayMode(mode)
+        ).trim();
+      }
+
+      /**
+       * Appends the no-matching-slots message to a schedule container.
+       * Side effect: adds an empty-state child element.
+       * @param {HTMLElement} container Responsive schedule container.
+       * @returns {void}
+       */
+      function renderMobileEmptyState(container) {
+        var empty = document.createElement("div");
+        empty.className = "mobile-empty-state";
+        empty.textContent =
+          "条件に合う募集枠がありません";
+        container.appendChild(empty);
+      }
+
+      /**
+       * Orders events by configured activity order and then chronological order.
+       * @param {Object} a First schedule event.
+       * @param {Object} b Second schedule event.
+       * @returns {number} Negative, zero, or positive sort comparator result.
+       */
+      function compareEventsByActivityOrder(a, b) {
+        var activities = (gridData && gridData.activities) || [];
+        var indexA = activities.indexOf(a.activity);
+        var indexB = activities.indexOf(b.activity);
+        if (indexA < 0) indexA = activities.length;
+        if (indexB < 0) indexB = activities.length;
+        if (indexA !== indexB) return indexA - indexB;
+        return compareEventsByTime(a, b);
+      }
+
+      /**
+       * Reports whether every event in a time group has the same end time.
+       * @param {Object[]} events Schedule events sharing a start time.
+       * @returns {boolean} True for fewer than two events or one common end time.
+       */
+      function eventsShareEndTime(events) {
+        if (!events || events.length < 2) return true;
+        var endTime = String(events[0].endTime || "");
+        return events.every(function (event) {
+          return String(event.endTime || "") === endTime;
+        });
+      }
+
+      /**
+       * Formats a time-group heading, including a shared end time when possible.
+       * @param {string} time Group start time.
+       * @param {Object[]} events Events in the time group.
+       * @returns {string} Formatted time or time range.
+       */
+      function getMobileTimeHeadingText(time, events) {
+        var matchingEvents = events || [];
+        if (
+          matchingEvents.length > 0 &&
+          matchingEvents[0].endTime &&
+          eventsShareEndTime(matchingEvents)
+        ) {
+          return formatTimeRange(time, matchingEvents[0].endTime);
+        }
+        return formatTime(time);
+      }
+
+      /**
+       * Builds a signup card with event details, capacity, and volunteer names.
+       * @param {Object} event Indexed schedule event.
+       * @param {{showTime: boolean}=} options Rendering options.
+       * @returns {HTMLButtonElement} Newly created actionable schedule card.
+       */
+      function buildMobileSlotCard(event, options) {
+        options = options || {};
+        var showTime = options.showTime !== false;
+        var card = document.createElement("button");
+        card.className = "mobile-slot-card " + getActivityAccentClass(event.activity);
+        card.type = "button";
+        card.setAttribute("data-eventid", event.eventId);
+
+        var header = document.createElement("div");
+        header.className = "mobile-slot-header";
+
+        var titleWrap = document.createElement("div");
+
+        var title = document.createElement("div");
+        title.className = "mobile-slot-title";
+        title.textContent = event.activity;
+        titleWrap.appendChild(title);
+
+        if (showTime) {
+          var timeLine = document.createElement("div");
+          timeLine.className = "mobile-slot-time";
+          timeLine.textContent = event.endTime
+            ? formatTimeRange(event.startTime, event.endTime)
+            : formatTime(event.startTime);
+          titleWrap.appendChild(timeLine);
+        }
+
+        var meta = document.createElement("div");
+        meta.className = "mobile-slot-meta";
+        meta.textContent = event.location || "";
+        titleWrap.appendChild(meta);
+
+        if (event.subtitle && event.subtitle.trim() !== "") {
+          var subtitle = document.createElement("div");
+          subtitle.className = "mobile-slot-meta";
+          subtitle.textContent = event.subtitle;
+          titleWrap.appendChild(subtitle);
+        }
+
+        if (event.description && event.description.trim() !== "") {
+          var desc = document.createElement("div");
+          desc.className = "mobile-slot-desc";
+          desc.textContent = event.description;
+          titleWrap.appendChild(desc);
+        }
+
+        var badge = document.createElement("div");
+        badge.className = "mobile-slot-badge";
+        var available = hasAnyAvailable(event.slots);
+        badge.textContent = available ? "" : "Full";
+        if (!available) {
+          badge.classList.add("is-full");
+          card.classList.add("is-full");
+        }
+
+        header.appendChild(titleWrap);
+        header.appendChild(badge);
+        card.appendChild(header);
+
+        var summary = document.createElement("div");
+        summary.className = "mobile-slot-summary";
+        ROLE_KEYS.forEach(function (r) {
+          var s = event.slots[r.key];
+          if (s.max === 0) return;
+          var remaining = s.max - s.filled;
+          var item = document.createElement("span");
+          item.className =
+            "mobile-slot-summary-item role-" + r.classSuffix;
+          if (remaining <= 0) item.classList.add("is-full");
+          item.textContent =
+            r.label +
+            "\u00a0" +
+            (remaining <= 0 ? "Full" : formatRemainingSlots(remaining));
+          summary.appendChild(item);
+        });
+        card.appendChild(summary);
+
+        if (event.signups && event.signups.length > 0) {
+          var namesList = document.createElement("div");
+          namesList.className = "mobile-slot-names";
+          ROLE_KEYS.forEach(function (r) {
+            var roleSignups = event.signupsByRole[r.label] || [];
+            if (roleSignups.length === 0) return;
+            var group = document.createElement("div");
+            group.className = "mobile-slot-name-group";
+
+            var roleLabel = document.createElement("span");
+            roleLabel.className = "mobile-slot-role-label " + r.nameClass;
+            roleLabel.textContent = r.label + ":";
+            group.appendChild(roleLabel);
+
+            var namesSpan = document.createElement("span");
+            namesSpan.className = "mobile-slot-name-list " + r.nameClass;
+            namesSpan.textContent = roleSignups
+              .map(function (signup) {
+                return signup.name;
+              })
+              .join(", ");
+            group.appendChild(namesSpan);
+
+            namesList.appendChild(group);
+          });
+          card.appendChild(namesList);
+        }
+
+        return card;
+      }
+
+      /**
+       * Rebuilds the filtered signup agenda grouped by start time.
+       * Side effect: replaces schedule DOM, or schedules a retry while data or
+       * the target container is unavailable.
+       * @returns {void}
+       */
+      function buildMobileAgendaByTime() {
+        if (!gridData || !gridData.events) {
+          setTimeout(buildMobileAgenda, 200);
+          return;
+        }
+        var container = getMobileAgenda();
+        if (!container) {
+          setTimeout(buildMobileAgenda, 200);
+          return;
+        }
+
+        setMobileAgendaModeClass(container, "signup");
+        while (container.firstChild) {
+          container.removeChild(container.firstChild);
+        }
+
+        var filteredEvents = getMobileFilteredEvents();
+        var times = getMobileFilteredTimes(filteredEvents);
+        times.forEach(function (time) {
+          var matchingEvents = filteredEvents
+            .filter(function (event) {
+              return event.startTime === time;
+            })
+            .sort(compareEventsByActivityOrder);
+          if (matchingEvents.length === 0) return;
+
+          var section = document.createElement("section");
+          section.className = "mobile-time-group";
+
+          var heading = document.createElement("h2");
+          heading.className = "mobile-time-heading";
+          heading.textContent = getMobileTimeHeadingText(time, matchingEvents);
+          section.appendChild(heading);
+
+          matchingEvents.forEach(function (event) {
+            section.appendChild(buildMobileSlotCard(event));
+          });
+
+          container.appendChild(section);
+        });
+
+        if (!container.firstChild) {
+          renderMobileEmptyState(container);
+        }
+      }
+
+      /**
+       * Joins populated overview metadata fields for an event.
+       * @param {Object} event Schedule event.
+       * @returns {string} Slash-separated location, subtitle, and description.
+       */
+      function getOverviewEventMeta(event) {
+        return [event.location, event.subtitle, event.description]
+          .filter(function (value) {
+            return value && String(value).trim() !== "";
+          })
+          .join(" / ");
+      }
+
+      /**
+       * Rebuilds the activity-filtered, time-based day overview.
+       * Side effect: replaces schedule DOM, or schedules a retry while data or
+       * the target container is unavailable.
+       * @returns {void}
+       */
+      function buildMobileDayOverview() {
+        if (!gridData || !gridData.events) {
+          setTimeout(buildMobileAgenda, 200);
+          return;
+        }
+        var container = getMobileAgenda();
+        if (!container) {
+          setTimeout(buildMobileAgenda, 200);
+          return;
+        }
+
+        setMobileAgendaModeClass(container, "overview");
+        while (container.firstChild) {
+          container.removeChild(container.firstChild);
+        }
+
+        var timeline = document.createElement("div");
+        timeline.className = "mobile-overview-timeline";
+        var activity = getMobileActivityFilter();
+        var events = (gridData.events || [])
+          .filter(function (event) {
+            return eventMatchesActivityFilter(event, activity);
+          })
+          .slice();
+        var times = getOrderedValuesForEvents(
+          events,
+          "startTime",
+          (gridData && gridData.times) || [],
+        );
+
+        times.forEach(function (time) {
+          var matchingEvents = events
+            .filter(function (event) {
+              return event.startTime === time;
+            })
+            .sort(compareEventsByActivityOrder);
+          if (matchingEvents.length === 0) return;
+
+          var block = document.createElement("section");
+          block.className = "mobile-overview-time-block";
+
+          var timeLabel = document.createElement("div");
+          timeLabel.className = "mobile-overview-time";
+          timeLabel.textContent = getMobileTimeHeadingText(time, matchingEvents);
+          block.appendChild(timeLabel);
+
+          var items = document.createElement("div");
+          items.className = "mobile-overview-items";
+          matchingEvents.forEach(function (event) {
+            var item = document.createElement("button");
+            item.className =
+              "mobile-overview-item " + getActivityAccentClass(event.activity);
+            item.type = "button";
+            item.setAttribute("data-eventid", event.eventId);
+
+            var text = document.createElement("div");
+            var title = document.createElement("div");
+            title.className = "mobile-overview-title";
+            title.textContent = event.activity;
+            text.appendChild(title);
+
+            var metaText = getOverviewEventMeta(event);
+            if (metaText) {
+              var meta = document.createElement("div");
+              meta.className = "mobile-overview-meta";
+              meta.textContent = metaText;
+              text.appendChild(meta);
+            }
+
+            var roleChips = document.createElement("div");
+            roleChips.className = "mobile-overview-role-chips";
+            var hasOpenRole = false;
+            ROLE_KEYS.forEach(function (r) {
+              var remaining = getRemainingForRole(event, r.key);
+              if (remaining <= 0) return;
+              if (!hasOpenRole) {
+                var roleChipLabel = document.createElement("span");
+                roleChipLabel.className = "mobile-overview-role-chip-label";
+                roleChipLabel.textContent = "募集中";
+                roleChips.appendChild(roleChipLabel);
+                hasOpenRole = true;
+              }
+              var chip = document.createElement("span");
+              chip.className =
+                "mobile-overview-role-chip role-" + r.classSuffix;
+              chip.textContent = r.label + " " + remaining;
+              roleChips.appendChild(chip);
+            });
+            if (!hasOpenRole) {
+              var fullChip = document.createElement("span");
+              fullChip.className = "mobile-overview-role-chip is-full";
+              fullChip.textContent = "Full";
+              roleChips.appendChild(fullChip);
+            }
+
+            item.appendChild(text);
+            item.appendChild(roleChips);
+            items.appendChild(item);
+          });
+
+          block.appendChild(items);
+          timeline.appendChild(block);
+        });
+
+        if (timeline.firstChild) {
+          container.appendChild(timeline);
+        } else {
+          renderMobileEmptyState(container);
+        }
+      }
+
+      /**
+       * Synchronises filters and summaries, then renders the selected view.
+       * Side effect: updates filter state and responsive schedule/summary DOM.
+       * @returns {void}
+       */
+      function buildMobileAgenda() {
+        var filters = document.getElementById("mobileAvailabilityControl");
+        var activeMode = getMobileDisplayMode();
+        if (activeMode !== "signup") {
+          mobileTimeFilterDropdownOpen = false;
+        }
+        if (filters) {
+          filters.style.display = "";
+          filters.classList.toggle("is-signup-mode", activeMode === "signup");
+          filters.classList.toggle("is-overview-mode", activeMode === "overview");
+        }
+        updateMobileAvailabilityControl();
+        updateDesktopScheduleSummary();
+        if (activeMode === "signup") {
+          buildMobileAgendaByTime();
+        } else {
+          buildMobileDayOverview();
+        }
+      }
+
+      /**
+       * Applies compact/desktop body classes and closes incompatible desktop UI.
+       * Side effect: updates body classes, banner offset, filters, and insights.
+       * @returns {void}
+       */
+      function renderResponsiveView() {
+        var compact = isCompactLayout();
+        document.body.classList.toggle("compact-layout", compact);
+        document.body.classList.toggle("desktop-layout", !compact);
+        updateReadOnlyBannerOffset();
+        if (compact) {
+          closeDesktopInsightsPanel(false);
+          if (desktopFilterPopoverOpen) {
+            desktopFilterPopoverOpen = "";
+            updateMobileAvailabilityControl();
+          }
+        }
+      }
+    </script>

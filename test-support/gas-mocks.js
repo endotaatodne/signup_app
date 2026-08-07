@@ -86,6 +86,13 @@ function createHtmlService() {
         content,
       };
     },
+    createHtmlOutputFromFile(fileName) {
+      return {
+        getContent() {
+          return `<!-- included:${fileName} -->`;
+        },
+      };
+    },
     createTemplateFromFile(fileName) {
       return {
         fileName,

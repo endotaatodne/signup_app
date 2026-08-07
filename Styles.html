@@ -1,0 +1,3092 @@
+    <style>
+      /**
+       * @fileoverview Shared visual system for the signup application, including
+       * base components, modal workflows, schedule cards, filters, and the
+       * compact and desktop responsive layouts.
+       */
+
+      /* Base reset, page typography, and event-access status. */
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+        background: #f5f5f5;
+        color: #333;
+      }
+      h1 {
+        font-size: 2em;
+        margin-bottom: 1.2rem;
+        color: #222;
+      }
+      .read-only-banner {
+        max-width: 1100px;
+        margin: -0.35rem auto 1rem;
+        padding: 12px 14px;
+        border: 1px solid #d6a84b;
+        border-radius: 8px;
+        background: #fff8e1;
+        color: #6d4c00;
+        font-size: 14px;
+        font-weight: 700;
+        line-height: 1.5;
+        text-align: center;
+      }
+
+      /* Shared role colours used by signup names and availability summaries. */
+      .name-role-general {
+        color: #2e7d32;
+      }
+      .name-role-classrep {
+        color: #c77800;
+      }
+      .name-role-steeringcommittee {
+        color: #1565c0;
+      }
+      .name-role-orgcommittee {
+        color: #6a1b9a;
+      }
+      /* Base modal, signup form, and role-selection presentation. */
+      .modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.45);
+        z-index: 1000;
+      }
+      .modal-overlay.active {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .modal {
+        background: white;
+        border-radius: 12px;
+        padding: 24px;
+        width: 90%;
+        max-width: 380px;
+      }
+      .modal-title {
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 4px;
+      }
+      .modal-subtitle {
+        font-size: 12px;
+        color: #888;
+        margin-bottom: 16px;
+      }
+
+      .role-buttons {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 16px;
+      }
+      .role-btn {
+        padding: 10px 14px;
+        border-radius: 8px;
+        border: 2px solid transparent;
+        cursor: pointer;
+        text-align: left;
+        font-size: 13px;
+        font-weight: 500;
+        transition: opacity 0.15s;
+      }
+      .role-btn:hover {
+        opacity: 0.85;
+      }
+      .role-btn.selected {
+        border-color: #333;
+      }
+      .role-btn-full {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      .role-btn-general {
+        background: #e8f5e9;
+        color: #2e7d32;
+      }
+      .role-btn-classrep {
+        background: #fff8e1;
+        color: #f57f17;
+      }
+      .role-btn-steeringcommittee {
+        background: #e3f2fd;
+        color: #1565c0;
+      }
+      .role-btn-orgcommittee {
+        background: #f3e5f5;
+        color: #6a1b9a;
+      }
+      .role-btn-label {
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .role-btn-count {
+        font-size: 11px;
+        font-weight: 400;
+        margin-top: 1px;
+        opacity: 0.8;
+      }
+
+      .modal-form {
+        display: none;
+      }
+      .modal-form.visible {
+        display: block;
+      }
+      .modal input {
+        width: 100%;
+        padding: 10px 12px;
+        font-size: 14px;
+        border: 1px solid #ddd;
+        border-radius: 7px;
+        margin-bottom: 10px;
+        outline: none;
+      }
+      .modal input:focus {
+        border-color: #4caf50;
+      }
+      .modal-submit {
+        width: 100%;
+        padding: 11px;
+        font-size: 16px;
+        font-weight: 600;
+        color: white;
+        border: none;
+        border-radius: 7px;
+        cursor: pointer;
+        margin-top: 4px;
+      }
+      .modal-submit:disabled {
+        background: #aaa;
+        cursor: not-allowed;
+      }
+      .modal-submit-general {
+        background: #4caf50;
+      }
+      .modal-submit-classrep {
+        background: #ffa000;
+      }
+      .modal-submit-steeringcommittee {
+        background: #1976d2;
+      }
+      .modal-submit-orgcommittee {
+        background: #7b1fa2;
+      }
+      .modal-cancel {
+        width: 100%;
+        padding: 9px;
+        font-size: 13px;
+        color: #888;
+        background: none;
+        border: none;
+        cursor: pointer;
+        margin-top: 6px;
+      }
+      .modal-message {
+        font-size: 13px;
+        padding: 8px 10px;
+        border-radius: 6px;
+        margin-top: 8px;
+        line-height: 1.5;
+      }
+      .modal-message.success {
+        background: #e8f5e9;
+        color: #2e7d32;
+      }
+      .modal-message.error {
+        background: #fdecea;
+        color: #d32f2f;
+        font-weight: 500;
+      }
+      .modal-message.action-needed {
+        background: #fff8e1;
+        color: #7a5200;
+        font-weight: 600;
+      }
+      .modal-message-main {
+        display: block;
+      }
+      .modal-message-emphasis {
+        display: block;
+        margin-top: 6px;
+        padding: 0;
+        color: #7a5200;
+        font-weight: 700;
+      }
+      .modal-helper {
+        font-size: 19px;
+        color: #666;
+        margin: 10px 0 8px;
+        line-height: 1.5;
+      }
+      .modal-read-only-notice {
+        margin: 12px 0 16px;
+        padding: 12px;
+        border: 1px solid #d6a84b;
+        border-radius: 8px;
+        background: #fff8e1;
+        color: #6d4c00;
+        font-size: 14px;
+        font-weight: 700;
+        line-height: 1.5;
+        text-align: center;
+      }
+
+      .names-section {
+        margin-bottom: 14px;
+      }
+      .names-role-group {
+        margin-bottom: 8px;
+      }
+      .names-role-label {
+        font-size: 11px;
+        font-weight: 600;
+        margin-bottom: 4px;
+      }
+      .names-role-label-general {
+        color: #2e7d32;
+      }
+      .names-role-label-classrep {
+        color: #f57f17;
+      }
+      .names-role-label-steeringcommittee {
+        color: #1565c0;
+      }
+      .names-role-label-orgcommittee {
+        color: #6a1b9a;
+      }
+      .names-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+      }
+      .name-chip {
+        font-size: 11px;
+        padding: 3px 9px;
+        background: #f0f0f0;
+        border-radius: 20px;
+        color: #444;
+      }
+      .name-chip.name-role-general {
+        background: #edf7ee;
+        color: #2e7d32;
+      }
+      .name-chip.name-role-classrep {
+        background: #fff6df;
+        color: #c77800;
+      }
+      .name-chip.name-role-steeringcommittee {
+        background: #eaf3ff;
+        color: #1565c0;
+      }
+      .name-chip.name-role-orgcommittee {
+        background: #f4eafd;
+        color: #6a1b9a;
+      }
+      .name-chip-class {
+        color: #888;
+        /* TEXT_SIZE: [POP-UP] Desktop class text inside name chips */
+        font-size: 11px;
+      }
+      .modal-full-message {
+        /* TEXT_SIZE: [POP-UP] Desktop full-capacity message */
+        font-size: 17px;
+        color: #999;
+        text-align: center;
+        padding: 8px 0;
+        line-height: 1.5;
+      }
+      .mobile-slot-names {
+        margin-top: 8px;
+        font-size: 11px;
+        line-height: 1.5;
+      }
+      .mobile-slot-name-group {
+        margin-top: 4px;
+      }
+      .mobile-slot-name-group:first-child {
+        margin-top: 0;
+      }
+      .mobile-slot-role-label {
+        display: inline-block;
+        margin-right: 6px;
+        font-weight: 700;
+      }
+      .mobile-slot-name-list {
+        font-weight: 600;
+      }
+      /* Cancellation tab, selectable signup list, and action controls. */
+      .modal-tabs {
+        display: flex;
+        border-bottom: 2px solid #e0e0e0;
+        margin-bottom: 14px;
+      }
+      .modal-tab {
+        flex: 1;
+        padding: 8px;
+        font-size: 15px;
+        font-weight: 600;
+        text-align: center;
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -2px;
+        color: #aaa;
+        background: none;
+        border-top: none;
+        border-left: none;
+        border-right: none;
+      }
+      .modal-tab.active-signup {
+        color: #2e7d32;
+        border-bottom-color: #2e7d32;
+      }
+      .modal-tab.active-cancel {
+        color: #c62828;
+        border-bottom-color: #c62828;
+      }
+
+      .cancel-form {
+        display: none;
+      }
+      .cancel-form.visible {
+        display: block;
+      }
+      .cancel-helper {
+        margin-bottom: 8px;
+        color: #666;
+        font-size: 14px;
+        line-height: 1.5;
+      }
+      .cancel-signup-list {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        max-height: 260px;
+        padding: 2px 6px 2px 2px;
+        margin-bottom: 10px;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        scrollbar-gutter: stable;
+      }
+      .cancel-signup-option {
+        flex: 0 0 auto;
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
+        padding: 10px 12px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        background: white;
+        background-clip: padding-box;
+        color: #333;
+        cursor: pointer;
+        overflow: hidden;
+        text-align: left;
+        touch-action: manipulation;
+        transition:
+          background-color 0.1s ease,
+          border-color 0.1s ease,
+          box-shadow 0.1s ease;
+        white-space: normal;
+        -webkit-tap-highlight-color: transparent;
+      }
+      @media (hover: hover) and (pointer: fine) {
+        .cancel-signup-option:hover {
+          border-color: #c62828;
+          background: #fff8f7;
+        }
+      }
+      .cancel-signup-option:active {
+        border-color: #c62828;
+        background: #fff8f7;
+      }
+      .cancel-signup-option:focus-visible {
+        outline: 2px solid #c62828;
+        outline-offset: -2px;
+      }
+      .cancel-signup-option:disabled {
+        cursor: wait;
+        opacity: 0.65;
+      }
+      .cancel-signup-option.selected {
+        border-color: #c62828;
+        background: #fdecea;
+        box-shadow: inset 0 0 0 1px #c62828;
+      }
+      .cancel-signup-name {
+        display: block;
+        font-size: 15px;
+        font-weight: 700;
+        line-height: 1.35;
+        overflow-wrap: anywhere;
+      }
+      .cancel-signup-details {
+        display: block;
+        margin-top: 2px;
+        color: #666;
+        font-size: 12px;
+        line-height: 1.4;
+        overflow-wrap: anywhere;
+      }
+      .cancel-submit {
+        width: 100%;
+        padding: 11px;
+        font-size: 16px;
+        font-weight: 600;
+        background: #c62828;
+        color: white;
+        border: none;
+        border-radius: 7px;
+        cursor: pointer;
+        margin-top: 4px;
+      }
+      .cancel-submit:disabled {
+        background: #aaa;
+        cursor: not-allowed;
+      }
+
+      /* Prominent cancellation confirmation state. */
+      .confirm-box {
+        background: #fdecea;
+        border-radius: 8px;
+        padding: 12px;
+        margin-bottom: 10px;
+        font-size: 13px;
+        color: #c62828;
+        line-height: 1.5;
+      }
+      #confirmText {
+        text-align: center;
+      }
+      .confirm-question {
+        margin-bottom: 10px;
+        font-size: 16px;
+        font-weight: 700;
+      }
+      .confirm-signup-summary {
+        padding: 12px;
+        border: 2px solid #c62828;
+        border-radius: 8px;
+        background: white;
+        overflow: hidden;
+        text-align: center;
+      }
+      .confirm-signup-name {
+        display: block;
+        font-size: 22px;
+        font-weight: 800;
+        line-height: 1.35;
+        overflow-wrap: anywhere;
+      }
+      .confirm-signup-details {
+        display: block;
+        margin-top: 5px;
+        font-size: 16px;
+        font-weight: 800;
+        line-height: 1.4;
+        overflow-wrap: anywhere;
+      }
+      .confirm-buttons {
+        display: flex;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      .confirm-yes {
+        flex: 1;
+        padding: 9px;
+        font-size: 13px;
+        font-weight: 600;
+        background: #c62828;
+        color: white;
+        border: none;
+        border-radius: 7px;
+        cursor: pointer;
+      }
+      .confirm-no {
+        flex: 1;
+        padding: 9px;
+        font-size: 13px;
+        font-weight: 600;
+        background: #f0f0f0;
+        color: #333;
+        border: none;
+        border-radius: 7px;
+        cursor: pointer;
+      }
+      .confirm-yes:disabled {
+        background: #aaa;
+        cursor: not-allowed;
+        opacity: 0.6;
+      }
+      .confirm-no:disabled {
+        background: #ccc;
+        color: #999;
+        cursor: not-allowed;
+        opacity: 0.6;
+      }
+
+      /* Shared schedule-card primitives used by responsive agenda views. */
+      .mobile-agenda {
+        display: none;
+        padding-bottom: 24px;
+      }
+
+      .mobile-time-group {
+        margin-bottom: 24px;
+      }
+
+      .mobile-time-heading {
+        font-size: 18px;
+        font-weight: 700;
+        margin: 0 0 12px;
+        color: #2b2b2b;
+        line-height: 1.35;
+      }
+
+      .mobile-slot-card {
+        width: 100%;
+        display: block;
+        text-align: left;
+        border: 1px solid #d9dee3;
+        border-radius: 16px;
+        background: #ffffff;
+        padding: 18px 18px 16px;
+        margin-bottom: 12px;
+        cursor: pointer;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+        transition:
+          transform 0.08s ease,
+          box-shadow 0.12s ease;
+      }
+
+      .mobile-slot-card:active {
+        transform: scale(0.992);
+      }
+
+      .mobile-slot-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .mobile-slot-title {
+        font-size: 19px;
+        font-weight: 700;
+        color: #222;
+        line-height: 1.3;
+        margin-bottom: 6px;
+      }
+
+      .mobile-slot-meta {
+        font-size: 15px;
+        color: #6b7280;
+        line-height: 1.45;
+      }
+
+    /* TEXT_SIZE: [SIGN-UP CARD] Mobile description display (e.g. "opening ceremony") */
+      .mobile-slot-desc {
+        font-size: 25px;
+        color: #666;
+        margin-top: 8px;
+        line-height: 1.5;
+      }
+      /*
+      .mobile-slot-badge {
+        flex-shrink: 0;
+        font-size: 14px;
+        font-weight: 700;
+        border-radius: 999px;
+        padding: 8px 14px;
+        white-space: nowrap;
+        background: #16a34a;
+        color: #ffffff;
+        box-shadow: 0 2px 6px rgba(234, 182, 60, 0.2);
+      }
+*/
+      .mobile-slot-badge.is-full {
+        background: #d64545;
+        color: #ffffff;
+        box-shadow: 0 2px 6px rgba(214, 69, 69, 0.2);
+      }
+
+      /* --- Role-count summary line shown only in compact mode --- */
+      .mobile-slot-summary {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 12px;
+        margin-top: 10px;
+      }
+      .mobile-slot-summary-item {
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .mobile-slot-summary-item.role-general {
+        color: #2e7d32;
+      }
+      .mobile-slot-summary-item.role-classrep {
+        color: #b26a00;
+      }
+      .mobile-slot-summary-item.role-steeringcommittee {
+        color: #1565c0;
+      }
+      .mobile-slot-summary-item.role-orgcommittee {
+        color: #6a1b9a;
+      }
+      .mobile-slot-summary-item.is-full {
+        color: #aaa;
+      }
+
+      /* ===== Compact / mobile layout (<=900px) ===== */
+
+      body.compact-layout {
+        padding: 12px;
+        font-size: 16px;
+      }
+
+      body.compact-layout h1 {
+        font-size: 32px;
+        line-height: 1.25;
+        margin-bottom: 16px;
+      }
+
+      .mobile-display-mode-control {
+        display: none;
+      }
+
+      .mobile-availability-control {
+        display: none;
+      }
+
+      .desktop-choice-popover,
+      .desktop-filter-reset {
+        display: none;
+      }
+
+      body.compact-layout .mobile-availability-control {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        display: grid;
+        gap: 10px;
+        margin: -8px 14px 14px;
+        padding: 9px 10px 10px;
+        isolation: isolate;
+        background: #faf8f5;
+        border: 1px solid #ede6dc;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(26, 26, 24, 0.05);
+      }
+
+      body.compact-layout .mobile-availability-control::before {
+        content: "";
+        position: absolute;
+        top: -12px;
+        right: -14px;
+        bottom: -18px;
+        left: -14px;
+        z-index: -1;
+        background: #f5f2ee;
+        pointer-events: none;
+      }
+
+      .mobile-filter-row {
+        display: grid;
+        gap: 8px;
+        align-items: end;
+      }
+
+      .mobile-filter-row-secondary {
+        grid-template-columns: 1fr;
+      }
+
+      .mobile-filter-field {
+        display: block;
+        min-width: 0;
+      }
+
+      .mobile-filter-label {
+        display: block;
+        margin: 0 0 6px;
+        color: #766d63;
+        font-size: 15px;
+        font-weight: 800;
+        line-height: 1.2;
+      }
+
+      .mobile-filter-select,
+      .mobile-keyword-search {
+        min-width: 0;
+        min-height: 40px;
+        width: 100%;
+        padding: 6px 34px 6px 12px;
+        border: 1px solid #e2dbd2;
+        border-radius: 9px;
+        background: #fbfaf7;
+        color: #514940;
+        font-size: 16px;
+        font-weight: 700;
+        line-height: 1.2;
+      }
+
+      .mobile-keyword-search {
+        padding-right: 12px;
+      }
+
+      .mobile-activity-filter-pills,
+      .mobile-role-filter-pills {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 9px;
+      }
+
+      .mobile-activity-filter-pill,
+      .mobile-role-filter-pill {
+        min-height: 54px;
+        padding: 13px 18px;
+        border: 1px solid #e2dbd2;
+        border-radius: 999px;
+        background: #f8f6f2;
+        color: #60584f;
+        cursor: pointer;
+        font-size: 23px;
+        font-weight: 800;
+        line-height: 1.15;
+      }
+
+      body.compact-layout .mobile-availability-control.is-signup-mode
+        .mobile-activity-filter-field {
+        order: 1;
+      }
+
+      body.compact-layout .mobile-availability-control.is-signup-mode
+        .mobile-role-filter-field {
+        order: 2;
+      }
+
+      body.compact-layout .mobile-availability-control.is-signup-mode
+        .mobile-time-filter-field {
+        order: 3;
+      }
+
+      body.compact-layout .mobile-availability-control.is-signup-mode
+        .mobile-keyword-filter-field {
+        order: 4;
+      }
+
+      body.compact-layout .mobile-availability-control.is-signup-mode
+        .mobile-time-availability-detail {
+        order: 5;
+      }
+
+      body.compact-layout .mobile-availability-control.is-overview-mode
+        .mobile-role-filter-field,
+      body.compact-layout .mobile-availability-control.is-overview-mode
+        .mobile-time-filter-field,
+      body.compact-layout .mobile-availability-control.is-overview-mode
+        .mobile-keyword-filter-field,
+      body.compact-layout .mobile-availability-control.is-overview-mode
+        .mobile-time-availability-detail {
+        display: none;
+      }
+
+      .mobile-activity-filter-pill {
+        border-radius: 8px;
+        background: #f8f6f2;
+        color: #60584f;
+      }
+
+      .mobile-activity-filter-pill.is-active {
+        border-color: #8f6b2f;
+        background: #5b4630;
+        color: #ffffff;
+        box-shadow: 0 2px 8px rgba(91, 70, 48, 0.16);
+      }
+
+      .mobile-activity-filter-pill.activity-accent-0.is-active {
+        border-color: #a74722;
+        background: #b94f25;
+        box-shadow: 0 2px 8px rgba(185, 79, 37, 0.18);
+      }
+
+      .mobile-activity-filter-pill.activity-accent-1.is-active {
+        border-color: #245e73;
+        background: #2b6f85;
+        box-shadow: 0 2px 8px rgba(43, 111, 133, 0.18);
+      }
+
+      .mobile-activity-filter-pill.activity-accent-2.is-active {
+        border-color: #59663a;
+        background: #687541;
+        box-shadow: 0 2px 8px rgba(104, 117, 65, 0.18);
+      }
+
+      .mobile-activity-filter-pill.activity-accent-3.is-active {
+        border-color: #9b6f1f;
+        background: #ad7d25;
+        box-shadow: 0 2px 8px rgba(173, 125, 37, 0.18);
+      }
+
+      .mobile-activity-filter-pill.activity-accent-4.is-active {
+        border-color: #68436d;
+        background: #75507a;
+        box-shadow: 0 2px 8px rgba(117, 80, 122, 0.18);
+      }
+
+      .mobile-activity-filter-pill.activity-accent-5.is-active {
+        border-color: #8a3329;
+        background: #9d3e32;
+        box-shadow: 0 2px 8px rgba(157, 62, 50, 0.18);
+      }
+
+      .mobile-role-filter-pill.is-active {
+        border-color: #3f3a35;
+        background: #3f3a35;
+        color: #ffffff;
+        box-shadow: 0 2px 8px rgba(63, 58, 53, 0.16);
+      }
+
+      .mobile-role-filter-pill.role-general.is-active {
+        border-color: #1f6b2b;
+        background: #267a32;
+        box-shadow: 0 2px 8px rgba(38, 122, 50, 0.18);
+      }
+
+      .mobile-role-filter-pill.role-classrep.is-active {
+        border-color: #9a5a00;
+        background: #b26a00;
+        box-shadow: 0 2px 8px rgba(178, 106, 0, 0.18);
+      }
+
+      .mobile-role-filter-pill.role-steeringcommittee.is-active {
+        border-color: #0f4f9a;
+        background: #155fae;
+        box-shadow: 0 2px 8px rgba(21, 95, 174, 0.18);
+      }
+
+      .mobile-role-filter-pill.role-orgcommittee.is-active {
+        border-color: #56137c;
+        background: #681c8d;
+        box-shadow: 0 2px 8px rgba(104, 28, 141, 0.18);
+      }
+
+      .mobile-role-filter-pill.role-general:not(.is-active) {
+        border-color: #e2dbd2;
+        background: #f8f6f2;
+        color: #60584f;
+      }
+
+      .mobile-role-filter-pill.role-classrep:not(.is-active) {
+        border-color: #e2dbd2;
+        background: #f8f6f2;
+        color: #60584f;
+      }
+
+      .mobile-role-filter-pill.role-steeringcommittee:not(.is-active) {
+        border-color: #e2dbd2;
+        background: #f8f6f2;
+        color: #60584f;
+      }
+
+      .mobile-role-filter-pill.role-orgcommittee:not(.is-active) {
+        border-color: #e2dbd2;
+        background: #f8f6f2;
+        color: #60584f;
+      }
+
+      .mobile-time-filter-dropdown {
+        position: relative;
+      }
+
+      .mobile-time-filter-field .mobile-filter-label {
+        font-size: 18px;
+      }
+
+      .mobile-time-filter-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        min-height: 50px;
+        padding: 10px 34px 10px 14px;
+        text-align: left;
+        border-color: #e2dbd2;
+        background: #fbfaf7;
+        color: #514940;
+        cursor: pointer;
+        font-size: 18px;
+        line-height: 1.2;
+      }
+
+      .mobile-time-filter-toggle::after {
+        content: "▾";
+        flex-shrink: 0;
+        color: #8a8176;
+        font-size: 15px;
+        line-height: 1;
+      }
+
+      .mobile-time-filter-toggle.is-open::after {
+        content: "▴";
+      }
+
+      .mobile-time-filter-toggle:disabled {
+        cursor: not-allowed;
+        opacity: 0.55;
+      }
+
+      .mobile-time-filter-menu {
+        position: absolute;
+        top: calc(100% + 6px);
+        left: 0;
+        right: 0;
+        z-index: 18;
+        display: grid;
+        gap: 4px;
+        max-height: 260px;
+        overflow-y: auto;
+        padding: 6px;
+        border: 1px solid #e2dbd2;
+        border-radius: 10px;
+        background: #ffffff;
+        box-shadow: 0 8px 24px rgba(26, 26, 24, 0.12);
+      }
+
+      .mobile-time-filter-menu[hidden] {
+        display: none;
+      }
+
+      .mobile-time-filter-option {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 24px minmax(0, 1fr);
+        gap: 10px;
+        align-items: center;
+        min-height: 46px;
+        padding: 10px;
+        border: 0;
+        border-radius: 7px;
+        background: #ffffff;
+        color: #124326;
+        cursor: pointer;
+        font-size: 17px;
+        font-weight: 800;
+        line-height: 1.2;
+        text-align: left;
+      }
+
+      .mobile-time-filter-option:hover,
+      .mobile-time-filter-option.is-active {
+        background: #f0f8f2;
+      }
+
+      .mobile-time-filter-option.is-active {
+        color: #1f6b2b;
+      }
+
+      .mobile-time-filter-check {
+        width: 20px;
+        height: 20px;
+        display: inline-grid;
+        place-items: center;
+        border: 2px solid #9fbaa6;
+        border-radius: 5px;
+        color: #ffffff;
+        font-size: 13px;
+        font-weight: 900;
+        line-height: 1;
+      }
+
+      .mobile-time-filter-option.is-active .mobile-time-filter-check {
+        border-color: #267a32;
+        background: #267a32;
+      }
+
+      .mobile-time-filter-option-label {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .mobile-time-availability-detail {
+        min-height: 20px;
+        color: #4d463f;
+        font-size: 13px;
+        font-weight: 700;
+        line-height: 1.35;
+      }
+
+      .mobile-overview-timeline {
+        display: grid;
+        gap: 18px;
+      }
+
+      .mobile-overview-time-block {
+        display: grid;
+        grid-template-columns: 96px minmax(0, 1fr);
+        gap: 12px;
+        align-items: start;
+      }
+
+      .mobile-overview-time {
+        position: sticky;
+        top: 8px;
+        color: #37312b;
+        font-size: 20px;
+        font-weight: 900;
+        line-height: 1.2;
+      }
+
+      .mobile-overview-items {
+        display: grid;
+        gap: 10px;
+      }
+
+      .mobile-overview-item {
+        width: 100%;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 10px;
+        align-items: center;
+        text-align: left;
+        border: 1px solid #e3ddd5;
+        border-left: 7px solid #d9a441;
+        border-radius: 10px;
+        background: #ffffff;
+        padding: 14px 12px 13px;
+        color: #2d2926;
+        box-shadow: 0 3px 12px rgba(26, 26, 24, 0.06);
+      }
+
+      .mobile-overview-item.activity-accent-0 {
+        border-left-color: #e87b45;
+      }
+
+      .mobile-overview-item.activity-accent-1 {
+        border-left-color: #3b82a0;
+      }
+
+      .mobile-overview-item.activity-accent-2 {
+        border-left-color: #8a9a5b;
+      }
+
+      .mobile-overview-item.activity-accent-3 {
+        border-left-color: #d9a441;
+      }
+
+      .mobile-overview-item.activity-accent-4 {
+        border-left-color: #9b6f9f;
+      }
+
+      .mobile-overview-item.activity-accent-5 {
+        border-left-color: #c05a47;
+      }
+
+      .mobile-overview-title {
+        font-size: 22px;
+        font-weight: 900;
+        line-height: 1.25;
+      }
+
+      .mobile-overview-meta {
+        margin-top: 3px;
+        color: #6b625a;
+        font-size: 16px;
+        font-weight: 700;
+        line-height: 1.35;
+      }
+
+      .mobile-overview-role-chips {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 5px;
+        min-width: 58px;
+      }
+
+      .mobile-overview-role-chip-label {
+        color: #5d554d;
+        font-size: 11px;
+        font-weight: 900;
+        line-height: 1.1;
+        white-space: nowrap;
+      }
+
+      .mobile-overview-role-chip {
+        min-height: 26px;
+        padding: 5px 9px;
+        border-radius: 999px;
+        background: #edf7ee;
+        color: #166534;
+        font-size: 13px;
+        font-weight: 900;
+        line-height: 1.2;
+        text-align: center;
+        white-space: nowrap;
+      }
+
+      .mobile-overview-role-chip.role-general {
+        background: #edf7ee;
+        color: #2e7d32;
+      }
+
+      .mobile-overview-role-chip.role-classrep {
+        background: #fff4da;
+        color: #b26a00;
+      }
+
+      .mobile-overview-role-chip.role-steeringcommittee {
+        background: #eaf3ff;
+        color: #1565c0;
+      }
+
+      .mobile-overview-role-chip.role-orgcommittee {
+        background: #f4eafd;
+        color: #6a1b9a;
+      }
+
+      .mobile-overview-role-chip.is-full {
+        background: #fff0ee;
+        color: #b42318;
+      }
+
+      .mobile-empty-state {
+        margin: 14px 0 0;
+        padding: 18px 14px;
+        border: 1px dashed #d8d1c8;
+        border-radius: 12px;
+        background: #fffdf9;
+        color: #6b625a;
+        font-size: 16px;
+        font-weight: 700;
+        line-height: 1.45;
+        text-align: center;
+      }
+
+      body.compact-layout .mobile-display-mode-control {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 6px;
+        margin: -4px 14px 18px;
+        padding: 6px;
+        background: #e7e1d8;
+        border: 1px solid #ddd5cb;
+        border-radius: 15px;
+      }
+
+      .mobile-display-mode-btn {
+        min-height: 66px;
+        padding: 14px 15px;
+        border: 0;
+        border-radius: 11px;
+        background: transparent;
+        color: #69635d;
+        cursor: pointer;
+        font-size: 24px;
+        font-weight: 700;
+        line-height: 1.2;
+      }
+
+      .mobile-display-mode-btn.active {
+        background: #ffffff;
+        color: #25211e;
+        box-shadow: 0 2px 8px rgba(26, 26, 24, 0.1);
+      }
+
+      body.compact-layout #desktopGridWrapper {
+        display: none !important;
+      }
+
+      body.compact-layout .mobile-agenda {
+        display: block !important;
+      }
+
+      /* --- Mobile agenda cards ---
+         Goal: ~5 cards visible at once, big legible text.
+         Each card is ~100-110px tall on a 390px-wide phone.
+         We achieve this by hiding the role-pills row and showing
+         a compact single-line summary instead.               */
+
+      body.compact-layout .mobile-time-group {
+        margin-bottom: 20px;
+      }
+
+      /* TEXT_SIZE: [SIGN-UP CARD] Mobile time heading (e.g. "9:00 am - 10:00 am") */
+      body.compact-layout .mobile-time-heading {
+        font-size: 40px;
+        font-weight: 2000;
+        line-height: 1.2;
+        color: #1f2937;
+        margin: 0 0 10px;
+        padding: 0;
+        letter-spacing: 0.01em;
+      }
+
+      body.compact-layout .mobile-time-heading {
+        display: none;
+      }
+
+      /* Card itself */
+      body.compact-layout .mobile-slot-card {
+        padding: 14px 16px 12px;
+        margin-bottom: 8px;
+        border-radius: 14px;
+      }
+
+      /* Grey-out when full */
+      body.compact-layout .mobile-slot-card.is-full {
+        background: #f0f0f0;
+        border-color: #d0d0d0;
+        box-shadow: none;
+        opacity: 0.82;
+      }
+
+      body.compact-layout .mobile-slot-header {
+        align-items: center;
+        gap: 10px;
+      }
+
+      /* Large, dominant title */
+      /* TEXT_SIZE: [SIGN-UP CARD] Mobile slot card title (e.g. "Sports Day") */
+      body.compact-layout .mobile-slot-title {
+        font-size: 30px;
+        font-weight: 700;
+        line-height: 1.25;
+        margin-bottom: 3px;
+        color: #111;
+      }
+
+      /* Location / subtitle */
+      /* TEXT_SIZE: [SIGN-UP CARD] Mobile slot location/subtitle (e.g. "Gymnasium" or "Subtitle text") */
+      body.compact-layout .mobile-slot-meta {
+        font-size: 25px;
+        line-height: 1.35;
+        color: #6b7280;
+      }
+
+      /* Optional description - hide to save vertical space
+      body.compact-layout .mobile-slot-desc {
+        display: none;
+      }
+ */
+      /* Badge (Open / Full) */
+      /* TEXT_SIZE: [SIGN-UP CARD] Mobile slot badge (e.g. "Open" or "Full") */
+      body.compact-layout .mobile-slot-badge {
+        font-size: 15px;
+        font-weight: 700;
+        padding: 7px 13px;
+        border-radius: 999px;
+        align-self: center;
+      }
+
+      body.compact-layout .mobile-slot-summary-item {
+        /* TEXT_SIZE: [SIGN-UP CARD] Mobile slot summary items (e.g. "General 残り3枠", "Steering Committee Full") */
+        font-size: 23px;
+        font-weight: 600;
+      }
+      /* TEXT_SIZE: [SIGN-UP CARD] Mobile card volunteer names container (e.g. "Tanaka, Suzuki, ...") */
+      body.compact-layout .mobile-slot-names {
+        font-size: 30px;
+        line-height: 1.5;
+      }
+      body.compact-layout .mobile-slot-role-label {
+        font-size: 18px;
+      }
+      body.compact-layout .mobile-slot-name-list {
+        font-size: 18px;
+      }
+
+      /* ---- Modal / popup ---- */
+      body.compact-layout .modal-overlay.active {
+        display: flex;
+        align-items: flex-end; /* sheet slides up from bottom */
+        justify-content: center;
+        padding: 0;
+      }
+
+      body.compact-layout .modal {
+        width: 100vw;
+        max-width: 100vw;
+        /* Use nearly all vertical space */
+        min-height: 70dvh;
+        max-height: 96dvh;
+        padding: 28px 22px 32px;
+        border-radius: 22px 22px 0 0; /* bottom-sheet style */
+        overflow-y: auto;
+        margin: 0;
+        box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.22);
+      }
+
+      /* Drag-handle hint */
+      body.compact-layout .modal::before {
+        content: "";
+        display: block;
+        width: 40px;
+        height: 4px;
+        background: #d1d5db;
+        border-radius: 99px;
+        margin: 0 auto 20px;
+      }
+      /* TEXT_SIZE: [POP-UP] Mobile modal title (e.g. "Sports Day") */
+      body.compact-layout .modal-title {
+        font-size: 30px;
+        font-weight: 700;
+        line-height: 1.2;
+        text-align: center;
+        margin-bottom: 6px;
+      }
+
+      body.compact-layout .modal-subtitle {
+        /* TEXT_SIZE: [POP-UP] Mobile modal subtitle (e.g. "9:00 am - 10:00 am” Gymnasium") */
+        font-size: 30px;
+        line-height: 1.55;
+        text-align: center;
+        color: #6b7280;
+        margin-bottom: 18px;
+      }
+
+      body.compact-layout .modal-read-only-notice {
+        padding: 18px 16px;
+        font-size: 28px;
+        line-height: 1.5;
+      }
+
+      body.compact-layout .modal-tabs {
+        margin-top: 4px;
+        margin-bottom: 18px;
+      }
+      /* TEXT_SIZE: [POP-UP] Mobile modal tabs (e.g. "登録する", "登録をキャンセルする") */
+      body.compact-layout .modal-tab {
+        font-size: 25px;
+        font-weight: 700;
+        min-height: 50px;
+        padding: 12px 16px;
+      }
+
+      /* Role selection buttons - full-width stack */
+      body.compact-layout .role-buttons {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin: 0 0 20px;
+      }
+
+      body.compact-layout .role-btn {
+        width: 100%;
+        min-height: 64px;
+        padding: 14px 18px;
+        border-radius: 14px;
+        text-align: left;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        -webkit-appearance: none;
+        appearance: none;
+      }
+
+      body.compact-layout .role-btn-label {
+        /* TEXT_SIZE: [POP-UP] Mobile role button label  */
+        font-size: 30px;
+        font-weight: 700;
+        line-height: 1.2;
+      }
+
+      body.compact-layout .role-btn-count {
+        /* TEXT_SIZE: [POP-UP] Mobile role button count (e.g. "残り3枠", "Full") */
+        font-size: 15px;
+        font-weight: 500;
+        margin-top: 0;
+        opacity: 0.85;
+      }
+
+      /* Names section */
+      body.compact-layout .names-section {
+        max-height: 22vh;
+        overflow-y: auto;
+        margin-bottom: 16px;
+      }
+
+      body.compact-layout .names-role-label {
+        /* TEXT_SIZE: [POP-UP] Mobile names role label  */
+        font-size: 15px;
+        font-weight: 700;
+        margin-bottom: 6px;
+      }
+
+      body.compact-layout .name-chip {
+        /* TEXT_SIZE: [POP-UP] Mobile name chips  */
+        font-size: 25px;
+        padding: 6px 13px;
+      }
+
+      /* TEXT_SIZE: [POP-UP] Mobile name chip class text  */
+      body.compact-layout .name-chip-class {
+        font-size: 20px;
+      }
+
+      body.compact-layout .cancel-helper {
+        font-size: 22px;
+        margin-bottom: 12px;
+      }
+
+      body.compact-layout .cancel-signup-list {
+        gap: 10px;
+        max-height: 42vh;
+        margin-bottom: 14px;
+      }
+
+      body.compact-layout .cancel-signup-option {
+        min-height: 70px;
+        padding: 13px 16px;
+        border-radius: 12px;
+      }
+
+      body.compact-layout .cancel-signup-name {
+        font-size: 27px;
+      }
+
+      body.compact-layout .cancel-signup-details {
+        font-size: 20px;
+      }
+
+      body.compact-layout .confirm-question {
+        font-size: 24px;
+        margin-bottom: 14px;
+      }
+
+      body.compact-layout .confirm-signup-summary {
+        padding: 16px;
+        border-radius: 12px;
+      }
+
+      body.compact-layout .confirm-signup-name {
+        font-size: 30px;
+      }
+
+      body.compact-layout .confirm-signup-details {
+        font-size: 24px;
+      }
+
+      /* TEXT_SIZE: [POP-UP] Mobile full-capacity message */
+      body.compact-layout .modal-full-message {
+        font-size: 28px;
+      }
+
+
+      /* Success / error message */
+      /* TEXT_SIZE: [POP-UP] Mobile success/error messages  */
+      body.compact-layout .modal-message {
+        font-size: 16px;
+        padding: 12px 14px;
+        border-radius: 10px;
+        margin-top: 10px;
+      }
+
+      /* Form fields */
+      body.compact-layout label {
+        font-size: 16px;
+        font-weight: 600;
+      }
+      /* TEXT_SIZE: [POP-UP] Mobile form inputs (name, class e.g. "åå‰", "ã‚¯ãƒ©ã‚¹" fields) */
+      body.compact-layout input,
+      body.compact-layout select,
+      body.compact-layout textarea {
+        font-size: 30px;
+        min-height: 54px;
+        padding: 14px 16px;
+        border-radius: 12px;
+        margin-bottom: 12px;
+      }
+
+      body.compact-layout .mobile-time-filter-toggle {
+        font-size: 30px;
+        min-height: 54px;
+        padding: 14px 16px;
+        border-radius: 12px;
+      }
+
+      body.compact-layout .mobile-time-filter-toggle::after {
+        font-size: 22px;
+      }
+
+      body.compact-layout .mobile-time-filter-option {
+        grid-template-columns: 32px minmax(0, 1fr);
+        gap: 12px;
+        min-height: 58px;
+        padding: 13px 12px;
+        font-size: 26px;
+        border-radius: 10px;
+      }
+
+      body.compact-layout .mobile-time-filter-check {
+        width: 28px;
+        height: 28px;
+        font-size: 18px;
+        border-radius: 7px;
+      }
+
+      /* Action buttons */
+      /* TEXT_SIZE: [POP-UP] Mobile action buttons (submit, cancel, confirm) */
+      body.compact-layout .modal-submit,
+      body.compact-layout #cancelSubmitBtn,
+      body.compact-layout #confirmYes,
+      body.compact-layout #confirmNo,
+      body.compact-layout .close-btn {
+        font-size: 30px;
+        font-weight: 700;
+        min-height: 56px;
+        padding: 15px 18px;
+        border-radius: 14px;
+      }
+
+      body.compact-layout .modal-submit,
+      body.compact-layout #cancelSubmitBtn,
+      body.compact-layout #confirmYes {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.14);
+      }
+
+      /* Close / cancel link */
+      /* TEXT_SIZE: [POP-UP] Mobile close/cancel link */
+      body.compact-layout .modal-cancel {
+        font-size: 17px;
+        padding: 10px;
+        margin-top: 8px;
+      }
+
+      /* Very small phones (<=380px) */
+      @media (max-width: 380px) {
+        body.compact-layout .modal-title {
+          font-size: 22px;
+        }
+        body.compact-layout .role-btn-label {
+          font-size: 18px;
+        }
+        body.compact-layout .mobile-slot-title {
+          font-size: 18px;
+        }
+      }
+
+      body {
+        background:
+          radial-gradient(circle at top, #f8fbff 0, #eef2f7 42%, #e7edf5 100%);
+      }
+
+      h1 {
+        text-align: center;
+      }
+
+      /* Card-focused visual refresh inspired by the equipment manager app. */
+      .mobile-slot-card {
+        position: relative;
+        overflow: hidden;
+        background: #ffffff;
+        border: 1.5px solid #e8e4df;
+        border-radius: 12px;
+        box-shadow: 0 1px 2px rgba(26, 26, 24, 0.04);
+      }
+
+      .mobile-slot-card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: #e87b45;
+      }
+
+      .activity-accent-0::before {
+        background: #e87b45;
+      }
+
+      .activity-accent-1::before {
+        background: #3b82a0;
+      }
+
+      .activity-accent-2::before {
+        background: #8a9a5b;
+      }
+
+      .activity-accent-3::before {
+        background: #d9a441;
+      }
+
+      .activity-accent-4::before {
+        background: #9b6f9f;
+      }
+
+      .activity-accent-5::before {
+        background: #c05a47;
+      }
+
+      .mobile-slot-card.is-full {
+        background: #f1efeb;
+        border-color: #ded8d0;
+      }
+
+      .mobile-slot-card {
+        min-height: 158px;
+        padding: 28px 22px 22px;
+        margin-bottom: 16px;
+        transition:
+          transform 0.15s ease,
+          box-shadow 0.15s ease,
+          border-color 0.15s ease;
+      }
+
+      .mobile-slot-card:not(.is-full):hover {
+        border-color: #d8d1c8;
+        box-shadow: 0 8px 24px rgba(26, 26, 24, 0.1);
+        transform: translateY(-2px);
+      }
+
+      .mobile-slot-card:active,
+      .mobile-slot-card:not(.is-full):active {
+        transform: scale(0.992);
+      }
+
+      .mobile-slot-title {
+        font-size: 22px;
+      }
+
+      .mobile-slot-meta {
+        color: #77736d;
+        font-size: 16px;
+      }
+
+      .mobile-slot-time {
+        color: #1f2937;
+        font-size: 17px;
+        font-weight: 700;
+        line-height: 1.3;
+        margin: 7px 0 4px;
+      }
+
+      .mobile-slot-desc {
+        color: #77736d;
+        font-size: 17px;
+      }
+
+      .mobile-slot-summary {
+        gap: 6px;
+        margin-top: 12px;
+      }
+
+      .mobile-slot-summary-item {
+        display: inline-flex;
+        align-items: center;
+        min-height: 24px;
+        padding: 3px 9px;
+        border-radius: 999px;
+        background: #f5f2ee;
+        color: #555;
+        font-size: 12px;
+        line-height: 1.25;
+      }
+
+      .mobile-slot-summary-item.role-general {
+        background: #edf7ee;
+      }
+
+      .mobile-slot-summary-item.role-classrep {
+        background: #fff4da;
+      }
+
+      .mobile-slot-summary-item.role-steeringcommittee {
+        background: #eaf3ff;
+      }
+
+      .mobile-slot-summary-item.role-orgcommittee {
+        background: #f4eafd;
+      }
+
+      .mobile-slot-summary-item.is-full {
+        background: #ebe8e3;
+        color: #8a8580;
+      }
+
+      .mobile-slot-names {
+        margin-top: 11px;
+        padding-top: 9px;
+        border-top: 1px solid #ebe8e3;
+      }
+
+      body.compact-layout .mobile-slot-card {
+        min-height: 188px;
+        padding: 32px 22px 24px;
+        margin-bottom: 16px;
+        border-radius: 12px;
+      }
+
+      body.compact-layout {
+        padding: 0;
+        background: #f5f2ee;
+      }
+
+      body.compact-layout h1 {
+        margin: 0 0 18px;
+        padding: 18px 16px 16px;
+        background: #ffffff;
+        border-bottom: 1px solid #e8e4df;
+        text-align: center;
+      }
+
+      body.compact-layout .mobile-display-mode-control {
+        position: sticky;
+        top: 0;
+        z-index: 22;
+        margin-top: 0;
+        margin-bottom: 0;
+        isolation: isolate;
+        background: #efebe5;
+        border-radius: 0;
+        border-left: 0;
+        border-right: 0;
+        box-shadow: 0 2px 8px rgba(26, 26, 24, 0.05);
+      }
+
+      body.compact-layout .mobile-display-mode-control::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        right: -14px;
+        bottom: 0;
+        left: -14px;
+        z-index: -1;
+        background: #efebe5;
+        pointer-events: none;
+      }
+
+      body.compact-layout .mobile-display-mode-btn.active {
+        box-shadow: 0 1px 4px rgba(26, 26, 24, 0.08);
+      }
+
+      body.compact-layout .mobile-availability-control {
+        top: 80px;
+      }
+
+      body.compact-layout .read-only-banner {
+        position: sticky;
+        top: 0;
+        z-index: 30;
+        max-width: none;
+        margin: 0;
+        border-right: 0;
+        border-left: 0;
+        border-radius: 0;
+        font-size: 24px;
+        line-height: 1.45;
+        box-shadow: 0 3px 10px rgba(52, 43, 34, 0.1);
+      }
+
+      body.compact-layout.event-read-only .mobile-display-mode-control {
+        top: var(--event-read-only-banner-height, 0px);
+      }
+
+      body.compact-layout.event-read-only .mobile-availability-control {
+        top: calc(80px + var(--event-read-only-banner-height, 0px));
+      }
+
+      body.compact-layout .mobile-agenda {
+        padding: 8px 14px 80px;
+      }
+
+      body.compact-layout .mobile-activity-group {
+        margin-bottom: 18px;
+      }
+
+      body.compact-layout .mobile-slot-card {
+        min-height: 196px;
+        padding: 34px 22px 26px;
+        margin-bottom: 22px;
+        border: 1px solid #ded8d0;
+        border-radius: 14px;
+        background: #ffffff;
+        box-shadow: 0 14px 34px rgba(26, 26, 24, 0.13);
+      }
+
+      body.compact-layout .mobile-slot-card::before {
+        height: 6px;
+      }
+
+      body.compact-layout .mobile-slot-card:not(.is-full):active {
+        transform: translateY(1px) scale(0.992);
+        box-shadow: 0 5px 16px rgba(26, 26, 24, 0.08);
+      }
+
+      body.compact-layout .mobile-slot-card.is-full {
+        border-color: #e3ddd5;
+        box-shadow: 0 5px 16px rgba(26, 26, 24, 0.06);
+        opacity: 0.88;
+      }
+
+      body.compact-layout .mobile-slot-title {
+        font-size: 32px;
+        font-weight: 900;
+        line-height: 1.2;
+        color: #171412;
+      }
+
+      body.compact-layout .mobile-slot-meta,
+      body.compact-layout .mobile-slot-desc {
+        color: #625c55;
+        font-size: 22px;
+        line-height: 1.35;
+      }
+
+      body.compact-layout .mobile-slot-time {
+        color: #2f3742;
+        font-size: 22px;
+        font-weight: 800;
+        line-height: 1.3;
+      }
+
+      body.compact-layout .mobile-overview-timeline {
+        gap: 22px;
+      }
+
+      body.compact-layout .mobile-overview-items {
+        gap: 12px;
+      }
+
+      body.compact-layout .mobile-overview-item {
+        border-color: #ded8d0;
+        border-left-width: 8px;
+        border-radius: 12px;
+        padding: 16px 14px 15px;
+        box-shadow: 0 10px 24px rgba(26, 26, 24, 0.1);
+      }
+
+      body.compact-layout .mobile-overview-item.activity-accent-0 {
+        border-left-color: #e87b45;
+      }
+
+      body.compact-layout .mobile-overview-item.activity-accent-1 {
+        border-left-color: #3b82a0;
+      }
+
+      body.compact-layout .mobile-overview-item.activity-accent-2 {
+        border-left-color: #8a9a5b;
+      }
+
+      body.compact-layout .mobile-overview-item.activity-accent-3 {
+        border-left-color: #d9a441;
+      }
+
+      body.compact-layout .mobile-overview-item.activity-accent-4 {
+        border-left-color: #9b6f9f;
+      }
+
+      body.compact-layout .mobile-overview-item.activity-accent-5 {
+        border-left-color: #c05a47;
+      }
+
+      body.compact-layout .mobile-overview-title {
+        color: #171412;
+        font-size: 24px;
+        line-height: 1.22;
+      }
+
+      body.compact-layout .mobile-agenda.mobile-display-by-signup
+        .mobile-time-heading {
+        display: block;
+        margin: 0 2px 12px;
+        color: #37312b;
+        font-size: 26px;
+        font-weight: 800;
+        line-height: 1.25;
+      }
+
+      body.compact-layout .mobile-agenda.mobile-display-by-signup
+        .mobile-slot-time {
+        color: #4b5563;
+        font-weight: 600;
+      }
+
+      body.compact-layout .mobile-slot-desc {
+        font-weight: 700;
+      }
+
+      body.compact-layout .mobile-slot-summary-item {
+        font-size: 18px;
+        min-height: 36px;
+        padding: 6px 13px;
+      }
+
+      body.compact-layout .mobile-slot-names {
+        font-size: 20px;
+        line-height: 1.4;
+      }
+
+      body.compact-layout .mobile-slot-role-label,
+      body.compact-layout .mobile-slot-name-list {
+        font-size: 18px;
+      }
+
+      @media (max-width: 420px) {
+        body.compact-layout .mobile-availability-control {
+          margin-left: 10px;
+          margin-right: 10px;
+        }
+
+        .mobile-filter-row-secondary {
+          grid-template-columns: 1fr;
+        }
+
+        body.compact-layout .mobile-slot-card {
+          min-height: 182px;
+          padding: 32px 18px 24px;
+          margin-bottom: 16px;
+        }
+
+        body.compact-layout .mobile-slot-title {
+          font-size: 30px;
+        }
+
+        body.compact-layout .mobile-slot-meta,
+        body.compact-layout .mobile-slot-desc {
+          font-size: 20px;
+        }
+
+        body.compact-layout .mobile-slot-time {
+          font-size: 20px;
+        }
+
+        body.compact-layout .mobile-slot-summary-item {
+          font-size: 17px;
+        }
+      }
+
+
+      /* Desktop modal sizing and presentation. */
+      body.desktop-layout .modal-overlay.active {
+        padding: 34px;
+        background: rgba(40, 34, 29, 0.52);
+        backdrop-filter: blur(5px);
+      }
+
+      body.desktop-layout .modal {
+        width: min(720px, 92vw);
+        max-width: 720px;
+        max-height: 88vh;
+        padding: 30px;
+        overflow-y: auto;
+        border: 1px solid #e0d8cf;
+        border-radius: 18px;
+        box-shadow: 0 28px 80px rgba(31, 26, 22, 0.28);
+      }
+
+      body.desktop-layout .modal-title {
+        color: #211d1a;
+        font-size: 27px;
+        font-weight: 900;
+        line-height: 1.2;
+      }
+
+      body.desktop-layout .modal-subtitle {
+        margin-top: 6px;
+        margin-bottom: 18px;
+        color: #766d63;
+        font-size: 15px;
+        font-weight: 600;
+        line-height: 1.5;
+      }
+
+      body.desktop-layout .modal-tabs {
+        gap: 6px;
+        margin-bottom: 20px;
+        padding: 5px;
+        border: 1px solid #ded7ce;
+        border-radius: 12px;
+        background: #eee9e2;
+      }
+
+      body.desktop-layout .modal-tab {
+        min-height: 46px;
+        margin: 0;
+        padding: 10px 14px;
+        border: 0;
+        border-radius: 8px;
+        font-size: 15px;
+        font-weight: 900;
+      }
+
+      body.desktop-layout .modal-tab.active-signup {
+        border: 0;
+        background: #ffffff;
+        color: #267a32;
+        box-shadow: 0 2px 8px rgba(52, 43, 34, 0.09);
+      }
+
+      body.desktop-layout .modal-tab.active-cancel {
+        border: 0;
+        background: #ffffff;
+        color: #b42318;
+        box-shadow: 0 2px 8px rgba(52, 43, 34, 0.09);
+      }
+
+      body.desktop-layout .modal-helper {
+        margin-bottom: 12px;
+        color: #5e564f;
+        font-size: 18px;
+        font-weight: 800;
+      }
+
+      body.desktop-layout .modal .role-buttons {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      body.desktop-layout .modal .role-btn {
+        min-height: 72px;
+        padding: 14px 16px;
+        border-radius: 11px;
+      }
+
+      body.desktop-layout .modal .role-btn-label {
+        font-size: 18px;
+      }
+
+      body.desktop-layout .modal .role-btn-count {
+        font-size: 14px;
+      }
+
+      body.desktop-layout .modal-full-message {
+        grid-column: 1 / -1;
+      }
+
+      body.desktop-layout .names-section {
+        max-height: 155px;
+        margin-bottom: 16px;
+        padding: 12px;
+        overflow-y: auto;
+        border: 1px solid #e6dfd7;
+        border-radius: 11px;
+        background: #faf8f5;
+        scrollbar-gutter: stable;
+      }
+
+      body.desktop-layout .cancel-signup-list {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        max-height: 340px;
+        gap: 9px;
+      }
+
+      body.desktop-layout .modal input,
+      body.desktop-layout .modal select,
+      body.desktop-layout .modal textarea {
+        min-height: 48px;
+        font-size: 16px;
+      }
+
+      /* ===== Unified card schedule on desktop ===== */
+      .schedule-controls {
+        display: contents;
+      }
+
+      .desktop-schedule-stats {
+        display: none;
+      }
+
+      .desktop-insights-panel {
+        display: none;
+      }
+
+      .desktop-filter-summary {
+        display: none;
+      }
+
+      .desktop-insight-scope-control {
+        display: none;
+      }
+
+      body.desktop-layout {
+        padding: 0 32px 56px;
+        background: #f5f2ee;
+        color: #2d2926;
+      }
+
+      body.desktop-layout #pageTitle {
+        position: static;
+        min-height: 68px;
+        margin: 0 -32px;
+        padding: 14px 32px 13px;
+        border-bottom: 1px solid #e4ddd4;
+        background: #ffffff;
+        color: #211d1a;
+        font-size: clamp(26px, 2.2vw, 34px);
+        font-weight: 900;
+        letter-spacing: 0;
+        line-height: 1.2;
+        text-align: center;
+        backdrop-filter: blur(12px);
+        box-shadow: 0 4px 18px rgba(52, 43, 34, 0.06);
+      }
+
+      .schedule-shell {
+        width: 100%;
+        margin: 0 auto;
+      }
+
+      body.desktop-layout .schedule-shell {
+        max-width: 1520px;
+      }
+
+      body.desktop-layout .schedule-controls {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        display: grid;
+        grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+        gap: 8px 12px;
+        margin-bottom: 0;
+        padding: 10px 0 24px;
+        isolation: isolate;
+        border-bottom: 1px solid #ded7ce;
+        background: #f5f2ee;
+        box-shadow: 0 8px 18px rgba(52, 43, 34, 0.07);
+      }
+
+      body.desktop-layout .schedule-controls::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        right: calc(50% - 50vw);
+        bottom: 0;
+        left: calc(50% - 50vw);
+        z-index: -1;
+        background: #f5f2ee;
+        pointer-events: none;
+      }
+
+      body.desktop-layout .read-only-banner {
+        position: sticky;
+        top: 0;
+        z-index: 29;
+        max-width: none;
+        margin: 0 -32px;
+        border-right: 0;
+        border-left: 0;
+        border-radius: 0;
+        box-shadow: 0 4px 14px rgba(52, 43, 34, 0.1);
+      }
+
+      body.desktop-layout.event-read-only .schedule-controls {
+        top: var(--event-read-only-banner-height, 0px);
+      }
+
+      body.desktop-layout .mobile-display-mode-control {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        width: 100%;
+        gap: 5px;
+        margin: 0;
+        padding: 4px;
+        border: 1px solid #ddd5cb;
+        border-radius: 9px;
+        background: #e7e1d8;
+      }
+
+      body.desktop-layout .mobile-display-mode-btn {
+        min-height: 40px;
+        padding: 8px 14px;
+        border-radius: 6px;
+        font-size: 15px;
+      }
+
+      body.desktop-layout .desktop-schedule-stats {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      body.desktop-layout .desktop-stat {
+        appearance: none;
+        position: relative;
+        min-height: 50px;
+        min-width: 0;
+        padding: 8px 12px;
+        border: 1px solid #e2dbd2;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.92);
+        color: inherit;
+        cursor: pointer;
+        font: inherit;
+        box-shadow: 0 3px 10px rgba(52, 43, 34, 0.05);
+        text-align: right;
+        transition:
+          border-color 0.15s ease,
+          background-color 0.15s ease,
+          box-shadow 0.15s ease,
+          transform 0.15s ease;
+      }
+
+      body.desktop-layout .desktop-stat:hover {
+        border-color: #c9bba9;
+        background: #ffffff;
+        box-shadow: 0 7px 18px rgba(52, 43, 34, 0.1);
+        transform: translateY(-1px);
+      }
+
+      body.desktop-layout .desktop-stat:focus-visible {
+        outline: 3px solid #8b6840;
+        outline-offset: 2px;
+      }
+
+      body.desktop-layout .desktop-stat.is-active {
+        border-color: #8b6840;
+        background: #fffaf2;
+        box-shadow: inset 0 0 0 1px #8b6840;
+      }
+
+      body.desktop-layout
+        .desktop-stat[data-desktop-insight="vacancies"] {
+        border-color: #c8dfcc;
+        background: #e1f0e4;
+      }
+
+      body.desktop-layout
+        .desktop-stat[data-desktop-insight="vacancies"]:hover {
+        background: #d7eadd;
+      }
+
+      body.desktop-layout
+        .desktop-stat[data-desktop-insight="vacancies"]
+        .desktop-stat-value {
+        color: #356b41;
+      }
+
+      body.desktop-layout
+        .desktop-stat[data-desktop-insight="registrations"] {
+        border-color: #dccbe4;
+        background: #eee4f3;
+      }
+
+      body.desktop-layout
+        .desktop-stat[data-desktop-insight="registrations"]:hover {
+        background: #e5d8ec;
+      }
+
+      body.desktop-layout
+        .desktop-stat[data-desktop-insight="registrations"]
+        .desktop-stat-value {
+        color: #6c4d77;
+      }
+
+      body.desktop-layout .desktop-stat-value {
+        display: block;
+        color: #211d1a;
+        font-size: 21px;
+        font-weight: 900;
+        line-height: 1;
+      }
+
+      body.desktop-layout .desktop-stat-value-row {
+        display: flex;
+        justify-content: flex-end;
+        gap: 5px;
+        align-items: baseline;
+        white-space: nowrap;
+      }
+
+      body.desktop-layout .desktop-stat-value-row .desktop-stat-value {
+        display: inline;
+      }
+
+      body.desktop-layout .desktop-stat-capacity {
+        color: #6c4d77;
+        font-size: 15px;
+        font-weight: 900;
+        line-height: 1;
+      }
+
+      body.desktop-layout .desktop-stat-label {
+        display: block;
+        margin-top: 3px;
+        color: #766d63;
+        font-size: 11px;
+        font-weight: 800;
+        line-height: 1.2;
+      }
+
+      body.desktop-layout .desktop-stat-context {
+        display: flex;
+        min-height: 13px;
+        justify-content: flex-end;
+        gap: 6px;
+        align-items: center;
+        margin-top: 2px;
+      }
+
+      body.desktop-layout .desktop-stat-scope {
+        position: absolute;
+        top: 8px;
+        left: 10px;
+        display: inline-flex;
+        align-items: center;
+        min-height: 16px;
+        padding: 1px 5px;
+        border: 1px solid rgba(82, 72, 62, 0.16);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.55);
+        color: #766d63;
+        font-size: 9px;
+        font-weight: 900;
+        line-height: 1;
+      }
+
+      body.desktop-layout .desktop-stat-filtered {
+        visibility: hidden;
+        color: #625a52;
+        font-size: 10px;
+        font-weight: 800;
+        line-height: 1.2;
+        white-space: nowrap;
+      }
+
+      body.desktop-layout .desktop-stat-filtered.is-visible {
+        visibility: visible;
+      }
+
+      body.desktop-layout .desktop-insights-panel {
+        position: absolute;
+        top: 64px;
+        right: 0;
+        z-index: 25;
+        display: block;
+        width: min(780px, 100%);
+        max-height: min(420px, calc(100vh - 190px));
+        overflow-y: auto;
+        padding: 0 18px 18px;
+        border: 1px solid #d8cec2;
+        border-radius: 15px;
+        background: #fffdf9;
+        box-shadow: 0 22px 50px rgba(52, 43, 34, 0.22);
+        scrollbar-gutter: stable;
+      }
+
+      body.desktop-layout .desktop-insights-panel[hidden] {
+        display: none;
+      }
+
+      body.desktop-layout .desktop-insights-header {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        display: flex;
+        justify-content: space-between;
+        gap: 18px;
+        align-items: flex-start;
+        margin: 0 -18px 14px;
+        padding: 17px 18px 14px;
+        border-bottom: 1px solid #e8e0d7;
+        background: rgba(255, 253, 249, 0.97);
+        backdrop-filter: blur(8px);
+      }
+
+      body.desktop-layout .desktop-insights-heading {
+        min-width: 0;
+        flex: 1 1 auto;
+      }
+
+      body.desktop-layout .desktop-insights-title {
+        color: #29231f;
+        font-size: 20px;
+        font-weight: 900;
+        line-height: 1.25;
+      }
+
+      body.desktop-layout .desktop-insights-description {
+        margin-top: 4px;
+        color: #746a60;
+        font-size: 13px;
+        font-weight: 600;
+        line-height: 1.4;
+      }
+
+      body.desktop-layout .desktop-insight-scope-control {
+        display: inline-flex;
+        max-width: 100%;
+        flex-wrap: wrap;
+        gap: 3px;
+        margin-top: 10px;
+        padding: 3px;
+        border: 1px solid #ddd4ca;
+        border-radius: 10px;
+        background: #eee9e2;
+      }
+
+      body.desktop-layout .desktop-insight-scope-control[hidden] {
+        display: none;
+      }
+
+      body.desktop-layout .desktop-insight-scope-button {
+        min-height: 32px;
+        padding: 6px 10px;
+        border: 1px solid transparent;
+        border-radius: 7px;
+        background: transparent;
+        color: #62594f;
+        cursor: pointer;
+        font: inherit;
+        font-size: 12px;
+        font-weight: 800;
+        line-height: 1.2;
+      }
+
+      body.desktop-layout .desktop-insight-scope-button:hover {
+        background: rgba(255, 255, 255, 0.62);
+      }
+
+      body.desktop-layout .desktop-insight-scope-button.is-active {
+        border-color: #cabdaf;
+        background: #ffffff;
+        color: #302923;
+        box-shadow: 0 2px 7px rgba(52, 43, 34, 0.1);
+      }
+
+      body.desktop-layout .desktop-insight-scope-button:focus-visible {
+        outline: 3px solid #8b6840;
+        outline-offset: 2px;
+      }
+
+      body.desktop-layout .desktop-insight-scope-button[hidden] {
+        display: none;
+      }
+
+      body.desktop-layout .desktop-insight-scope-count {
+        margin-left: 3px;
+        color: #776d63;
+        font-size: 11px;
+        white-space: nowrap;
+      }
+
+      body.desktop-layout .desktop-insights-close {
+        flex: 0 0 auto;
+        width: 38px;
+        height: 38px;
+        border: 1px solid #ddd3c8;
+        border-radius: 50%;
+        background: #ffffff;
+        color: #51483f;
+        cursor: pointer;
+        font-size: 24px;
+        font-weight: 500;
+        line-height: 1;
+      }
+
+      body.desktop-layout .desktop-insights-close:hover {
+        border-color: #bba996;
+        background: #f8f3ed;
+      }
+
+      body.desktop-layout .desktop-insights-close:focus-visible {
+        outline: 3px solid #8b6840;
+        outline-offset: 2px;
+      }
+
+      body.desktop-layout .desktop-insights-content {
+        display: grid;
+        gap: 10px;
+      }
+
+      body.desktop-layout .desktop-insights-content.is-vacancies,
+      body.desktop-layout .desktop-insights-content.is-registrations {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      body.desktop-layout .desktop-insight-item {
+        width: 100%;
+        min-width: 0;
+        padding: 13px 14px;
+        border: 1px solid #e2d9cf;
+        border-radius: 11px;
+        background: #ffffff;
+        color: #302a25;
+        cursor: pointer;
+        font: inherit;
+        text-align: left;
+        transition:
+          border-color 0.15s ease,
+          background-color 0.15s ease,
+          box-shadow 0.15s ease;
+      }
+
+      body.desktop-layout .desktop-insight-item:hover {
+        border-color: #bba996;
+        background: #fffbf5;
+        box-shadow: 0 5px 14px rgba(52, 43, 34, 0.09);
+      }
+
+      body.desktop-layout .desktop-insight-item.has-activity-ribbon {
+        position: relative;
+        overflow: hidden;
+        padding-top: 17px;
+      }
+
+      body.desktop-layout .desktop-insight-item.has-activity-ribbon::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        right: 0;
+        left: 0;
+        height: 4px;
+      }
+
+      body.desktop-layout .desktop-insight-item:focus-visible {
+        outline: 3px solid #8b6840;
+        outline-offset: 2px;
+      }
+
+      body.desktop-layout .desktop-insight-item-heading {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: baseline;
+      }
+
+      body.desktop-layout .desktop-insight-item-title {
+        min-width: 0;
+        color: #28221e;
+        font-size: 16px;
+        font-weight: 900;
+        line-height: 1.3;
+      }
+
+      body.desktop-layout .desktop-insight-item-time {
+        flex: 0 0 auto;
+        color: #755231;
+        font-size: 13px;
+        font-weight: 900;
+        white-space: nowrap;
+      }
+
+      body.desktop-layout .desktop-insight-item-meta {
+        margin-top: 4px;
+        color: #756c63;
+        font-size: 12px;
+        font-weight: 600;
+        line-height: 1.35;
+      }
+
+      body.desktop-layout .desktop-insight-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        margin-top: 9px;
+      }
+
+      body.desktop-layout .desktop-insight-chip {
+        display: inline-flex;
+        min-height: 25px;
+        align-items: center;
+        padding: 4px 8px;
+        border-radius: 999px;
+        background: #f2eee8;
+        color: #5d554d;
+        font-size: 11px;
+        font-weight: 800;
+        line-height: 1.2;
+      }
+
+      body.desktop-layout .desktop-insight-chip.role-general {
+        background: #edf7ee;
+        color: #2e7d32;
+      }
+
+      body.desktop-layout .desktop-insight-chip.role-classrep {
+        background: #fff4da;
+        color: #a85f00;
+      }
+
+      body.desktop-layout .desktop-insight-chip.role-steeringcommittee {
+        background: #eaf3ff;
+        color: #1565c0;
+      }
+
+      body.desktop-layout .desktop-insight-chip.role-orgcommittee {
+        background: #f4eafd;
+        color: #6a1b9a;
+      }
+
+      body.desktop-layout .desktop-insight-chip.is-low {
+        box-shadow: inset 0 0 0 1px currentColor;
+      }
+
+      body.desktop-layout .desktop-insight-names {
+        margin-top: 8px;
+        color: #5e554d;
+        font-size: 12px;
+        font-weight: 600;
+        line-height: 1.45;
+        overflow-wrap: anywhere;
+      }
+
+      body.desktop-layout .desktop-insight-empty {
+        grid-column: 1 / -1;
+        padding: 24px 16px;
+        border: 1px dashed #d8cec2;
+        border-radius: 11px;
+        color: #746a60;
+        font-size: 14px;
+        font-weight: 700;
+        text-align: center;
+      }
+
+      body.desktop-layout .mobile-availability-control {
+        grid-column: 1 / -1;
+        display: block;
+        margin: 0;
+        padding: 8px;
+        border: 1px solid #ded7ce;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.94);
+        box-shadow: 0 5px 15px rgba(52, 43, 34, 0.05);
+      }
+
+      body.desktop-layout .desktop-filter-summary {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        clip-path: inset(50%);
+        white-space: nowrap;
+      }
+
+      body.desktop-layout .desktop-filter-summary.is-visible {
+        visibility: visible;
+      }
+
+      body.desktop-layout .mobile-filter-row-secondary {
+        grid-template-columns:
+          minmax(150px, 0.8fr) minmax(190px, 1fr)
+          minmax(210px, 1fr) minmax(260px, 1.5fr) 40px;
+        gap: 8px;
+        align-items: center;
+      }
+
+      body.desktop-layout .mobile-activity-filter-field {
+        grid-column: 1;
+        grid-row: 1;
+      }
+
+      body.desktop-layout .mobile-role-filter-field {
+        grid-column: 2;
+        grid-row: 1;
+      }
+
+      body.desktop-layout .mobile-keyword-filter-field {
+        grid-column: 4;
+        grid-row: 1;
+      }
+
+      body.desktop-layout .mobile-time-filter-field {
+        grid-column: 3;
+        grid-row: 1;
+      }
+
+      body.desktop-layout .mobile-time-availability-detail {
+        display: none;
+      }
+
+      body.desktop-layout
+        .mobile-availability-control.is-overview-mode
+        .mobile-role-filter-field,
+      body.desktop-layout
+        .mobile-availability-control.is-overview-mode
+        .mobile-time-filter-field,
+      body.desktop-layout
+        .mobile-availability-control.is-overview-mode
+        .mobile-keyword-filter-field,
+      body.desktop-layout
+        .mobile-availability-control.is-overview-mode
+        .mobile-time-availability-detail {
+        display: none;
+      }
+
+      body.desktop-layout
+        .mobile-availability-control.is-overview-mode
+        .mobile-activity-filter-field {
+        grid-column: 1;
+      }
+
+      body.desktop-layout .mobile-filter-label,
+      body.desktop-layout .mobile-time-filter-field .mobile-filter-label {
+        display: none;
+      }
+
+      body.desktop-layout .mobile-activity-filter-pills,
+      body.desktop-layout .mobile-role-filter-pills {
+        display: none;
+      }
+
+      body.desktop-layout .mobile-activity-filter-field,
+      body.desktop-layout .mobile-role-filter-field {
+        display: block;
+      }
+
+      body.desktop-layout .desktop-choice-popover {
+        position: relative;
+        display: block;
+      }
+
+      body.desktop-layout .desktop-choice-toggle {
+        position: relative;
+        display: flex;
+        width: 100%;
+        min-width: 0;
+        min-height: 40px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 7px 11px;
+        border: 1px solid #d8cec2;
+        border-radius: 6px;
+        background: #ffffff;
+        color: #433c35;
+        cursor: pointer;
+        font: inherit;
+        font-size: 13px;
+        font-weight: 800;
+        line-height: 1.2;
+        text-align: left;
+        transition:
+          border-color 0.15s ease,
+          background-color 0.15s ease,
+          box-shadow 0.15s ease;
+      }
+
+      body.desktop-layout .desktop-choice-toggle::after {
+        content: "▾";
+        flex: 0 0 auto;
+        color: #8a8176;
+        font-size: 12px;
+        line-height: 1;
+      }
+
+      body.desktop-layout .desktop-choice-toggle-label {
+        display: block;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      body.desktop-layout .desktop-choice-toggle:hover,
+      body.desktop-layout .desktop-choice-toggle.is-open {
+        border-color: #bba996;
+        background: #fffaf2;
+      }
+
+      body.desktop-layout .desktop-choice-toggle.is-open {
+        box-shadow: inset 0 0 0 1px #bba996;
+      }
+
+      body.desktop-layout .desktop-choice-toggle.is-open::after {
+        content: "▴";
+      }
+
+      body.desktop-layout .desktop-choice-toggle.has-selection {
+        border-color: #c8b79f;
+        background: #fffdf8;
+      }
+
+      body.desktop-layout .desktop-choice-menu {
+        position: absolute;
+        top: calc(100% + 7px);
+        left: 0;
+        z-index: 60;
+        display: flex;
+        width: max-content;
+        min-width: 100%;
+        max-width: min(560px, calc(100vw - 80px));
+        max-height: 280px;
+        flex-wrap: wrap;
+        gap: 7px;
+        overflow-y: auto;
+        padding: 10px;
+        border: 1px solid #d8cec2;
+        border-radius: 8px;
+        background: #ffffff;
+        box-shadow: 0 16px 36px rgba(52, 43, 34, 0.18);
+        scrollbar-gutter: stable;
+      }
+
+      body.desktop-layout .desktop-choice-menu[hidden] {
+        display: none;
+      }
+
+      body.desktop-layout .desktop-choice-option {
+        display: inline-flex;
+        max-width: 100%;
+        min-height: 36px;
+        align-items: center;
+        padding: 7px 11px;
+        font: inherit;
+        font-size: 12px;
+        font-weight: 800;
+        line-height: 1.2;
+        text-align: left;
+        white-space: normal;
+      }
+
+      body.desktop-layout
+        .desktop-choice-option.mobile-activity-filter-pill {
+        border-radius: 6px;
+      }
+
+      body.desktop-layout
+        .desktop-choice-option:not(.is-active):hover {
+        border-color: #bba996;
+        background: #fffaf2;
+        color: #433c35;
+      }
+
+      body.desktop-layout .desktop-choice-toggle:focus-visible,
+      body.desktop-layout .desktop-choice-option:focus-visible,
+      body.desktop-layout .mobile-time-filter-toggle:focus-visible,
+      body.desktop-layout .mobile-keyword-search:focus-visible,
+      body.desktop-layout .desktop-filter-reset:focus-visible {
+        outline: 3px solid #8b6840;
+        outline-offset: 2px;
+      }
+
+      body.desktop-layout .desktop-filter-reset {
+        grid-column: 5;
+        grid-row: 1;
+        display: grid;
+        width: 40px;
+        height: 40px;
+        place-items: center;
+        padding: 0;
+        border: 1px solid #d8cec2;
+        border-radius: 6px;
+        background: #ffffff;
+        color: #76695e;
+        cursor: pointer;
+        font-size: 18px;
+        font-weight: 800;
+        line-height: 1;
+      }
+
+      body.desktop-layout .desktop-filter-reset:hover:not(:disabled) {
+        border-color: #bba996;
+        background: #fffaf2;
+        color: #5b4630;
+      }
+
+      body.desktop-layout .desktop-filter-reset:disabled {
+        cursor: default;
+        opacity: 0.42;
+      }
+
+      body.desktop-layout .mobile-filter-select,
+      body.desktop-layout .mobile-keyword-search {
+        min-height: 40px;
+        border-radius: 6px;
+        font-size: 13px;
+      }
+
+      body.desktop-layout .mobile-time-filter-toggle {
+        min-height: 40px;
+        padding: 7px 32px 7px 11px;
+        font-size: 13px;
+      }
+
+      body.desktop-layout .mobile-time-filter-menu {
+        max-height: 320px;
+      }
+
+      body.desktop-layout .mobile-time-filter-option {
+        min-height: 42px;
+        font-size: 14px;
+      }
+
+      body.desktop-layout
+        .mobile-availability-control.is-overview-mode
+        .mobile-filter-row-secondary {
+        grid-template-columns: minmax(220px, 360px) 40px;
+        justify-content: start;
+      }
+
+      body.desktop-layout
+        .mobile-availability-control.is-overview-mode
+        .desktop-filter-reset {
+        grid-column: 2;
+      }
+
+      @media (min-width: 901px) and (max-width: 979px) {
+        body.desktop-layout .mobile-filter-row-secondary {
+          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 40px;
+        }
+
+        body.desktop-layout .mobile-activity-filter-field {
+          grid-column: 1;
+          grid-row: 1;
+        }
+
+        body.desktop-layout .mobile-role-filter-field {
+          grid-column: 2;
+          grid-row: 1;
+        }
+
+        body.desktop-layout
+          .mobile-role-filter-field
+          .desktop-choice-menu {
+          right: 0;
+          left: auto;
+        }
+
+        body.desktop-layout .desktop-filter-reset {
+          grid-column: 3;
+          grid-row: 1;
+        }
+
+        body.desktop-layout .mobile-time-filter-field {
+          grid-column: 1;
+          grid-row: 2;
+        }
+
+        body.desktop-layout .mobile-keyword-filter-field {
+          grid-column: 2 / 4;
+          grid-row: 2;
+        }
+
+        body.desktop-layout
+          .mobile-availability-control.is-overview-mode
+          .mobile-filter-row-secondary {
+          grid-template-columns: minmax(220px, 1fr) 40px;
+        }
+
+        body.desktop-layout
+          .mobile-availability-control.is-overview-mode
+          .mobile-activity-filter-field {
+          grid-column: 1;
+          grid-row: 1;
+        }
+
+        body.desktop-layout
+          .mobile-availability-control.is-overview-mode
+          .desktop-filter-reset {
+          grid-column: 2;
+          grid-row: 1;
+        }
+      }
+
+      body.desktop-layout .mobile-agenda {
+        display: block !important;
+        padding: 0 0 42px;
+      }
+
+      body.desktop-layout .mobile-time-group {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+        align-items: stretch;
+        margin-bottom: 32px;
+      }
+
+      body.desktop-layout .mobile-time-heading {
+        grid-column: 1 / -1;
+        margin: 0 0 -2px;
+        padding-bottom: 9px;
+        border-bottom: 1px solid #ddd5cb;
+        color: #37312b;
+        font-size: 22px;
+        font-weight: 900;
+      }
+
+      body.desktop-layout .mobile-slot-card {
+        height: 100%;
+        min-height: 230px;
+        margin: 0;
+        padding: 26px 22px 20px;
+        border-radius: 14px;
+        box-shadow: 0 5px 18px rgba(52, 43, 34, 0.08);
+      }
+
+      body.desktop-layout .mobile-slot-card:focus-visible,
+      body.desktop-layout .mobile-overview-item:focus-visible {
+        outline: 3px solid #8b6840;
+        outline-offset: 3px;
+      }
+
+      body.desktop-layout .mobile-slot-title {
+        font-size: 24px;
+      }
+
+      body.desktop-layout .mobile-slot-time {
+        font-size: 16px;
+      }
+
+      body.desktop-layout .mobile-slot-meta,
+      body.desktop-layout .mobile-slot-desc {
+        font-size: 15px;
+      }
+
+      body.desktop-layout .mobile-slot-names {
+        max-height: 132px;
+        overflow-y: auto;
+        padding-right: 5px;
+        font-size: 13px;
+        scrollbar-gutter: stable;
+      }
+
+      body.desktop-layout .mobile-slot-role-label,
+      body.desktop-layout .mobile-slot-name-list {
+        font-size: 13px;
+      }
+
+      body.desktop-layout .mobile-overview-timeline {
+        gap: 24px;
+      }
+
+      body.desktop-layout .mobile-overview-time-block {
+        grid-template-columns: 118px minmax(0, 1fr);
+        gap: 18px;
+      }
+
+      body.desktop-layout .mobile-overview-time {
+        top: 92px;
+        font-size: 18px;
+      }
+
+      body.desktop-layout .mobile-overview-items {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      body.desktop-layout .mobile-overview-item {
+        min-height: 112px;
+        cursor: pointer;
+        transition:
+          transform 0.15s ease,
+          box-shadow 0.15s ease,
+          border-color 0.15s ease;
+      }
+
+      body.desktop-layout .mobile-overview-item:hover {
+        border-color: #cfc5ba;
+        box-shadow: 0 10px 24px rgba(52, 43, 34, 0.12);
+        transform: translateY(-2px);
+      }
+
+      @media (min-width: 1280px) {
+        body.desktop-layout .mobile-time-group,
+        body.desktop-layout .mobile-overview-items {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+      }
+    </style>

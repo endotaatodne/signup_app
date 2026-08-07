@@ -1,0 +1,700 @@
+    <script>
+      /**
+       * @fileoverview Signup and cancellation modal workflows. This partial
+       * renders event-specific modal state, validates browser input, and
+       * coordinates asynchronous Google Apps Script requests.
+       */
+
+      // Modal lifecycle and signup-role selection.
+
+      /**
+       * Opens and populates the modal for a schedule event.
+       * @param {string|number} eventId The event identifier represented by the modal.
+       * @returns {void}
+       */
+      function openModal(eventId) {
+        if (!gridData || !gridData.events) {
+          setTimeout(function () {
+            openModal(eventId);
+          }, 100);
+          return;
+        }
+        var event = getEventById(eventId);
+        if (!event) return;
+
+        currentEventId = eventId;
+        currentRole = null;
+        var readOnly = isEventReadOnly();
+
+        document.getElementById("modalTitle").textContent = event.activity;
+        var subtitle =
+          formatTimeRange(event.startTime, event.endTime) +
+          " — " +
+          event.location;
+        if (event.description && event.description.trim() !== "") {
+          subtitle += " — " + event.description;
+        }
+        document.getElementById("modalSubtitle").textContent = subtitle;
+
+        // Names grouped by role
+        var namesSection = document.getElementById("namesSection");
+        var namesGroups = document.getElementById("namesGroups");
+        while (namesGroups.firstChild) {
+          namesGroups.removeChild(namesGroups.firstChild);
+        }
+        var hasAnySignups = false;
+        ROLE_KEYS.forEach(function (r) {
+          var roleSignups = event.signupsByRole[r.label] || [];
+          if (roleSignups.length === 0) return;
+          hasAnySignups = true;
+          var group = document.createElement("div");
+          group.className = "names-role-group";
+          var label = document.createElement("div");
+          label.className = "names-role-label " + r.labelClass;
+          label.textContent = r.label;
+          group.appendChild(label);
+          var chips = document.createElement("div");
+          chips.className = "names-chips";
+          roleSignups.forEach(function (s) {
+            var chip = document.createElement("div");
+            chip.className = "name-chip " + r.nameClass;
+            chip.textContent = s.name;
+            if (s.cls) {
+              var clsSpan = document.createElement("span");
+              clsSpan.className = "name-chip-class";
+              clsSpan.textContent = " — " + s.cls;
+              chip.appendChild(clsSpan);
+            }
+            chips.appendChild(chip);
+          });
+          group.appendChild(chips);
+          namesGroups.appendChild(group);
+        });
+        namesSection.style.display = hasAnySignups ? "block" : "none";
+
+        var roleButtons = document.getElementById("roleButtons");
+        while (roleButtons.firstChild) {
+          roleButtons.removeChild(roleButtons.firstChild);
+        }
+        if (!readOnly) {
+          ROLE_KEYS.forEach(function (r) {
+            var s = event.slots[r.key];
+            if (s.max === 0) return;
+            var btn = document.createElement("button");
+            btn.className = "role-btn " + r.btnClass;
+            btn.setAttribute("data-role", r.label);
+            var remaining = s.max - s.filled;
+            var isFull = remaining <= 0;
+            if (isFull) {
+              btn.classList.add("role-btn-full");
+              btn.disabled = true;
+            } else {
+              btn.addEventListener("click", function () {
+                selectRole(r.label, btn);
+              });
+            }
+            var labelDiv = document.createElement("div");
+            labelDiv.className = "role-btn-label";
+            labelDiv.textContent = r.label;
+            var countDiv = document.createElement("div");
+            countDiv.className = "role-btn-count";
+            countDiv.textContent = isFull
+              ? "Full"
+              : formatRemainingSlots(remaining);
+            btn.appendChild(labelDiv);
+            btn.appendChild(countDiv);
+            roleButtons.appendChild(btn);
+          });
+
+          var allFull = ROLE_KEYS.every(function (r) {
+            var s = event.slots[r.key];
+            return s.max === 0 || s.filled >= s.max;
+          });
+          if (allFull) {
+            var fullMsg = document.createElement("div");
+            fullMsg.className = "modal-full-message";
+            fullMsg.textContent =
+              "この枠はおかげさまで定員に達しました。ありがとうございます。";
+            roleButtons.appendChild(fullMsg);
+          }
+        }
+
+        document.getElementById("modalForm").className = "modal-form";
+        document.getElementById("inputName").value = "";
+        document.getElementById("inputClass").value = "";
+        document.getElementById("modalMessage").style.display = "none";
+        document.getElementById("submitBtn").disabled = false;
+        document.getElementById("submitBtn").textContent = SIGNUP_BTN_TEXT;
+
+        var modalTabs = document.getElementById("modalTabs");
+        modalTabs.style.display =
+          !readOnly && event.signups.length > 0 ? "flex" : "none";
+
+        resetCancelSignupSelection();
+        clearElement(document.getElementById("cancelSignupList"));
+        document.getElementById("modalReadOnlyNotice").style.display = readOnly
+          ? "block"
+          : "none";
+        if (readOnly) {
+          document.getElementById("signupHelper").style.display = "none";
+          roleButtons.style.display = "none";
+          document.getElementById("modalForm").className = "modal-form";
+          document.getElementById("cancelForm").className = "cancel-form";
+        } else {
+          switchTab("signup");
+        }
+
+        document.getElementById("modalOverlay").classList.add("active");
+        document.body.style.overflow = "hidden";
+        if (!readOnly && !isCompactLayout()) {
+          document.getElementById("inputName").focus();
+        }
+      }
+
+      /**
+       * Selects an available signup role and reveals the matching form state.
+       * @param {string} roleLabel The canonical, user-facing role label.
+       * @param {HTMLElement} btn The role button selected by the user.
+       * @returns {void}
+       */
+      function selectRole(roleLabel, btn) {
+        if (isEventReadOnly()) return;
+        currentRole = roleLabel;
+        document.querySelectorAll(".role-btn").forEach(function (b) {
+          b.classList.remove("selected");
+        });
+        btn.classList.add("selected");
+
+        // Show form with matching submit button colour
+        var modalForm = document.getElementById("modalForm");
+        modalForm.className = "modal-form visible";
+        var submitBtn = document.getElementById("submitBtn");
+        submitBtn.className = "modal-submit";
+        var roleKey = ROLE_KEYS.find(function (r) {
+          return r.label === roleLabel;
+        });
+        if (roleKey) {
+          submitBtn.classList.add("modal-submit-" + roleKey.classSuffix);
+        }
+        submitBtn.textContent = SIGNUP_BTN_TEXT;
+        document.getElementById("modalMessage").style.display = "none";
+        if (!isCompactLayout()) {
+          document.getElementById("inputName").focus();
+        }
+      }
+
+      /**
+       * Closes the modal and clears its transient signup and cancellation state.
+       * @returns {void}
+       */
+      function closeModal() {
+        document.getElementById("modalOverlay").classList.remove("active");
+        document.getElementById("cancelForm").className = "cancel-form";
+        document.getElementById("confirmBox").style.display = "none";
+        document.getElementById("cancelMessage").style.display = "none";
+        resetCancelSignupSelection();
+        clearElement(document.getElementById("cancelSignupList"));
+        document.getElementById("confirmYes").disabled = false;
+        document.getElementById("confirmYes").textContent =
+          "はい、キャンセルします。";
+        document.getElementById("confirmNo").disabled = false;
+        currentEventId = null;
+        currentRole = null;
+        document.body.style.overflow = "";
+        if (!isCompactLayout()) {
+          document.body.scrollTop = 0;
+          document.documentElement.scrollTop = 0;
+          var top = document.querySelector("h1");
+          if (top) top.scrollIntoView({ behavior: "smooth" });
+        }
+      }
+
+      /**
+       * Switches the modal between its signup and cancellation workflows.
+       * @param {string} tab The target tab, either "signup" or "cancel".
+       * @returns {void}
+       */
+      function switchTab(tab) {
+        var roleButtons = document.getElementById("roleButtons");
+        var modalForm = document.getElementById("modalForm");
+        var cancelForm = document.getElementById("cancelForm");
+        var tabSignup = document.getElementById("tabSignup");
+        var tabCancel = document.getElementById("tabCancel");
+
+        document.getElementById("confirmBox").style.display = "none";
+        document.getElementById("cancelMessage").style.display = "none";
+        document.getElementById("cancelSubmitBtn").style.display = "block";
+        document.getElementById("cancelSubmitBtn").disabled =
+          !currentCancelSignup;
+        document.getElementById("cancelSubmitBtn").textContent =
+          "選択した登録をキャンセル";
+        document.getElementById("confirmYes").disabled = false;
+        document.getElementById("confirmYes").textContent =
+          "はい、キャンセルします。";
+        document.getElementById("confirmNo").disabled = false;
+
+        if (tab === "signup") {
+          tabSignup.className = "modal-tab active-signup";
+          tabCancel.className = "modal-tab";
+          document.getElementById("signupHelper").style.display = "block";
+          var signupEvent = getEventById(currentEventId);
+          document.getElementById("namesSection").style.display =
+            signupEvent && signupEvent.signups.length > 0 ? "block" : "none";
+          roleButtons.style.display = "";
+          modalForm.className = currentRole
+            ? "modal-form visible"
+            : "modal-form";
+          cancelForm.className = "cancel-form";
+        } else {
+          tabSignup.className = "modal-tab";
+          tabCancel.className = "modal-tab active-cancel";
+          document.getElementById("signupHelper").style.display = "none";
+          document.getElementById("namesSection").style.display = "none";
+          roleButtons.style.display = "none";
+          modalForm.className = "modal-form";
+          cancelForm.className = "cancel-form visible";
+          resetCancelSignupSelection();
+          document.getElementById("cancelSubmitBtn").disabled = true;
+          renderCancelSignupList();
+        }
+        resetModalTabScroll(tab);
+      }
+
+      /**
+       * Restores the modal and active tab content to their initial scroll positions.
+       * @param {string} tab The active tab, either "signup" or "cancel".
+       * @returns {void}
+       */
+      function resetModalTabScroll(tab) {
+        var modal = document.querySelector(".modal");
+        if (modal) modal.scrollTop = 0;
+
+        var tabScrollArea =
+          tab === "cancel"
+            ? document.getElementById("cancelSignupList")
+            : document.getElementById("namesSection");
+        if (tabScrollArea) tabScrollArea.scrollTop = 0;
+      }
+
+      // Cancellation selection and confirmation.
+
+      /**
+       * Clears the currently selected cancellation record and its DOM option.
+       * @returns {void}
+       */
+      function resetCancelSignupSelection() {
+        currentCancelSignup = null;
+        currentCancelOption = null;
+      }
+
+      /**
+       * Renders cancellable signups for the event currently shown in the modal.
+       * @returns {void}
+       */
+      function renderCancelSignupList() {
+        var list = document.getElementById("cancelSignupList");
+        resetCancelSignupSelection();
+        clearElement(list);
+        var event = getEventById(currentEventId);
+        if (!event) return;
+
+        ROLE_KEYS.forEach(function (roleMeta) {
+          var roleSignups = event.signupsByRole[roleMeta.label] || [];
+          roleSignups.forEach(function (signup) {
+            var option = document.createElement("button");
+            option.type = "button";
+            option.className = "cancel-signup-option";
+            option.cancelSignupData = signup;
+            option.setAttribute("data-cancel-signup", "");
+            option.setAttribute("aria-pressed", "false");
+
+            var name = document.createElement("span");
+            name.className = "cancel-signup-name";
+            name.textContent = signup.name;
+
+            var details = document.createElement("span");
+            details.className = "cancel-signup-details";
+            details.textContent = signup.cls + " · " + signup.role;
+
+            option.appendChild(name);
+            option.appendChild(details);
+            list.appendChild(option);
+          });
+        });
+      }
+
+      /**
+       * Stores and visually marks the signup selected for cancellation.
+       * @param {{name: string, cls: string, role: string}} signup The signup record.
+       * @param {HTMLElement} selectedOption The corresponding list option element.
+       * @returns {void}
+       */
+      function selectCancelSignup(signup, selectedOption) {
+        if (!signup || !selectedOption) return;
+
+        if (currentCancelOption && currentCancelOption !== selectedOption) {
+          currentCancelOption.classList.remove("selected");
+          currentCancelOption.setAttribute("aria-pressed", "false");
+        }
+
+        currentCancelSignup = {
+          name: signup.name,
+          cls: signup.cls,
+          role: signup.role,
+        };
+        currentCancelOption = selectedOption;
+        selectedOption.classList.add("selected");
+        selectedOption.setAttribute("aria-pressed", "true");
+
+        document.getElementById("confirmBox").style.display = "none";
+        document.getElementById("cancelMessage").style.display = "none";
+        document.getElementById("cancelSubmitBtn").style.display = "block";
+        document.getElementById("cancelSubmitBtn").disabled = false;
+      }
+
+      /**
+       * Enables or disables every cancellation choice while a request is pending.
+       * @param {boolean} disabled Whether list options should be disabled.
+       * @returns {void}
+       */
+      function setCancelSignupListDisabled(disabled) {
+        var options = document.getElementById("cancelSignupList").children;
+        Array.prototype.forEach.call(options, function (option) {
+          option.disabled = disabled;
+        });
+      }
+
+      /**
+       * Validates the cancellation selection and renders its confirmation prompt.
+       * @returns {void}
+       */
+      function findAndConfirmCancel() {
+        var msg = document.getElementById("cancelMessage");
+        msg.style.display = "none";
+
+        if (!currentCancelSignup) {
+          showCancelMessage("キャンセルする登録を選んでください。", false);
+          return;
+        }
+
+        var confirmText = document.getElementById("confirmText");
+        clearElement(confirmText);
+
+        var question = document.createElement("div");
+        question.className = "confirm-question";
+        question.textContent = "本当に以下の登録をキャンセルしますか？";
+
+        var summary = document.createElement("div");
+        summary.className = "confirm-signup-summary";
+
+        var name = document.createElement("span");
+        name.className = "confirm-signup-name";
+        name.textContent = currentCancelSignup.name;
+
+        var details = document.createElement("span");
+        details.className = "confirm-signup-details";
+        details.textContent =
+          currentCancelSignup.cls + " · " + currentCancelSignup.role;
+
+        summary.appendChild(name);
+        summary.appendChild(details);
+        confirmText.appendChild(question);
+        confirmText.appendChild(summary);
+
+        var confirmBox = document.getElementById("confirmBox");
+        confirmBox.style.display = "block";
+        document.getElementById("cancelSubmitBtn").style.display = "none";
+        if (confirmBox.scrollIntoView) {
+          confirmBox.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+            inline: "nearest",
+          });
+        }
+      }
+
+      /**
+       * Sends the selected cancellation to the server and updates modal feedback.
+       * @returns {void}
+       */
+      function confirmCancel() {
+        if (isEventReadOnly()) {
+          showCancelMessage(
+            "現在、このページは閲覧専用です。登録やキャンセルはできません。",
+            false,
+          );
+          return;
+        }
+        if (!currentCancelSignup) {
+          showCancelMessage("キャンセルする登録を選んでください。", false);
+          return;
+        }
+
+        var name = currentCancelSignup.name;
+        var cls = currentCancelSignup.cls;
+        var role = currentCancelSignup.role;
+        var btn = document.getElementById("confirmYes");
+
+        btn.disabled = true;
+        btn.textContent = "キャンセル中...";
+        document.getElementById("confirmNo").disabled = true;
+        document.getElementById("cancelSubmitBtn").disabled = true;
+        setCancelSignupListDisabled(true);
+
+        google.script.run
+          .withSuccessHandler(function (result) {
+            if (result && result.code === "event_read_only") {
+              var eventId = currentEventId;
+              setEventStatus(EVENT_STATUS_READ_ONLY);
+              if (eventId !== null) openModal(eventId);
+              return;
+            }
+            if (result.success) {
+              showCancelMessage(result.message, true);
+              setTimeout(function () {
+                if (EXEC_URL) {
+                  window.top.location.href = EXEC_URL;
+                } else {
+                  // Fallback
+                  window.top.location.reload();
+                }
+              }, 1500);
+            } else {
+              showCancelMessage(result.message, false);
+              document.getElementById("confirmBox").style.display = "none";
+              btn.disabled = false;
+              btn.textContent = "はい、キャンセルします。";
+              document.getElementById("confirmNo").disabled = false;
+              setCancelSignupListDisabled(false);
+              document.getElementById("cancelSubmitBtn").style.display =
+                "block";
+            }
+          })
+          .withFailureHandler(function (error) {
+            showCancelMessage(
+              "エラーが発生しました。再度試してください。",
+              false,
+            );
+            document.getElementById("confirmBox").style.display = "none";
+            btn.disabled = false;
+            btn.textContent = "はい、キャンセルします。";
+            document.getElementById("confirmNo").disabled = false;
+            setCancelSignupListDisabled(false);
+            document.getElementById("cancelSubmitBtn").style.display = "block";
+          })
+          .cancelSignup(currentEventId, name, cls, role, alias);
+      }
+
+      // Shared modal feedback and refreshed-data recovery.
+
+      /**
+       * Renders a success or error message in a modal feedback region.
+       * @param {string} targetId The id of the feedback element to update.
+       * @param {string} message The user-facing message from the workflow or server.
+       * @param {boolean} success Whether to apply success presentation.
+       * @returns {void}
+       */
+      function showMessage(targetId, message, success) {
+        var msgDiv = document.getElementById(targetId);
+        var refreshPrompt = "ページをリフレッシュしてください。";
+        msgDiv.textContent = "";
+        msgDiv.className = "modal-message " + (success ? "success" : "error");
+
+        if (success && message.indexOf(refreshPrompt) !== -1) {
+          msgDiv.className += " action-needed";
+
+          var mainText = message.replace(refreshPrompt, "").trim();
+          if (mainText) {
+            var mainSpan = document.createElement("span");
+            mainSpan.className = "modal-message-main";
+            mainSpan.textContent = mainText;
+            msgDiv.appendChild(mainSpan);
+          }
+
+          var emphasisSpan = document.createElement("span");
+          emphasisSpan.className = "modal-message-emphasis";
+          emphasisSpan.textContent = refreshPrompt;
+          msgDiv.appendChild(emphasisSpan);
+        } else {
+          msgDiv.textContent = message;
+        }
+
+        msgDiv.style.display = "block";
+      }
+
+      /**
+       * Renders feedback in the cancellation message region.
+       * @param {string} message The user-facing feedback text.
+       * @param {boolean} success Whether to apply success presentation.
+       * @returns {void}
+       */
+      function showCancelMessage(message, success) {
+        showMessage("cancelMessage", message, success);
+      }
+
+      /**
+       * Rebuilds the responsive schedule using the current client-side data.
+       * @returns {void}
+       */
+      function rebuildCurrentView() {
+        buildMobileAgenda();
+      }
+
+      /**
+       * Reports whether a rejected signup indicates stale slot availability.
+       * @param {?{code: string}} result The server response, when one was returned.
+       * @returns {boolean|null|undefined} Whether fresh grid data should be requested.
+       */
+      function shouldRefreshAfterSubmitRejection(result) {
+        return result && result.code === "slot_full";
+      }
+
+      /**
+       * Fetches current grid data after a stale-slot rejection and restores the modal.
+       * @param {string|number} eventId The event that rejected the signup.
+       * @param {string} message The rejection message to show after refreshing.
+       * @returns {void}
+       */
+      function refreshGridDataAfterSubmitRejection(eventId, message) {
+        google.script.run
+          .withSuccessHandler(function (result) {
+            if (!result || !result.success || !result.gridData) return;
+
+            gridData = result.gridData;
+            if (result.eventStatus) setEventStatus(result.eventStatus);
+            buildGridIndexes();
+            rebuildCurrentView();
+
+            if (
+              currentEventId !== null &&
+              String(currentEventId) === String(eventId) &&
+              getEventById(eventId)
+            ) {
+              openModal(eventId);
+              showModalMessage(message, false);
+            }
+          })
+          .withFailureHandler(function () {})
+          .getGridDataForAlias(alias);
+      }
+
+      // Signup validation and submission.
+
+      /**
+       * Validates the active signup form and submits it to the server.
+       * @returns {void}
+       */
+      function submitSignup() {
+        if (isEventReadOnly()) {
+          showModalMessage(
+            "現在、このページは閲覧専用です。登録やキャンセルはできません。",
+            false,
+          );
+          return;
+        }
+        // This is intentionally only a low-friction client-side filter. Real
+        // abuse protection is enforced server-side via rate limiting.
+        if (document.getElementById("honeypot").value !== "") return;
+        // This is also only a client-side friction check. The backend rate
+        // limiter remains the actual enforcement point.
+        if (Date.now() - PAGE_LOAD_TIME < 3000) {
+          showModalMessage("少し待ってから送信してください。", false);
+          return;
+        }
+        if (!currentRole) {
+          showModalMessage("登録したポジションを選択してください。", false);
+          return;
+        }
+
+        var name = normaliseNameValue(document.getElementById("inputName").value);
+        var cls = normaliseClassValue(document.getElementById("inputClass").value);
+        var btn = document.getElementById("submitBtn");
+
+        if (!name) {
+          showModalMessage("名前を入力してください。", false);
+          return;
+        }
+        if (name.length > 50) {
+          showModalMessage("名前は５０文字以下で入力してください。", false);
+          return;
+        }
+        if (!isValidNameValue(name)) {
+          showModalMessage("名前に不正な文字が含まれています。", false);
+          return;
+        }
+        if (!cls) {
+          showModalMessage("クラスを入力してください。", false);
+          return;
+        }
+        if (cls.length > 10) {
+          showModalMessage("クラスは１０文字以下で入力してください。", false);
+          return;
+        }
+        if (!/^[\p{L}\p{N}\s\-'.]+$/u.test(cls)) {
+          showModalMessage("クラス名に不正な文字が含まれています。", false);
+          return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = "送信中...";
+        document.getElementById("modalMessage").style.display = "none";
+
+        google.script.run
+          .withSuccessHandler(function (result) {
+            if (result && result.code === "event_read_only") {
+              var eventId = currentEventId;
+              setEventStatus(EVENT_STATUS_READ_ONLY);
+              if (eventId !== null) openModal(eventId);
+              return;
+            }
+            showModalMessage(result.message, result.success);
+            if (result.success) {
+              var event = getEventById(currentEventId);
+              if (event) {
+                var signup = {
+                  name: result.name || name,
+                  cls: result.cls || cls,
+                  role: currentRole,
+                };
+                event.signups.push(signup);
+                if (!event.signupsByRole[currentRole]) {
+                  event.signupsByRole[currentRole] = [];
+                }
+                event.signupsByRole[currentRole].push(signup);
+                var roleKey = ROLE_KEYS.find(function (r) {
+                  return r.label === currentRole;
+                });
+                if (roleKey) event.slots[roleKey.key].filled++;
+              }
+              buildMobileAgenda();
+              setTimeout(closeModal, 1500);
+            } else {
+              btn.disabled = false;
+              btn.textContent = SIGNUP_BTN_TEXT;
+              if (shouldRefreshAfterSubmitRejection(result)) {
+                refreshGridDataAfterSubmitRejection(
+                  currentEventId,
+                  result.message,
+                );
+              }
+            }
+          })
+          .withFailureHandler(function (error) {
+            showModalMessage("問題が発生しました。再度試してください。", false);
+            btn.disabled = false;
+            btn.textContent = SIGNUP_BTN_TEXT;
+          })
+          .submitSignup(currentEventId, name, cls, currentRole, alias);
+      }
+
+      /**
+       * Renders feedback in the signup message region.
+       * @param {string} message The user-facing feedback text.
+       * @param {boolean} success Whether to apply success presentation.
+       * @returns {void}
+       */
+      function showModalMessage(message, success) {
+        showMessage("modalMessage", message, success);
+      }
+
+    </script>

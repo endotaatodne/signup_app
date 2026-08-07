@@ -1,0 +1,655 @@
+    <script>
+      /**
+       * @fileoverview Desktop schedule summaries and vacancy/registration
+       * insight panels. Loaded after ClientCore.html and ClientFilters.html,
+       * and before ClientSchedule.html and ClientInit.html. It consumes shared
+       * event/filter state and formatting helpers, and exposes summary refresh
+       * functions used whenever the responsive schedule is rerendered.
+       */
+      /**
+       * Totals vacancies, configured capacity, and registrations for events.
+       * @param {Object[]} events Schedule events.
+       * @param {string=} registrationRoleKey Optional role scope for registrations.
+       * @returns {{availableCount: number, capacityCount: number, signupCount: number}} Totals.
+       */
+      function getScheduleSummaryCounts(events, registrationRoleKey) {
+        var availableCount = 0;
+        var capacityCount = 0;
+        var signupCount = 0;
+        var registrationRole = ROLE_KEYS.find(function (roleMeta) {
+          return roleMeta.key === registrationRoleKey;
+        });
+
+        (events || []).forEach(function (event) {
+          var signups = event.signups || [];
+          signupCount += registrationRole
+            ? signups.filter(function (signup) {
+                return signup.role === registrationRole.label;
+              }).length
+            : signups.length;
+          ROLE_KEYS.forEach(function (roleMeta) {
+            var slot = getRoleSlot(event, roleMeta.key) || {};
+            var remaining = getRemainingForRole(event, roleMeta.key);
+            availableCount += remaining;
+            if (!registrationRole || roleMeta.key === registrationRole.key) {
+              capacityCount += Math.max(0, Number(slot.max) || 0);
+            }
+          });
+        });
+
+        return {
+          availableCount: availableCount,
+          capacityCount: capacityCount,
+          signupCount: signupCount,
+        };
+      }
+
+      /**
+       * Gets events represented by the current display mode and active filters.
+       * @returns {Object[]} Visible schedule events.
+       */
+      function getVisibleScheduleEvents() {
+        if (getMobileDisplayMode() === "overview") {
+          var activity = getMobileActivityFilter();
+          return ((gridData && gridData.events) || []).filter(function (event) {
+            return eventMatchesActivityFilter(event, activity);
+          });
+        }
+        return getMobileFilteredEvents();
+      }
+
+      /**
+       * Reports whether the current display mode has any effective filter.
+       * @returns {boolean} True when the visible event set is filtered.
+       */
+      function hasActiveScheduleFilters() {
+        var activityActive =
+          getMobileActivityFilter() !== MOBILE_ACTIVITY_FILTER_ALL;
+        if (getMobileDisplayMode() === "overview") return activityActive;
+        return (
+          activityActive ||
+          getMobileRoleFilter() !== MOBILE_ROLE_FILTER_ALL ||
+          getMobileAvailableTimeFilters().length > 0 ||
+          getMobileKeywordSearchQuery() !== ""
+        );
+      }
+
+      /**
+       * Updates one contextual summary label and its accessibility state.
+       * Side effect: changes text, classes, and aria-hidden on the node.
+       * @param {HTMLElement|null} node Summary element.
+       * @param {string} text Text to show when visible.
+       * @param {boolean} visible Whether the context should be shown.
+       * @returns {void}
+       */
+      function updateDesktopFilteredContext(node, text, visible) {
+        if (!node) return;
+        node.textContent = visible ? text : "";
+        if (node.classList && node.classList.toggle) {
+          node.classList.toggle("is-visible", visible);
+        }
+        node.setAttribute("aria-hidden", visible ? "false" : "true");
+      }
+
+      /**
+       * Recalculates overall and filtered desktop summary statistics.
+       * Side effect: updates summary DOM and rerenders an open insight panel.
+       * @returns {void}
+       */
+      function updateDesktopScheduleSummary() {
+        var allEvents = (gridData && gridData.events) || [];
+        var overallCounts = getScheduleSummaryCounts(allEvents);
+        var availableNode = document.getElementById("desktopAvailableCount");
+        var signupNode = document.getElementById("desktopSignupCount");
+        var signupCapacityNode = document.getElementById(
+          "desktopSignupCapacityCount",
+        );
+        if (availableNode) {
+          availableNode.textContent = overallCounts.availableCount;
+        }
+        if (signupNode) signupNode.textContent = overallCounts.signupCount + "名";
+        if (signupCapacityNode) {
+          signupCapacityNode.textContent =
+            "/ " + overallCounts.capacityCount + "枠";
+        }
+
+        var filtersActive = hasActiveScheduleFilters();
+        var filteredEvents = filtersActive ? getVisibleScheduleEvents() : [];
+        var filteredRegistrationRole =
+          getMobileDisplayMode() === "signup"
+            ? getMobileRoleFilter()
+            : MOBILE_ROLE_FILTER_ALL;
+        var filteredCounts = filtersActive
+          ? getScheduleSummaryCounts(
+              filteredEvents,
+              filteredRegistrationRole,
+            )
+          : {
+              availableCount: 0,
+              capacityCount: 0,
+              signupCount: 0,
+            };
+
+        updateDesktopFilteredContext(
+          document.getElementById("desktopFilteredAvailableCount"),
+          "表示中 " + filteredCounts.availableCount + "枠",
+          filtersActive,
+        );
+        updateDesktopFilteredContext(
+          document.getElementById("desktopFilteredSignupCount"),
+          "表示中 " +
+            filteredCounts.signupCount +
+            "名 / " +
+            filteredCounts.capacityCount +
+            "枠",
+          filtersActive,
+        );
+        updateDesktopFilteredContext(
+          document.getElementById("desktopFilterSummary"),
+          "絞り込み中：" + filteredEvents.length + "件表示",
+          filtersActive,
+        );
+
+        var panel = document.getElementById("desktopInsightsPanel");
+        if (
+          activeDesktopInsightView &&
+          panel &&
+          !panel.hidden
+        ) {
+          renderDesktopInsightPanel(activeDesktopInsightView);
+        }
+      }
+
+      /**
+       * Lists supported desktop insight panel views.
+       * @returns {string[]} Supported view identifiers.
+       */
+      function getDesktopInsightViews() {
+        return ["vacancies", "registrations"];
+      }
+
+      /**
+       * Validates a requested desktop insight view.
+       * @param {*} view Candidate view identifier.
+       * @returns {string|null} Supported identifier, or null.
+       */
+      function normaliseDesktopInsightView(view) {
+        var requested = String(view || "");
+        return getDesktopInsightViews().indexOf(requested) === -1
+          ? null
+          : requested;
+      }
+
+      /**
+       * Synchronises summary-card state with the active insight view.
+       * Side effect: updates button classes and aria-expanded attributes.
+       * @returns {void}
+       */
+      function updateDesktopInsightButtons() {
+        var stats = document.getElementById("desktopScheduleStats");
+        if (!stats || !stats.children) return;
+        Array.prototype.forEach.call(stats.children, function (button) {
+          var view = button.getAttribute("data-desktop-insight");
+          if (!view) return;
+          var active = view === activeDesktopInsightView;
+          if (button.classList && button.classList.toggle) {
+            button.classList.toggle("is-active", active);
+          }
+          button.setAttribute("aria-expanded", active ? "true" : "false");
+        });
+      }
+
+      /**
+       * Joins populated location, subtitle, and description fields.
+       * @param {Object} event Schedule event.
+       * @returns {string} Compact event metadata.
+       */
+      function getDesktopInsightEventMeta(event) {
+        return [event.location, event.subtitle, event.description]
+          .filter(function (value) {
+            return value && String(value).trim() !== "";
+          })
+          .join(" · ");
+      }
+
+      /**
+       * Creates a role-coloured status chip for an insight item.
+       * @param {Object} roleMeta Role display metadata.
+       * @param {string} text Chip label.
+       * @param {boolean} lowAvailability Whether to add low-capacity styling.
+       * @returns {HTMLElement} Newly created chip element.
+       */
+      function createDesktopInsightChip(roleMeta, text, lowAvailability) {
+        var chip = document.createElement("span");
+        chip.className =
+          "desktop-insight-chip role-" +
+          roleMeta.classSuffix +
+          (lowAvailability ? " is-low" : "");
+        chip.textContent = text;
+        return chip;
+      }
+
+      /**
+       * Builds an actionable vacancy or registration insight item.
+       * @param {Object} event Schedule event.
+       * @param {string} view Vacancies or registrations view identifier.
+       * @returns {HTMLButtonElement} Newly created insight item.
+       */
+      function createDesktopInsightEventItem(event, view) {
+        var item = document.createElement("button");
+        item.type = "button";
+        item.className =
+          "desktop-insight-item has-activity-ribbon " +
+          getActivityAccentClass(event.activity);
+        item.setAttribute("data-insight-eventid", event.eventId);
+
+        var heading = document.createElement("div");
+        heading.className = "desktop-insight-item-heading";
+
+        var title = document.createElement("span");
+        title.className = "desktop-insight-item-title";
+        title.textContent = event.activity;
+
+        var time = document.createElement("span");
+        time.className = "desktop-insight-item-time";
+        time.textContent = event.endTime
+          ? formatTimeRange(event.startTime, event.endTime)
+          : formatTime(event.startTime);
+
+        heading.appendChild(title);
+        heading.appendChild(time);
+        item.appendChild(heading);
+
+        var metaText = getDesktopInsightEventMeta(event);
+        if (metaText) {
+          var meta = document.createElement("div");
+          meta.className = "desktop-insight-item-meta";
+          meta.textContent = metaText;
+          item.appendChild(meta);
+        }
+
+        var chips = document.createElement("div");
+        chips.className = "desktop-insight-chips";
+
+        if (view === "vacancies") {
+          ROLE_KEYS.forEach(function (roleMeta) {
+            var remaining = getRemainingForRole(event, roleMeta.key);
+            if (remaining <= 0) return;
+            chips.appendChild(
+              createDesktopInsightChip(
+                roleMeta,
+                roleMeta.label + " " + formatRemainingSlots(remaining),
+                remaining === 1,
+              ),
+            );
+          });
+        } else {
+          ROLE_KEYS.forEach(function (roleMeta) {
+            var roleSignups =
+              (event.signupsByRole &&
+                event.signupsByRole[roleMeta.label]) ||
+              [];
+            if (roleSignups.length === 0) return;
+            chips.appendChild(
+              createDesktopInsightChip(
+                roleMeta,
+                roleMeta.label + " " + roleSignups.length + "名",
+                false,
+              ),
+            );
+          });
+        }
+
+        if (chips.firstChild) item.appendChild(chips);
+
+        if (view === "registrations") {
+          var nameLines = [];
+          ROLE_KEYS.forEach(function (roleMeta) {
+            var roleSignups =
+              (event.signupsByRole &&
+                event.signupsByRole[roleMeta.label]) ||
+              [];
+            if (roleSignups.length === 0) return;
+            nameLines.push(
+              roleMeta.label +
+                ": " +
+                roleSignups
+                  .map(function (signup) {
+                    return signup.name;
+                  })
+                  .join(", "),
+            );
+          });
+          if (nameLines.length > 0) {
+            var names = document.createElement("div");
+            names.className = "desktop-insight-names";
+            names.textContent = nameLines.join(" / ");
+            item.appendChild(names);
+          }
+        }
+
+        return item;
+      }
+
+      /**
+       * Appends an empty-state message to an insight content container.
+       * Side effect: adds a child element to content.
+       * @param {HTMLElement} content Insight content container.
+       * @param {string} message Empty-state message.
+       * @returns {void}
+       */
+      function renderDesktopInsightEmpty(content, message) {
+        var empty = document.createElement("div");
+        empty.className = "desktop-insight-empty";
+        empty.textContent = message;
+        content.appendChild(empty);
+      }
+
+      /**
+       * Selects events with vacancies and returns them in time order.
+       * @param {Object[]} events Candidate schedule events.
+       * @returns {Object[]} New sorted array of events with open slots.
+       */
+      function getDesktopVacancyEvents(events) {
+        return (events || [])
+          .filter(function (event) {
+            return getAvailableSlotCount(event) > 0;
+          })
+          .slice()
+          .sort(compareEventsByTime);
+      }
+
+      /**
+       * Validates insight scope against current filter availability.
+       * @param {*} scope Candidate overall or filtered scope.
+       * @param {boolean} filtersActive Whether filtered scope is meaningful.
+       * @returns {string} Canonical insight scope.
+       */
+      function normaliseDesktopInsightScope(scope, filtersActive) {
+        return scope === DESKTOP_INSIGHT_SCOPE_FILTERED && filtersActive
+          ? DESKTOP_INSIGHT_SCOPE_FILTERED
+          : DESKTOP_INSIGHT_SCOPE_OVERALL;
+      }
+
+      /**
+       * Updates scope buttons, counts, visibility, and selected state.
+       * Side effect: mutates the desktop insight scope-control DOM.
+       * @param {number} overallCount Number of items in overall scope.
+       * @param {number} filteredCount Number of items in filtered scope.
+       * @param {boolean} filtersActive Whether filtered scope can be selected.
+       * @returns {void}
+       */
+      function updateDesktopInsightScopeControl(
+        overallCount,
+        filteredCount,
+        filtersActive,
+      ) {
+        var control = document.getElementById(
+          "desktopInsightScopeControl",
+        );
+        var overallButton = document.getElementById(
+          "desktopInsightScopeOverall",
+        );
+        var filteredButton = document.getElementById(
+          "desktopInsightScopeFiltered",
+        );
+        var overallCountNode = document.getElementById(
+          "desktopInsightScopeOverallCount",
+        );
+        var filteredCountNode = document.getElementById(
+          "desktopInsightScopeFilteredCount",
+        );
+
+        if (control) control.hidden = false;
+        if (overallCountNode) overallCountNode.textContent = overallCount + "件";
+        if (filteredCountNode) {
+          filteredCountNode.textContent = filteredCount + "件";
+        }
+        if (filteredButton) filteredButton.hidden = !filtersActive;
+
+        [
+          {
+            button: overallButton,
+            scope: DESKTOP_INSIGHT_SCOPE_OVERALL,
+          },
+          {
+            button: filteredButton,
+            scope: DESKTOP_INSIGHT_SCOPE_FILTERED,
+          },
+        ].forEach(function (item) {
+          if (!item.button) return;
+          var active = item.scope === desktopInsightScope;
+          if (item.button.classList && item.button.classList.toggle) {
+            item.button.classList.toggle("is-active", active);
+          }
+          item.button.setAttribute("aria-pressed", active ? "true" : "false");
+        });
+      }
+
+      /**
+       * Selects an insight scope and rerenders the active panel.
+       * Side effect: updates desktopInsightScope and insight-panel DOM.
+       * @param {*} scope Candidate scope.
+       * @returns {void}
+       */
+      function setDesktopInsightScope(scope) {
+        desktopInsightScope = normaliseDesktopInsightScope(
+          scope,
+          hasActiveScheduleFilters(),
+        );
+        if (activeDesktopInsightView) {
+          renderDesktopInsightPanel(activeDesktopInsightView);
+        }
+      }
+
+      /**
+       * Renders vacancy items for the selected overall or filtered scope.
+       * Side effect: updates scope controls, description, and content children.
+       * @param {HTMLElement} content Insight content container.
+       * @returns {void}
+       */
+      function renderDesktopVacancyInsights(content) {
+        var overallEvents = getDesktopVacancyEvents(
+          (gridData && gridData.events) || [],
+        );
+        var filtersActive = hasActiveScheduleFilters();
+        var filteredEvents = filtersActive
+          ? getDesktopVacancyEvents(getVisibleScheduleEvents())
+          : [];
+        desktopInsightScope = normaliseDesktopInsightScope(
+          desktopInsightScope,
+          filtersActive,
+        );
+        updateDesktopInsightScopeControl(
+          overallEvents.length,
+          filteredEvents.length,
+          filtersActive,
+        );
+
+        var filteredScope =
+          desktopInsightScope === DESKTOP_INSIGHT_SCOPE_FILTERED;
+        var events = filteredScope ? filteredEvents : overallEvents;
+        var description = document.getElementById(
+          "desktopInsightsDescription",
+        );
+        if (description) {
+          description.textContent = filteredScope
+            ? "現在の絞り込みに合う空き枠を時間順に表示しています。選択すると登録画面が開きます。"
+            : "全体の募集から、時間順に募集中の活動を表示しています。選択すると登録画面が開きます。";
+        }
+
+        events.forEach(function (event) {
+          content.appendChild(createDesktopInsightEventItem(event, "vacancies"));
+        });
+        if (events.length === 0) {
+          renderDesktopInsightEmpty(
+            content,
+            filteredScope
+              ? "現在の絞り込みに合う空き枠はありません。"
+              : "現在、空いている募集枠はありません。",
+          );
+        }
+      }
+
+      /**
+       * Selects events with registrations and returns them in time order.
+       * @param {Object[]} events Candidate schedule events.
+       * @returns {Object[]} New sorted array of events with signups.
+       */
+      function getDesktopRegistrationEvents(events) {
+        return (events || [])
+          .filter(function (event) {
+            return event.signups && event.signups.length > 0;
+          })
+          .slice()
+          .sort(compareEventsByTime);
+      }
+
+      /**
+       * Renders registration items for the selected overall or filtered scope.
+       * Side effect: updates scope controls, description, and content children.
+       * @param {HTMLElement} content Insight content container.
+       * @returns {void}
+       */
+      function renderDesktopRegistrationInsights(content) {
+        var overallEvents = getDesktopRegistrationEvents(
+          (gridData && gridData.events) || [],
+        );
+        var filtersActive = hasActiveScheduleFilters();
+        var filteredEvents = filtersActive
+          ? getDesktopRegistrationEvents(getVisibleScheduleEvents())
+          : [];
+        desktopInsightScope = normaliseDesktopInsightScope(
+          desktopInsightScope,
+          filtersActive,
+        );
+        updateDesktopInsightScopeControl(
+          overallEvents.length,
+          filteredEvents.length,
+          filtersActive,
+        );
+
+        var filteredScope =
+          desktopInsightScope === DESKTOP_INSIGHT_SCOPE_FILTERED;
+        var events = filteredScope ? filteredEvents : overallEvents;
+        var description = document.getElementById(
+          "desktopInsightsDescription",
+        );
+        if (description) {
+          description.textContent = filteredScope
+            ? "現在の絞り込みに合う募集枠の登録を、時間順に表示しています。選択すると登録・キャンセル画面が開きます。"
+            : "全体の登録を時間順に表示しています。選択すると登録・キャンセル画面が開きます。";
+        }
+
+        events.forEach(function (event) {
+          content.appendChild(
+            createDesktopInsightEventItem(event, "registrations"),
+          );
+        });
+        if (events.length === 0) {
+          renderDesktopInsightEmpty(
+            content,
+            filteredScope
+              ? "現在の絞り込みに合う募集枠には、登録がありません。"
+              : "現在の登録はありません。",
+          );
+        }
+      }
+
+      /**
+       * Rebuilds the requested desktop insight panel.
+       * Side effect: replaces panel content, labels, and scope metadata.
+       * @param {*} view Candidate insight view.
+       * @returns {void}
+       */
+      function renderDesktopInsightPanel(view) {
+        var activeView = normaliseDesktopInsightView(view);
+        var panel = document.getElementById("desktopInsightsPanel");
+        var title = document.getElementById("desktopInsightsTitle");
+        var description = document.getElementById(
+          "desktopInsightsDescription",
+        );
+        var content = document.getElementById("desktopInsightsContent");
+        var scopeControl = document.getElementById(
+          "desktopInsightScopeControl",
+        );
+        if (!activeView || !panel || !title || !description || !content) return;
+
+        if (scopeControl) {
+          scopeControl.hidden = false;
+          scopeControl.setAttribute(
+            "aria-label",
+            activeView === "vacancies"
+              ? "空き枠の表示範囲"
+              : "登録の表示範囲",
+          );
+        }
+        clearElement(content);
+        content.className =
+          "desktop-insights-content is-" + activeView;
+
+        if (activeView === "vacancies") {
+          title.textContent = "空き枠の一覧";
+          description.textContent =
+            "全体の募集から、時間順に募集中の活動を表示しています。選択すると登録画面が開きます。";
+          renderDesktopVacancyInsights(content);
+        } else {
+          title.textContent = "現在の登録";
+          description.textContent =
+            "全体の登録を時間順に表示しています。選択すると登録・キャンセル画面が開きます。";
+          renderDesktopRegistrationInsights(content);
+        }
+      }
+
+      /**
+       * Closes the insight panel and optionally restores its trigger focus.
+       * Side effect: clears active view, hides the panel, and may move focus.
+       * @param {boolean} restoreFocus Whether to focus the previous view button.
+       * @returns {void}
+       */
+      function closeDesktopInsightsPanel(restoreFocus) {
+        var previousView = activeDesktopInsightView;
+        var panel = document.getElementById("desktopInsightsPanel");
+        activeDesktopInsightView = null;
+        if (panel) panel.hidden = true;
+        updateDesktopInsightButtons();
+
+        if (!restoreFocus || !previousView) return;
+        var stats = document.getElementById("desktopScheduleStats");
+        if (!stats || !stats.children) return;
+        Array.prototype.forEach.call(stats.children, function (button) {
+          if (
+            button.getAttribute("data-desktop-insight") === previousView &&
+            button.focus
+          ) {
+            button.focus();
+          }
+        });
+      }
+
+      /**
+       * Opens, switches, or toggles a desktop insight view.
+       * Side effect: updates insight state, visibility, buttons, and content.
+       * @param {*} view Candidate insight view.
+       * @returns {void}
+       */
+      function setDesktopInsightView(view) {
+        var nextView = normaliseDesktopInsightView(view);
+        var panel = document.getElementById("desktopInsightsPanel");
+        if (!nextView || !panel || isCompactLayout()) {
+          closeDesktopInsightsPanel(false);
+          return;
+        }
+        if (activeDesktopInsightView === nextView && !panel.hidden) {
+          closeDesktopInsightsPanel(false);
+          return;
+        }
+
+        desktopInsightScope = DESKTOP_INSIGHT_SCOPE_OVERALL;
+        activeDesktopInsightView = nextView;
+        panel.hidden = false;
+        updateDesktopInsightButtons();
+        renderDesktopInsightPanel(nextView);
+      }
+
+    </script>

@@ -1,3 +1,14 @@
+## v0.2.8 - 2026-08-08
+
+- Patch
+  - Splits the Apps Script backend into responsibility-focused server files while preserving the existing public entry points and behaviour.
+  - Splits the page structure, styles, and client-side logic into composed HTML partials without changing the rendered application.
+  - Updates the test harnesses to load every backend file and resolve frontend template includes during regression testing.
+  - Updates the English and Japanese customisation, project structure, and testing documentation.
+  - Adds file-level responsibility notes and function-level JSDoc across the production source files.
+  - Adds regression coverage that requires documentation for every production file and named function.
+  - Bumps the app version to 0.2.8.
+
 ## v0.2.7 - 2026-08-02
 
 - Patch

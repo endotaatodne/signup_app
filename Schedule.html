@@ -1,0 +1,284 @@
+    <!--
+      @fileoverview Responsive schedule partial containing event status,
+      summary/insight controls, shared filters, and the agenda render target.
+    -->
+    <!-- Page identity and the server-controlled read-only state. -->
+    <h1 id="pageTitle"></h1>
+    <div
+      id="readOnlyBanner"
+      class="read-only-banner"
+      role="status"
+      aria-live="polite"
+      hidden
+    >
+      現在、このページは閲覧専用です。登録やキャンセルはできません。
+    </div>
+    <!-- Responsive schedule controls shared by compact and desktop layouts. -->
+    <main class="schedule-shell">
+      <div class="schedule-controls">
+        <div
+          id="mobileDisplayModeControl"
+          class="mobile-display-mode-control"
+          aria-label="表示方法"
+        >
+          <button
+            id="mobileDisplayModeTime"
+            class="mobile-display-mode-btn"
+            type="button"
+            data-mobile-display-mode="signup"
+            aria-pressed="false"
+          >
+            さがす
+          </button>
+          <button
+            id="mobileDisplayModeActivity"
+            class="mobile-display-mode-btn"
+            type="button"
+            data-mobile-display-mode="overview"
+            aria-pressed="false"
+          >
+            まとめ
+          </button>
+        </div>
+        <!-- Desktop summary cards and their expandable detail panel. -->
+        <div
+          id="desktopScheduleStats"
+          class="desktop-schedule-stats"
+          aria-label="募集状況（全体）"
+          aria-live="polite"
+        >
+          <button
+            class="desktop-stat"
+            type="button"
+            data-desktop-insight="vacancies"
+            aria-controls="desktopInsightsPanel"
+            aria-expanded="false"
+          >
+            <span class="desktop-stat-scope">全体</span>
+            <strong class="desktop-stat-value" id="desktopAvailableCount">0</strong>
+            <span class="desktop-stat-label">空き枠</span>
+            <span class="desktop-stat-context">
+              <span
+                class="desktop-stat-filtered"
+                id="desktopFilteredAvailableCount"
+                aria-hidden="true"
+              ></span>
+            </span>
+          </button>
+          <button
+            class="desktop-stat"
+            type="button"
+            data-desktop-insight="registrations"
+            aria-controls="desktopInsightsPanel"
+            aria-expanded="false"
+          >
+            <span class="desktop-stat-scope">全体</span>
+            <span class="desktop-stat-value-row">
+              <strong class="desktop-stat-value" id="desktopSignupCount">0名</strong>
+              <span class="desktop-stat-capacity" id="desktopSignupCapacityCount">/ 0枠</span>
+            </span>
+            <span class="desktop-stat-label">現在の登録</span>
+            <span class="desktop-stat-context">
+              <span
+                class="desktop-stat-filtered"
+                id="desktopFilteredSignupCount"
+                aria-hidden="true"
+              ></span>
+            </span>
+          </button>
+        </div>
+        <div
+          id="desktopInsightsPanel"
+          class="desktop-insights-panel"
+          role="region"
+          aria-labelledby="desktopInsightsTitle"
+          hidden
+        >
+          <div class="desktop-insights-header">
+            <div class="desktop-insights-heading">
+              <h2 class="desktop-insights-title" id="desktopInsightsTitle"></h2>
+              <p
+                class="desktop-insights-description"
+                id="desktopInsightsDescription"
+              ></p>
+              <div
+                id="desktopInsightScopeControl"
+                class="desktop-insight-scope-control"
+                role="group"
+                aria-label="詳細の表示範囲"
+                hidden
+              >
+                <button
+                  id="desktopInsightScopeOverall"
+                  class="desktop-insight-scope-button is-active"
+                  type="button"
+                  data-desktop-insight-scope="overall"
+                  aria-pressed="true"
+                >
+                  <span>全体</span>
+                  <span
+                    id="desktopInsightScopeOverallCount"
+                    class="desktop-insight-scope-count"
+                  ></span>
+                </button>
+                <button
+                  id="desktopInsightScopeFiltered"
+                  class="desktop-insight-scope-button"
+                  type="button"
+                  data-desktop-insight-scope="filtered"
+                  aria-pressed="false"
+                  hidden
+                >
+                  <span>現在の絞り込み</span>
+                  <span
+                    id="desktopInsightScopeFilteredCount"
+                    class="desktop-insight-scope-count"
+                  ></span>
+                </button>
+              </div>
+            </div>
+            <button
+              class="desktop-insights-close"
+              id="desktopInsightsClose"
+              type="button"
+              aria-label="詳細を閉じる"
+            >
+              ×
+            </button>
+          </div>
+          <div
+            class="desktop-insights-content"
+            id="desktopInsightsContent"
+          ></div>
+        </div>
+        <!-- Activity, role, keyword, and time filters for the shared agenda. -->
+        <div
+          id="mobileAvailabilityControl"
+          class="mobile-availability-control"
+          aria-label="募集枠の絞り込み"
+        >
+          <div
+            id="desktopFilterSummary"
+            class="desktop-filter-summary"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            aria-hidden="true"
+          ></div>
+          <div class="mobile-filter-row mobile-filter-row-secondary">
+            <div class="mobile-filter-field mobile-activity-filter-field">
+              <span class="mobile-filter-label">募集枠</span>
+              <div class="desktop-choice-popover">
+                <button
+                  id="desktopActivityFilterToggle"
+                  class="desktop-choice-toggle"
+                  type="button"
+                  aria-haspopup="true"
+                  aria-expanded="false"
+                  aria-controls="desktopActivityFilterMenu"
+                >
+                  <span
+                    id="desktopActivityFilterValue"
+                    class="desktop-choice-toggle-label"
+                  ></span>
+                </button>
+                <div
+                  id="desktopActivityFilterMenu"
+                  class="desktop-choice-menu"
+                  role="group"
+                  aria-label="募集枠を選択"
+                  hidden
+                ></div>
+              </div>
+              <div
+                id="mobileActivityFilter"
+                class="mobile-activity-filter-pills"
+                role="group"
+                aria-label="Filter by activity"
+              ></div>
+            </div>
+            <div class="mobile-filter-field mobile-role-filter-field">
+              <span class="mobile-filter-label">ポジション</span>
+              <div class="desktop-choice-popover">
+                <button
+                  id="desktopRoleFilterToggle"
+                  class="desktop-choice-toggle"
+                  type="button"
+                  aria-haspopup="true"
+                  aria-expanded="false"
+                  aria-controls="desktopRoleFilterMenu"
+                >
+                  <span
+                    id="desktopRoleFilterValue"
+                    class="desktop-choice-toggle-label"
+                  ></span>
+                </button>
+                <div
+                  id="desktopRoleFilterMenu"
+                  class="desktop-choice-menu"
+                  role="group"
+                  aria-label="ポジションを選択"
+                  hidden
+                ></div>
+              </div>
+              <div
+                id="mobileRoleAvailabilityFilter"
+                class="mobile-role-filter-pills"
+                role="group"
+                aria-label="Filter by volunteer slot type"
+              ></div>
+            </div>
+            <label
+              class="mobile-filter-field mobile-keyword-filter-field"
+              for="mobileKeywordSearch"
+            >
+              <span class="mobile-filter-label">検索</span>
+              <input
+                id="mobileKeywordSearch"
+                class="mobile-keyword-search"
+                type="search"
+                autocomplete="off"
+                placeholder="名前・募集内容で検索"
+                aria-label="Search volunteer names and signup details"
+              />
+            </label>
+            <div class="mobile-filter-field mobile-time-filter-field">
+              <span class="mobile-filter-label">時間帯で絞り込み</span>
+              <div class="mobile-time-filter-dropdown">
+                <button
+                  id="mobileTimeAvailabilityToggle"
+                  class="mobile-filter-select mobile-time-filter-toggle"
+                  type="button"
+                  aria-expanded="false"
+                  aria-controls="mobileTimeAvailabilityFilter"
+                ></button>
+                <div
+                  id="mobileTimeAvailabilityFilter"
+                  class="mobile-time-filter-menu"
+                  role="group"
+                  aria-label="Filter by time slots"
+                  hidden
+                ></div>
+              </div>
+            </div>
+            <button
+              id="desktopFilterReset"
+              class="desktop-filter-reset"
+              type="button"
+              aria-label="絞り込みを解除"
+              title="絞り込みを解除"
+              disabled
+            >
+              ↺
+            </button>
+            <div
+              id="mobileTimeAvailabilityDetail"
+              class="mobile-time-availability-detail"
+              aria-live="polite"
+            ></div>
+          </div>
+        </div>
+      </div>
+      <!-- Client renderers populate this container with schedule cards. -->
+      <div id="mobileAgenda" class="mobile-agenda"></div>
+    </main>

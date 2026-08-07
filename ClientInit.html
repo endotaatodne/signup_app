@@ -1,0 +1,319 @@
+    <script>
+      /**
+       * @fileoverview Client bootstrap and DOM event wiring. This partial must
+       * load after the schedule and modal markup and after all client helpers.
+       */
+
+      // Modal lifecycle, form submission, and cancellation controls.
+      document
+        .getElementById("modalOverlay")
+        .addEventListener("click", function (e) {
+          if (e.target === this) closeModal();
+        });
+      document.getElementById("closeBtn").addEventListener("click", closeModal);
+      document
+        .getElementById("tabSignup")
+        .addEventListener("click", function () {
+          switchTab("signup");
+        });
+      document
+        .getElementById("tabCancel")
+        .addEventListener("click", function () {
+          switchTab("cancel");
+        });
+      document
+        .getElementById("cancelSubmitBtn")
+        .addEventListener("click", function (e) {
+          e.stopPropagation();
+          findAndConfirmCancel();
+        });
+      document
+        .getElementById("cancelSignupList")
+        .addEventListener("click", function (e) {
+          var option =
+            e.target && e.target.closest
+              ? e.target.closest("[data-cancel-signup]")
+              : null;
+          var list = document.getElementById("cancelSignupList");
+          if (!option || !list.contains(option) || option.disabled) return;
+          selectCancelSignup(option.cancelSignupData, option);
+        });
+      document
+        .getElementById("confirmYes")
+        .addEventListener("click", function (e) {
+          e.stopPropagation();
+          confirmCancel();
+        });
+      document
+        .getElementById("confirmNo")
+        .addEventListener("click", function () {
+          document.getElementById("confirmBox").style.display = "none";
+          document.getElementById("cancelSubmitBtn").style.display = "block";
+        });
+      document
+        .getElementById("submitBtn")
+        .addEventListener("click", submitSignup);
+      document
+        .getElementById("inputName")
+        .addEventListener("keydown", function (e) {
+          if (e.key === "Enter") submitSignup();
+        });
+      document
+        .getElementById("inputClass")
+        .addEventListener("keydown", function (e) {
+          if (e.key === "Enter") submitSignup();
+        });
+
+      // Desktop schedule summary and insight-panel interactions.
+      document
+        .getElementById("desktopScheduleStats")
+        .addEventListener("click", function (e) {
+          var button =
+            e.target && e.target.closest
+              ? e.target.closest("[data-desktop-insight]")
+              : null;
+          if (!button || !this.contains(button)) return;
+          if (e.stopPropagation) e.stopPropagation();
+          setDesktopInsightView(button.getAttribute("data-desktop-insight"));
+        });
+      document
+        .getElementById("desktopInsightsPanel")
+        .addEventListener("click", function (e) {
+          var closeButton =
+            e.target && e.target.closest
+              ? e.target.closest("#desktopInsightsClose")
+              : null;
+          if (closeButton) {
+            if (e.stopPropagation) e.stopPropagation();
+            closeDesktopInsightsPanel(true);
+            return;
+          }
+
+          var scopeButton =
+            e.target && e.target.closest
+              ? e.target.closest("[data-desktop-insight-scope]")
+              : null;
+          if (scopeButton) {
+            if (e.stopPropagation) e.stopPropagation();
+            setDesktopInsightScope(
+              scopeButton.getAttribute("data-desktop-insight-scope"),
+            );
+            return;
+          }
+
+          var eventButton =
+            e.target && e.target.closest
+              ? e.target.closest("[data-insight-eventid]")
+              : null;
+          if (eventButton) {
+            if (e.stopPropagation) e.stopPropagation();
+            var eventId = eventButton.getAttribute("data-insight-eventid");
+            closeDesktopInsightsPanel(false);
+            openModal(eventId);
+          }
+        });
+      document.addEventListener("click", function (e) {
+        if (!activeDesktopInsightView) return;
+        var target = e.target;
+        var stats = document.getElementById("desktopScheduleStats");
+        var panel = document.getElementById("desktopInsightsPanel");
+        var insideStats = stats && target && stats.contains(target);
+        var insidePanel = panel && target && panel.contains(target);
+        if (!insideStats && !insidePanel) {
+          closeDesktopInsightsPanel(false);
+        }
+      });
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape" && activeDesktopInsightView) {
+          closeDesktopInsightsPanel(true);
+        }
+      });
+
+      // Schedule-card navigation and responsive display-mode controls.
+      document
+        .getElementById("mobileAgenda")
+        .addEventListener("click", function (e) {
+          var slot = e.target.closest("[data-eventid]");
+          if (slot) {
+            openModal(slot.getAttribute("data-eventid"));
+          }
+        });
+      document
+        .getElementById("mobileDisplayModeControl")
+        .addEventListener("click", function (e) {
+          var btn =
+            e.target && e.target.closest
+              ? e.target.closest("[data-mobile-display-mode]")
+              : null;
+          if (!btn) return;
+          setMobileDisplayMode(btn.getAttribute("data-mobile-display-mode"));
+        });
+      // Time, activity, role, and keyword filter interactions.
+      document
+        .getElementById("mobileTimeAvailabilityToggle")
+        .addEventListener("click", function (e) {
+          if (e.stopPropagation) e.stopPropagation();
+          setMobileTimeFilterDropdownOpen(!mobileTimeFilterDropdownOpen);
+        });
+      document
+        .getElementById("mobileTimeAvailabilityFilter")
+        .addEventListener("click", function (e) {
+          if (e.stopPropagation) e.stopPropagation();
+          var btn =
+            e.target && e.target.closest
+              ? e.target.closest("[data-mobile-time-filter]")
+              : null;
+          if (!btn || btn.disabled) return;
+          setMobileAvailableTimeFilter(btn.getAttribute("data-mobile-time-filter"));
+        });
+      document.addEventListener("click", function (e) {
+        if (!mobileTimeFilterDropdownOpen) return;
+        var target = e.target;
+        var timeToggle = document.getElementById("mobileTimeAvailabilityToggle");
+        var timeFilter = document.getElementById("mobileTimeAvailabilityFilter");
+        var insideToggle =
+          timeToggle &&
+          target &&
+          ((timeToggle.contains && timeToggle.contains(target)) ||
+            (target.closest &&
+              target.closest("#mobileTimeAvailabilityToggle")));
+        var insideFilter =
+          timeFilter &&
+          target &&
+          ((timeFilter.contains && timeFilter.contains(target)) ||
+            (target.closest &&
+              target.closest("#mobileTimeAvailabilityFilter")));
+        if (!insideToggle && !insideFilter) {
+          setMobileTimeFilterDropdownOpen(false);
+        }
+      });
+      document
+        .getElementById("mobileActivityFilter")
+        .addEventListener("click", function (e) {
+          var btn =
+            e.target && e.target.closest
+              ? e.target.closest("[data-mobile-activity-filter]")
+              : null;
+          if (!btn) return;
+          setMobileActivityFilter(btn.getAttribute("data-mobile-activity-filter"));
+        });
+      document
+        .getElementById("mobileRoleAvailabilityFilter")
+        .addEventListener("click", function (e) {
+          var btn =
+            e.target && e.target.closest
+              ? e.target.closest("[data-mobile-role-filter]")
+              : null;
+          if (!btn) return;
+          setMobileRoleFilter(btn.getAttribute("data-mobile-role-filter"));
+        });
+      document
+        .getElementById("mobileKeywordSearch")
+        .addEventListener("input", function (e) {
+          setMobileKeywordSearchQuery(e.target.value);
+        });
+      document
+        .getElementById("desktopActivityFilterToggle")
+        .addEventListener("click", function () {
+          setDesktopFilterPopoverOpen(
+            desktopFilterPopoverOpen === "activity" ? "" : "activity",
+          );
+        });
+      document
+        .getElementById("desktopActivityFilterMenu")
+        .addEventListener("click", function (e) {
+          if (e.stopPropagation) e.stopPropagation();
+          var btn =
+            e.target && e.target.closest
+              ? e.target.closest("[data-desktop-activity-filter]")
+              : null;
+          if (!btn) return;
+          var activity = btn.getAttribute("data-desktop-activity-filter");
+          setMobileActivityFilter(activity);
+          focusDesktopChoiceOption(
+            getDesktopActivityFilterMenu(),
+            "data-desktop-activity-filter",
+            activity,
+          );
+        });
+      document
+        .getElementById("desktopRoleFilterToggle")
+        .addEventListener("click", function () {
+          setDesktopFilterPopoverOpen(
+            desktopFilterPopoverOpen === "role" ? "" : "role",
+          );
+        });
+      document
+        .getElementById("desktopRoleFilterMenu")
+        .addEventListener("click", function (e) {
+          if (e.stopPropagation) e.stopPropagation();
+          var btn =
+            e.target && e.target.closest
+              ? e.target.closest("[data-desktop-role-filter]")
+              : null;
+          if (!btn) return;
+          var roleKey = btn.getAttribute("data-desktop-role-filter");
+          setMobileRoleFilter(roleKey);
+          focusDesktopChoiceOption(
+            getDesktopRoleFilterMenu(),
+            "data-desktop-role-filter",
+            roleKey,
+          );
+        });
+      document
+        .getElementById("desktopFilterReset")
+        .addEventListener("click", resetScheduleFilters);
+      document.addEventListener("click", function (e) {
+        if (!desktopFilterPopoverOpen) return;
+        var target = e.target;
+        var toggle =
+          desktopFilterPopoverOpen === "activity"
+            ? getDesktopActivityFilterToggle()
+            : getDesktopRoleFilterToggle();
+        var menu =
+          desktopFilterPopoverOpen === "activity"
+            ? getDesktopActivityFilterMenu()
+            : getDesktopRoleFilterMenu();
+        var insideToggle = toggle && target && toggle.contains(target);
+        var insideMenu = menu && target && menu.contains(target);
+        if (!insideToggle && !insideMenu) {
+          setDesktopFilterPopoverOpen("");
+        }
+      });
+      document.addEventListener("keydown", function (e) {
+        if (e.key !== "Escape" || !desktopFilterPopoverOpen) return;
+        var toggle =
+          desktopFilterPopoverOpen === "activity"
+            ? getDesktopActivityFilterToggle()
+            : getDesktopRoleFilterToggle();
+        setDesktopFilterPopoverOpen("");
+        if (toggle && toggle.focus) toggle.focus();
+      });
+
+      // Initial page state and the canonical URL used after successful writes.
+      document.getElementById("pageTitle").textContent = PAGE_TITLE;
+      setEventStatus(eventStatus);
+      updateMobileDisplayModeControl();
+      updateMobileAvailabilityControl();
+
+      google.script.run
+        .withSuccessHandler(function (url) {
+          EXEC_URL =
+            url +
+            (url.indexOf("?") === -1 ? "?" : "&") +
+            "event=" +
+            encodeURIComponent(alias);
+        })
+        .getDeployedUrl();
+
+      // Initial data indexing/rendering and debounced responsive updates.
+      buildGridIndexes();
+      renderResponsiveView();
+      buildMobileAgenda();
+      window.addEventListener("resize", function () {
+        window.clearTimeout(resizeTimer);
+        resizeTimer = window.setTimeout(function () {
+          renderResponsiveView();
+        }, 120);
+      });
+    </script>

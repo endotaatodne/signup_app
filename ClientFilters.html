@@ -1,0 +1,1024 @@
+    <script>
+      /**
+       * @fileoverview Schedule capacity calculations, filter state, filter
+       * matching, and responsive filter-control rendering. Loaded after
+       * ClientCore.html and before ClientInit.html. It consumes core state and
+       * DOM helpers, plus formatting and schedule helpers that are available
+       * before user-driven rendering begins.
+       */
+      /**
+       * Reports whether at least one configured role has remaining capacity.
+       * @param {Object<string, {max: number, filled: number}>} slots Slots by role key.
+       * @returns {boolean} True when any role is not full.
+       */
+      function hasAnyAvailable(slots) {
+        return ROLE_KEYS.some(function (r) {
+          return slots[r.key].max > 0 && slots[r.key].filled < slots[r.key].max;
+        });
+      }
+
+      /**
+       * Reads one role's slot record from an event.
+       * @param {Object|null} event Schedule event.
+       * @param {string} roleKey Canonical client role key.
+       * @returns {Object|null} Slot record, or null when unavailable.
+       */
+      function getRoleSlot(event, roleKey) {
+        return event && event.slots ? event.slots[roleKey] || null : null;
+      }
+
+      /**
+       * Calculates remaining capacity for one event role without going below zero.
+       * @param {Object|null} event Schedule event.
+       * @param {string} roleKey Canonical client role key.
+       * @returns {number} Number of unfilled slots.
+       */
+      function getRemainingForRole(event, roleKey) {
+        var slot = getRoleSlot(event, roleKey) || {};
+        var max = Number(slot.max) || 0;
+        var filled = Number(slot.filled) || 0;
+        return Math.max(0, max - filled);
+      }
+
+      /**
+       * Reports whether an event offers any capacity for a role.
+       * @param {Object|null} event Schedule event.
+       * @param {string} roleKey Canonical client role key.
+       * @returns {boolean} True when the configured maximum is positive.
+       */
+      function eventHasRoleSlot(event, roleKey) {
+        var slot = getRoleSlot(event, roleKey) || {};
+        return (Number(slot.max) || 0) > 0;
+      }
+
+      /**
+       * Reports whether an event offers a role with remaining capacity.
+       * @param {Object|null} event Schedule event.
+       * @param {string} roleKey Canonical client role key.
+       * @returns {boolean} True when the role exists and is not full.
+       */
+      function eventHasAvailableRoleSlot(event, roleKey) {
+        return eventHasRoleSlot(event, roleKey) && getRemainingForRole(event, roleKey) > 0;
+      }
+
+      /**
+       * Totals available slots for a selected role or for every role.
+       * @param {Object|null} event Schedule event.
+       * @param {string} roleKey Role key, or the all-roles sentinel.
+       * @returns {number} Available slot count.
+       */
+      function getAvailableSlotCount(event, roleKey) {
+        if (!event || !event.slots) return 0;
+        if (roleKey && roleKey !== MOBILE_ROLE_FILTER_ALL) {
+          return getRemainingForRole(event, roleKey);
+        }
+        return ROLE_KEYS.reduce(function (total, r) {
+          return total + getRemainingForRole(event, r.key);
+        }, 0);
+      }
+
+      /**
+       * Totals available slots across a collection of events.
+       * @param {Object[]} events Schedule events.
+       * @param {string} roleKey Role key, or the all-roles sentinel.
+       * @returns {number} Combined available slot count.
+       */
+      function getAvailableSlotCountForEvents(events, roleKey) {
+        return (events || []).reduce(function (total, event) {
+          return total + getAvailableSlotCount(event, roleKey);
+        }, 0);
+      }
+
+      /**
+       * Counts events that are full for the selected role scope.
+       * @param {Object[]} events Schedule events.
+       * @param {string} roleKey Role key, or the all-roles sentinel.
+       * @returns {number} Number of full matching events.
+       */
+      function getFullEventCount(events, roleKey) {
+        return (events || []).filter(function (event) {
+          if (roleKey && roleKey !== MOBILE_ROLE_FILTER_ALL) {
+            return eventHasRoleSlot(event, roleKey) && !eventHasAvailableRoleSlot(event, roleKey);
+          }
+          return !hasAnyAvailable(event.slots || {});
+        }).length;
+      }
+
+      /**
+       * Restricts a candidate role filter to known client role keys.
+       * @param {*} value Candidate role filter.
+       * @returns {string} Canonical role key or the all-roles sentinel.
+       */
+      function normaliseMobileRoleFilter(value) {
+        if (!value || value === MOBILE_ROLE_FILTER_ALL) {
+          return MOBILE_ROLE_FILTER_ALL;
+        }
+        var requested = String(value);
+        return ROLE_KEYS.some(function (r) {
+          return r.key === requested;
+        })
+          ? requested
+          : MOBILE_ROLE_FILTER_ALL;
+      }
+
+      /**
+       * Returns and stores the canonical current role filter.
+       * Side effect: normalises mobileRoleAvailabilityFilter in place.
+       * @returns {string} Canonical role filter.
+       */
+      function getMobileRoleFilter() {
+        mobileRoleAvailabilityFilter = normaliseMobileRoleFilter(
+          mobileRoleAvailabilityFilter,
+        );
+        return mobileRoleAvailabilityFilter;
+      }
+
+      /**
+       * Restricts a candidate activity filter to activities in the grid data.
+       * @param {*} value Candidate activity filter.
+       * @returns {string} Known activity or the all-activities sentinel.
+       */
+      function normaliseMobileActivityFilter(value) {
+        if (!value || value === MOBILE_ACTIVITY_FILTER_ALL) {
+          return MOBILE_ACTIVITY_FILTER_ALL;
+        }
+        var requested = String(value);
+        var activities = (gridData && gridData.activities) || [];
+        var hasActivity = activities.indexOf(requested) !== -1;
+        if (!hasActivity && gridData && gridData.events) {
+          hasActivity = gridData.events.some(function (event) {
+            return event.activity === requested;
+          });
+        }
+        return hasActivity ? requested : MOBILE_ACTIVITY_FILTER_ALL;
+      }
+
+      /**
+       * Returns and stores the canonical current activity filter.
+       * Side effect: normalises mobileActivityFilter in place.
+       * @returns {string} Canonical activity filter.
+       */
+      function getMobileActivityFilter() {
+        mobileActivityFilter = normaliseMobileActivityFilter(
+          mobileActivityFilter,
+        );
+        return mobileActivityFilter;
+      }
+
+      /**
+       * Converts keyword input to the shared comparison form.
+       * Depends on normaliseComparable from ClientFormatting.html.
+       * @param {*} value Candidate keyword input.
+       * @returns {string} Normalised comparison query.
+       */
+      function normaliseMobileKeywordSearchQuery(value) {
+        return normaliseComparable(String(value || ""));
+      }
+
+      /**
+       * Returns the current keyword query in comparison form.
+       * @returns {string} Normalised keyword query.
+       */
+      function getMobileKeywordSearchQuery() {
+        return normaliseMobileKeywordSearchQuery(mobileKeywordSearchQuery);
+      }
+
+      /**
+       * Provides the legacy volunteer-name query alias.
+       * @returns {string} The current normalised keyword query.
+       */
+      function getMobileVolunteerNameQuery() {
+        return getMobileKeywordSearchQuery();
+      }
+
+      /**
+       * Selects a role filter, revalidates times, and rerenders controls and cards.
+       * Side effect: updates global filter state and schedule DOM.
+       * @param {*} roleKey Candidate role key.
+       * @returns {void}
+       */
+      function setMobileRoleFilter(roleKey) {
+        mobileRoleAvailabilityFilter = normaliseMobileRoleFilter(roleKey);
+        mobileAvailableTimeFilter = normaliseMobileAvailableTimeFilter(
+          mobileAvailableTimeFilter,
+        );
+        updateMobileAvailabilityControl();
+        buildMobileAgenda();
+      }
+
+      /**
+       * Selects an activity filter, revalidates times, and rerenders the view.
+       * Side effect: updates global filter state and schedule DOM.
+       * @param {*} activity Candidate activity name.
+       * @returns {void}
+       */
+      function setMobileActivityFilter(activity) {
+        mobileActivityFilter = normaliseMobileActivityFilter(activity);
+        mobileAvailableTimeFilter = normaliseMobileAvailableTimeFilter(
+          mobileAvailableTimeFilter,
+        );
+        updateMobileAvailabilityControl();
+        buildMobileAgenda();
+      }
+
+      /**
+       * Stores a keyword query, revalidates times, and rerenders the view.
+       * Side effect: updates global filter state and schedule DOM.
+       * @param {*} value Raw keyword input.
+       * @returns {void}
+       */
+      function setMobileKeywordSearchQuery(value) {
+        mobileKeywordSearchQuery = String(value || "");
+        mobileAvailableTimeFilter = normaliseMobileAvailableTimeFilter(
+          mobileAvailableTimeFilter,
+        );
+        updateMobileAvailabilityControl();
+        buildMobileAgenda();
+      }
+
+      /**
+       * Restores every schedule filter and popover to its default state.
+       * Side effect: resets global filter state and rerenders controls and cards.
+       * @returns {void}
+       */
+      function resetScheduleFilters() {
+        mobileActivityFilter = MOBILE_ACTIVITY_FILTER_ALL;
+        mobileRoleAvailabilityFilter = MOBILE_ROLE_FILTER_ALL;
+        mobileAvailableTimeFilter = [];
+        mobileKeywordSearchQuery = "";
+        mobileTimeFilterDropdownOpen = false;
+        desktopFilterPopoverOpen = "";
+        updateMobileAvailabilityControl();
+        buildMobileAgenda();
+      }
+
+      /**
+       * Provides the legacy setter alias for keyword search.
+       * @param {*} value Raw keyword input.
+       * @returns {void}
+       */
+      function setMobileVolunteerNameQuery(value) {
+        setMobileKeywordSearchQuery(value);
+      }
+
+      /**
+       * Tests whether an event is included by a role filter.
+       * @param {Object} event Schedule event.
+       * @param {string} roleKey Role key, or the all-roles sentinel.
+       * @returns {boolean} True when the event matches.
+       */
+      function eventMatchesRoleFilter(event, roleKey) {
+        if (!roleKey || roleKey === MOBILE_ROLE_FILTER_ALL) return true;
+        return eventHasRoleSlot(event, roleKey);
+      }
+
+      /**
+       * Tests whether an event is included by an activity filter.
+       * @param {Object} event Schedule event.
+       * @param {string} activity Activity name, or the all-activities sentinel.
+       * @returns {boolean} True when the event matches.
+       */
+      function eventMatchesActivityFilter(event, activity) {
+        if (!activity || activity === MOBILE_ACTIVITY_FILTER_ALL) return true;
+        return event.activity === activity;
+      }
+
+      /**
+       * Tests whether an event starts in the selected time scope.
+       * @param {Object} event Schedule event.
+       * @param {string|string[]} time Selected time, selected times, or all-times sentinel.
+       * @returns {boolean} True when the event matches.
+       */
+      function eventMatchesTimeFilter(event, time) {
+        if (Array.isArray(time)) {
+          if (time.length === 0) return true;
+          return time.indexOf(String(event.startTime || "")) !== -1;
+        }
+        if (!time || time === MOBILE_TIME_FILTER_ALL) return true;
+        return String(event.startTime || "") === String(time);
+      }
+
+      /**
+       * Searches event text and volunteer names for a normalised query.
+       * @param {Object} event Schedule event.
+       * @param {string} query Normalised comparison query.
+       * @returns {boolean} True when any searchable field contains the query.
+       */
+      function eventMatchesKeywordSearch(event, query) {
+        if (!query) return true;
+        var eventFields = [
+          event.activity,
+          event.subtitle,
+          event.description,
+        ];
+        var matchesEventText = eventFields.some(function (value) {
+          return normaliseComparable(value || "").indexOf(query) !== -1;
+        });
+        if (matchesEventText) return true;
+
+        return (event.signups || []).some(function (signup) {
+          return normaliseComparable(signup.name || "").indexOf(query) !== -1;
+        });
+      }
+
+      /**
+       * Applies role, activity, and keyword filters before time filtering.
+       * @returns {Object[]} Matching schedule events.
+       */
+      function getMobileBaseFilteredEvents() {
+        var roleKey = getMobileRoleFilter();
+        var activity = getMobileActivityFilter();
+        var keywordQuery = getMobileKeywordSearchQuery();
+        return ((gridData && gridData.events) || []).filter(function (event) {
+          return (
+            eventMatchesRoleFilter(event, roleKey) &&
+            eventMatchesActivityFilter(event, activity) &&
+            eventMatchesKeywordSearch(event, keywordQuery)
+          );
+        });
+      }
+
+      /**
+       * Gets events used to determine which role options remain meaningful.
+       * Applies activity, time, and keyword filters but not the role filter.
+       * @returns {Object[]} Events relevant to role-option availability.
+       */
+      function getMobileRoleFilterOptionEvents() {
+        var activity = getMobileActivityFilter();
+        var times = getMobileAvailableTimeFilters();
+        var keywordQuery = getMobileKeywordSearchQuery();
+        return ((gridData && gridData.events) || []).filter(function (event) {
+          return (
+            eventMatchesActivityFilter(event, activity) &&
+            eventMatchesTimeFilter(event, times) &&
+            eventMatchesKeywordSearch(event, keywordQuery)
+          );
+        });
+      }
+
+      /**
+       * Finds role filters with remaining capacity in the current non-role scope.
+       * @returns {Object[]} Available ROLE_KEYS metadata records.
+       */
+      function getMobileAvailableRoleOptions() {
+        var events = getMobileRoleFilterOptionEvents();
+        return ROLE_KEYS.filter(function (r) {
+          return getAvailableSlotCountForEvents(events, r.key) > 0;
+        });
+      }
+
+      /**
+       * Builds positive remaining-capacity summaries by role.
+       * @param {Object[]} events Schedule events to total.
+       * @param {string} roleKey Role key, or the all-roles sentinel.
+       * @returns {Array<{key: string, label: string, remaining: number}>} Role summaries.
+       */
+      function getAvailableRoleSummariesForEvents(events, roleKey) {
+        return ROLE_KEYS.filter(function (r) {
+          return !roleKey || roleKey === MOBILE_ROLE_FILTER_ALL || r.key === roleKey;
+        })
+          .map(function (r) {
+            return {
+              key: r.key,
+              label: r.label,
+              remaining: getAvailableSlotCountForEvents(events, r.key),
+            };
+          })
+          .filter(function (summary) {
+            return summary.remaining > 0;
+          });
+      }
+
+      /**
+       * Formats role-capacity summaries for compact display.
+       * @param {Array<{label: string, remaining: number}>} summaries Role summaries.
+       * @returns {string} Japanese availability text.
+       */
+      function formatRoleAvailabilitySummary(summaries) {
+        if (!summaries || summaries.length === 0) {
+          return "空きなし";
+        }
+        return summaries
+          .map(function (summary) {
+            return summary.label + " " + formatRemainingSlots(summary.remaining);
+          })
+          .join(" / ");
+      }
+
+      /**
+       * Builds ordered time choices and their role/capacity summaries.
+       * @returns {Array<Object>} Available-time option records.
+       */
+      function getMobileAvailableTimeOptions() {
+        var events = getMobileBaseFilteredEvents();
+        var roleKey = getMobileRoleFilter();
+        var eventGroups = Object.create(null);
+        events.forEach(function (event) {
+          var time = String(event.startTime || "");
+          if (!time) return;
+          if (!eventGroups[time]) eventGroups[time] = [];
+          eventGroups[time].push(event);
+        });
+
+        var orderedTimes = (gridData && gridData.times ? gridData.times : [])
+          .slice()
+          .filter(function (time, index, times) {
+            return times.indexOf(time) === index;
+          });
+        Object.keys(eventGroups)
+          .sort()
+          .forEach(function (time) {
+            if (orderedTimes.indexOf(time) === -1) orderedTimes.push(time);
+          });
+
+        return orderedTimes
+          .filter(function (time) {
+            return (eventGroups[String(time)] || []).length > 0;
+          })
+          .map(function (time) {
+            var matchingEvents = eventGroups[String(time)] || [];
+            var roleSummaries = getAvailableRoleSummariesForEvents(
+              matchingEvents,
+              roleKey,
+            );
+            return {
+              time: time,
+              events: matchingEvents,
+              availableSlots: getAvailableSlotCountForEvents(
+                matchingEvents,
+                roleKey,
+              ),
+              fullEvents: getFullEventCount(matchingEvents, roleKey),
+              roleSummaries: roleSummaries,
+            };
+          });
+      }
+
+      /**
+       * Formats a time option using the shared schedule-heading rules.
+       * @param {Object} option Available-time option.
+       * @returns {string} Display label for the option.
+       */
+      function getMobileTimeOptionLabel(option) {
+        var events = option.events || [];
+        return getMobileTimeHeadingText(option.time, events);
+      }
+
+      /**
+       * Describes the current time selection for the dropdown toggle.
+       * @param {string[]} selectedTimes Canonical selected start times.
+       * @param {Object[]} options Current available-time options.
+       * @returns {string} Japanese selection summary.
+       */
+      function getMobileSelectedTimeLabel(selectedTimes, options) {
+        if (!options || options.length === 0) return "時間帯なし";
+        if (!selectedTimes || selectedTimes.length === 0) {
+          return "すべての時間帯";
+        }
+        if (selectedTimes.length === 1) {
+          var selectedOption = options.find(function (option) {
+            return String(option.time) === selectedTimes[0];
+          });
+          return selectedOption
+            ? getMobileTimeOptionLabel(selectedOption)
+            : "すべての時間帯";
+        }
+        return selectedTimes.length + "つの時間帯を選択中";
+      }
+
+      /**
+       * Opens or closes the time menu and refreshes filter controls.
+       * Side effect: updates global dropdown state and filter-control DOM.
+       * @param {*} open Truthy to open the dropdown.
+       * @returns {void}
+       */
+      function setMobileTimeFilterDropdownOpen(open) {
+        mobileTimeFilterDropdownOpen = !!open;
+        updateMobileAvailabilityControl();
+      }
+
+      /**
+       * Deduplicates selected times and removes choices no longer selectable.
+       * @param {*} value One time, an array of times, or the all-times sentinel.
+       * @returns {string[]} Canonical selected start times.
+       */
+      function normaliseMobileAvailableTimeFilter(value) {
+        var requestedValues = [];
+        if (Array.isArray(value)) {
+          requestedValues = value;
+        } else if (value && value !== MOBILE_TIME_FILTER_ALL) {
+          requestedValues = [value];
+        }
+        var selectableTimes = getMobileAvailableTimeOptions().map(
+          function (option) {
+            return String(option.time);
+          },
+        );
+        var selected = [];
+        requestedValues.forEach(function (item) {
+          var requested = String(item);
+          if (
+            selectableTimes.indexOf(requested) !== -1 &&
+            selected.indexOf(requested) === -1
+          ) {
+            selected.push(requested);
+          }
+        });
+        return selected;
+      }
+
+      /**
+       * Returns a copy of the canonical selected-time list.
+       * Side effect: normalises mobileAvailableTimeFilter in place.
+       * @returns {string[]} Selected start times.
+       */
+      function getMobileAvailableTimeFilters() {
+        mobileAvailableTimeFilter = normaliseMobileAvailableTimeFilter(
+          mobileAvailableTimeFilter,
+        );
+        return mobileAvailableTimeFilter.slice();
+      }
+
+      /**
+       * Provides the compatibility alias for the selected-time list.
+       * @returns {string[]} Selected start times.
+       */
+      function getMobileAvailableTimeFilter() {
+        return getMobileAvailableTimeFilters();
+      }
+
+      /**
+       * Replaces or toggles selected times and rerenders the schedule.
+       * Side effect: updates global time-filter state and schedule DOM.
+       * @param {string|string[]} time Time selection or all-times sentinel.
+       * @returns {void}
+       */
+      function setMobileAvailableTimeFilter(time) {
+        if (Array.isArray(time)) {
+          mobileAvailableTimeFilter = normaliseMobileAvailableTimeFilter(time);
+        } else {
+          var requested = String(time || "");
+          if (!requested || requested === MOBILE_TIME_FILTER_ALL) {
+            mobileAvailableTimeFilter = [];
+          } else {
+            var selectedTimes = getMobileAvailableTimeFilters();
+            var selectedIndex = selectedTimes.indexOf(requested);
+            if (selectedIndex === -1) {
+              selectedTimes.push(requested);
+            } else {
+              selectedTimes.splice(selectedIndex, 1);
+            }
+            mobileAvailableTimeFilter =
+              normaliseMobileAvailableTimeFilter(selectedTimes);
+          }
+        }
+        updateMobileAvailabilityControl();
+        buildMobileAgenda();
+      }
+
+      /**
+       * Applies every active schedule filter, including selected times.
+       * @returns {Object[]} Fully filtered schedule events.
+       */
+      function getMobileFilteredEvents() {
+        var events = getMobileBaseFilteredEvents();
+        var selectedTimes = getMobileAvailableTimeFilters();
+        if (selectedTimes.length === 0) return events;
+        return events.filter(function (event) {
+          return selectedTimes.indexOf(String(event.startTime || "")) !== -1;
+        });
+      }
+
+      /**
+       * Collects unique event-field values using a preferred order first.
+       * @param {Object[]} events Schedule events.
+       * @param {string} key Event property to collect.
+       * @param {Array<*>} preferredOrder Preferred values in display order.
+       * @returns {Array<*>} Unique values represented by the events.
+       */
+      function getOrderedValuesForEvents(events, key, preferredOrder) {
+        var values = [];
+        var seen = Object.create(null);
+        (preferredOrder || []).forEach(function (value) {
+          var hasMatchingEvent = events.some(function (event) {
+            return event[key] === value;
+          });
+          if (hasMatchingEvent && !seen[value]) {
+            seen[value] = true;
+            values.push(value);
+          }
+        });
+        events.forEach(function (event) {
+          var value = event[key];
+          if (value && !seen[value]) {
+            seen[value] = true;
+            values.push(value);
+          }
+        });
+        return values;
+      }
+
+      /**
+       * Gets unique filtered start times in configured display order.
+       * @param {Object[]} events Filtered schedule events.
+       * @returns {Array<*>} Ordered start-time values.
+       */
+      function getMobileFilteredTimes(events) {
+        return getOrderedValuesForEvents(
+          events,
+          "startTime",
+          (gridData && gridData.times) || [],
+        );
+      }
+
+      /**
+       * Gets unique filtered activities in configured display order.
+       * @param {Object[]} events Filtered schedule events.
+       * @returns {Array<*>} Ordered activity values.
+       */
+      function getMobileFilteredActivities(events) {
+        return getOrderedValuesForEvents(
+          events,
+          "activity",
+          (gridData && gridData.activities) || [],
+        );
+      }
+
+      /**
+       * Selects the open desktop choice popover and closes the time dropdown.
+       * Side effect: updates global popover state and filter-control DOM.
+       * @param {string} filterName Activity, role, or an empty/unknown value.
+       * @returns {void}
+       */
+      function setDesktopFilterPopoverOpen(filterName) {
+        desktopFilterPopoverOpen =
+          filterName === "activity" || filterName === "role" ? filterName : "";
+        if (desktopFilterPopoverOpen) {
+          mobileTimeFilterDropdownOpen = false;
+        }
+        updateMobileAvailabilityControl();
+      }
+
+      /**
+       * Renders one desktop choice filter's toggle state and menu options.
+       * Side effect: replaces menu children and updates toggle attributes.
+       * @param {HTMLButtonElement|null} toggle Popover toggle button.
+       * @param {HTMLElement|null} valueLabel Current-value label.
+       * @param {HTMLElement|null} menu Popover menu container.
+       * @param {Array<Object>} options Choice descriptors.
+       * @param {string} selectedValue Currently selected value.
+       * @param {string} filterName Activity or role.
+       * @returns {void}
+       */
+      function updateDesktopChoiceFilter(
+        toggle,
+        valueLabel,
+        menu,
+        options,
+        selectedValue,
+        filterName,
+      ) {
+        if (!toggle || !valueLabel || !menu) return;
+        var selectedOption =
+          options.find(function (item) {
+            return item.value === selectedValue;
+          }) || options[0];
+        var open = desktopFilterPopoverOpen === filterName;
+        toggle.className =
+          "desktop-choice-toggle" +
+          (open ? " is-open" : "") +
+          (selectedValue !== options[0].value ? " has-selection" : "");
+        valueLabel.textContent = selectedOption ? selectedOption.label : "";
+        toggle.title = selectedOption ? selectedOption.label : "";
+        toggle.setAttribute("aria-expanded", open ? "true" : "false");
+        toggle.setAttribute(
+          "aria-label",
+          (filterName === "activity" ? "募集枠" : "ポジション") +
+            "で絞り込み。現在: " +
+            (selectedOption ? selectedOption.label : ""),
+        );
+        menu.hidden = !open;
+        while (menu.firstChild) {
+          menu.removeChild(menu.firstChild);
+        }
+        options.forEach(function (item) {
+          var active = item.value === selectedValue;
+          var option = document.createElement("button");
+          option.type = "button";
+          option.className =
+            "desktop-choice-option " +
+            (filterName === "activity"
+              ? "mobile-activity-filter-pill"
+              : "mobile-role-filter-pill") +
+            (item.className ? " " + item.className : "") +
+            (active ? " is-active" : "");
+          option.setAttribute(
+            filterName === "activity"
+              ? "data-desktop-activity-filter"
+              : "data-desktop-role-filter",
+            item.value,
+          );
+          option.setAttribute("aria-pressed", active ? "true" : "false");
+          option.textContent = item.label;
+          menu.appendChild(option);
+        });
+      }
+
+      /**
+       * Focuses the menu option whose data attribute matches a value.
+       * Side effect: moves browser focus when a matching option is found.
+       * @param {HTMLElement|null} menu Choice menu.
+       * @param {string} attributeName Attribute used to identify options.
+       * @param {string} value Desired attribute value.
+       * @returns {void}
+       */
+      function focusDesktopChoiceOption(menu, attributeName, value) {
+        if (!menu || !menu.children) return;
+        for (var i = 0; i < menu.children.length; i++) {
+          var option = menu.children[i];
+          if (option.getAttribute(attributeName) === value) {
+            if (option.focus) option.focus();
+            return;
+          }
+        }
+      }
+
+      /**
+       * Rebuilds and synchronises all mobile and desktop schedule controls.
+       * Side effect: may canonicalise filter state and replaces filter DOM,
+       * labels, disabled states, popover visibility, and ARIA attributes.
+       * @returns {void}
+       */
+      function updateMobileAvailabilityControl() {
+        var timeFilter = getMobileTimeFilterSelect();
+        var timeToggle = getMobileTimeFilterToggle();
+        var activityFilter = getMobileActivityFilterContainer();
+        var roleFilter = getMobileRoleFilterSelect();
+        var desktopActivityToggle = getDesktopActivityFilterToggle();
+        var desktopActivityValue = getDesktopActivityFilterValue();
+        var desktopActivityMenu = getDesktopActivityFilterMenu();
+        var desktopRoleToggle = getDesktopRoleFilterToggle();
+        var desktopRoleValue = getDesktopRoleFilterValue();
+        var desktopRoleMenu = getDesktopRoleFilterMenu();
+        var desktopFilterReset = getDesktopFilterResetButton();
+        var keywordInput = getMobileKeywordSearchInput();
+        var timeDetail = document.getElementById("mobileTimeAvailabilityDetail");
+        var activity = getMobileActivityFilter();
+        var roleKey = getMobileRoleFilter();
+        var options = getMobileAvailableTimeOptions();
+        var selectedTimes = getMobileAvailableTimeFilters();
+        var availableRoleOptions = getMobileAvailableRoleOptions();
+
+        if (
+          roleKey !== MOBILE_ROLE_FILTER_ALL &&
+          !availableRoleOptions.some(function (r) {
+            return r.key === roleKey;
+          })
+        ) {
+          var selectedRoleStillApplies = getMobileRoleFilterOptionEvents().some(
+            function (event) {
+              return eventHasRoleSlot(event, roleKey);
+            },
+          );
+
+          if (selectedRoleStillApplies) {
+            availableRoleOptions = ROLE_KEYS.filter(function (r) {
+              return (
+                r.key === roleKey ||
+                availableRoleOptions.some(function (availableRole) {
+                  return availableRole.key === r.key;
+                })
+              );
+            });
+          } else {
+            mobileRoleAvailabilityFilter = MOBILE_ROLE_FILTER_ALL;
+            roleKey = MOBILE_ROLE_FILTER_ALL;
+            options = getMobileAvailableTimeOptions();
+            selectedTimes = getMobileAvailableTimeFilters();
+            availableRoleOptions = getMobileAvailableRoleOptions();
+          }
+        }
+
+        updateDesktopChoiceFilter(
+          desktopActivityToggle,
+          desktopActivityValue,
+          desktopActivityMenu,
+          [
+            {
+              value: MOBILE_ACTIVITY_FILTER_ALL,
+              label: "すべての募集枠",
+              className: "",
+            },
+          ].concat(
+            ((gridData && gridData.activities) || []).map(function (item) {
+              return {
+                value: item,
+                label: item,
+                className: getActivityAccentClass(item),
+              };
+            }),
+          ),
+          activity,
+          "activity",
+        );
+        updateDesktopChoiceFilter(
+          desktopRoleToggle,
+          desktopRoleValue,
+          desktopRoleMenu,
+          [
+            {
+              value: MOBILE_ROLE_FILTER_ALL,
+              label: "すべてのポジション",
+              className: "",
+            },
+          ].concat(
+            availableRoleOptions.map(function (r) {
+              return {
+                value: r.key,
+                label: r.label,
+                className: "role-" + r.classSuffix,
+              };
+            }),
+          ),
+          roleKey,
+          "role",
+        );
+        if (desktopFilterReset) {
+          desktopFilterReset.disabled =
+            activity === MOBILE_ACTIVITY_FILTER_ALL &&
+            roleKey === MOBILE_ROLE_FILTER_ALL &&
+            selectedTimes.length === 0 &&
+            getMobileKeywordSearchQuery() === "";
+        }
+
+        if (timeToggle) {
+          if (options.length === 0) {
+            mobileTimeFilterDropdownOpen = false;
+          }
+          timeToggle.className =
+            "mobile-filter-select mobile-time-filter-toggle" +
+            (mobileTimeFilterDropdownOpen ? " is-open" : "");
+          timeToggle.textContent = getMobileSelectedTimeLabel(
+            selectedTimes,
+            options,
+          );
+          timeToggle.disabled = options.length === 0;
+          timeToggle.setAttribute(
+            "aria-expanded",
+            mobileTimeFilterDropdownOpen ? "true" : "false",
+          );
+        }
+
+        if (timeFilter) {
+          while (timeFilter.firstChild) {
+            timeFilter.removeChild(timeFilter.firstChild);
+          }
+          timeFilter.hidden = !mobileTimeFilterDropdownOpen || options.length === 0;
+
+          var allTimeButton = document.createElement("button");
+          allTimeButton.type = "button";
+          allTimeButton.className =
+            "mobile-time-filter-option" +
+            (selectedTimes.length === 0 ? " is-active" : "");
+          allTimeButton.setAttribute(
+            "data-mobile-time-filter",
+            MOBILE_TIME_FILTER_ALL,
+          );
+          allTimeButton.setAttribute(
+            "aria-pressed",
+            selectedTimes.length === 0 ? "true" : "false",
+          );
+          var allTimeCheck = document.createElement("span");
+          allTimeCheck.className = "mobile-time-filter-check";
+          allTimeCheck.textContent = selectedTimes.length === 0 ? "✓" : "";
+          allTimeButton.appendChild(allTimeCheck);
+
+          var allTimeLabel = document.createElement("span");
+          allTimeLabel.className = "mobile-time-filter-option-label";
+          allTimeLabel.textContent = "すべての時間帯";
+          allTimeButton.appendChild(allTimeLabel);
+          timeFilter.appendChild(allTimeButton);
+
+          options.forEach(function (option) {
+            var active = selectedTimes.indexOf(String(option.time)) !== -1;
+            var timeButton = document.createElement("button");
+            timeButton.type = "button";
+            timeButton.className =
+              "mobile-time-filter-option" + (active ? " is-active" : "");
+            timeButton.setAttribute("data-mobile-time-filter", option.time);
+            timeButton.setAttribute("aria-pressed", active ? "true" : "false");
+            var timeCheck = document.createElement("span");
+            timeCheck.className = "mobile-time-filter-check";
+            timeCheck.textContent = active ? "✓" : "";
+            timeButton.appendChild(timeCheck);
+
+            var timeLabel = document.createElement("span");
+            timeLabel.className = "mobile-time-filter-option-label";
+            timeLabel.textContent = getMobileTimeOptionLabel(option);
+            timeButton.appendChild(timeLabel);
+            timeFilter.appendChild(timeButton);
+          });
+        }
+
+        if (activityFilter) {
+          while (activityFilter.firstChild) {
+            activityFilter.removeChild(activityFilter.firstChild);
+          }
+
+          var allActivityButton = document.createElement("button");
+          allActivityButton.type = "button";
+          allActivityButton.className =
+            "mobile-activity-filter-pill" +
+            (activity === MOBILE_ACTIVITY_FILTER_ALL ? " is-active" : "");
+          allActivityButton.setAttribute(
+            "data-mobile-activity-filter",
+            MOBILE_ACTIVITY_FILTER_ALL,
+          );
+          allActivityButton.setAttribute(
+            "aria-pressed",
+            activity === MOBILE_ACTIVITY_FILTER_ALL ? "true" : "false",
+          );
+          allActivityButton.textContent =
+            "すべての募集枠";
+          activityFilter.appendChild(allActivityButton);
+
+          ((gridData && gridData.activities) || []).forEach(function (item) {
+            var activityButton = document.createElement("button");
+            var active = activity === item;
+            activityButton.type = "button";
+            activityButton.className =
+              "mobile-activity-filter-pill " +
+              getActivityAccentClass(item) +
+              (active ? " is-active" : "");
+            activityButton.setAttribute("data-mobile-activity-filter", item);
+            activityButton.setAttribute("aria-pressed", active ? "true" : "false");
+            activityButton.textContent = item;
+            activityFilter.appendChild(activityButton);
+          });
+        }
+
+        if (roleFilter) {
+          while (roleFilter.firstChild) {
+            roleFilter.removeChild(roleFilter.firstChild);
+          }
+
+          var allRoleButton = document.createElement("button");
+          allRoleButton.type = "button";
+          allRoleButton.className =
+            "mobile-role-filter-pill" +
+            (roleKey === MOBILE_ROLE_FILTER_ALL ? " is-active" : "");
+          allRoleButton.setAttribute("data-mobile-role-filter", MOBILE_ROLE_FILTER_ALL);
+          allRoleButton.setAttribute(
+            "aria-pressed",
+            roleKey === MOBILE_ROLE_FILTER_ALL ? "true" : "false",
+          );
+          allRoleButton.textContent =
+            "すべてのポジション";
+          roleFilter.appendChild(allRoleButton);
+
+          availableRoleOptions.forEach(function (r) {
+            var roleButton = document.createElement("button");
+            var active = roleKey === r.key;
+            roleButton.type = "button";
+            roleButton.className =
+              "mobile-role-filter-pill role-" +
+              r.classSuffix +
+              (active ? " is-active" : "");
+            roleButton.setAttribute("data-mobile-role-filter", r.key);
+            roleButton.setAttribute("aria-pressed", active ? "true" : "false");
+            roleButton.textContent = r.label;
+            roleFilter.appendChild(roleButton);
+          });
+        }
+
+        if (keywordInput && keywordInput.value !== mobileKeywordSearchQuery) {
+          keywordInput.value = mobileKeywordSearchQuery;
+        }
+
+        var selectedOptions = options.filter(function (option) {
+          return selectedTimes.indexOf(String(option.time)) !== -1;
+        });
+        if (timeDetail) {
+          if (selectedOptions.length === 1) {
+            timeDetail.textContent =
+              "この時間の空き: " +
+              formatRoleAvailabilitySummary(selectedOptions[0].roleSummaries);
+          } else if (selectedOptions.length > 1) {
+            var selectedEvents = [];
+            selectedOptions.forEach(function (option) {
+              selectedEvents = selectedEvents.concat(option.events || []);
+            });
+            timeDetail.textContent =
+              selectedOptions.length +
+              "つの時間帯の空き: " +
+              formatRoleAvailabilitySummary(
+                getAvailableRoleSummariesForEvents(selectedEvents, roleKey),
+              );
+          } else if (options.length > 0) {
+            timeDetail.textContent = "すべての時間帯を表示中";
+          } else {
+            timeDetail.textContent = "条件に合う時間帯はありません";
+          }
+        }
+      }
+    </script>
