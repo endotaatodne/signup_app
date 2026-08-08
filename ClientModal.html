@@ -12,6 +12,8 @@
       var modalSessionToken = 0;
       var modalCompletionRequestToken = null;
       var CANCELLATION_REFRESH_GRACE_MS = 10500;
+      var FULL_CAPACITY_MESSAGE =
+        "この枠はおかげさまで定員に達しました。ありがとうございます。";
 
       /**
        * Captures one immutable signup or cancellation request context.
@@ -76,6 +78,37 @@
        */
       function invalidateModalCompletion() {
         modalCompletionRequestToken = null;
+        var roleMessage = document.getElementById("modalRoleMessage");
+        if (roleMessage && /\bsuccess\b/.test(roleMessage.className)) {
+          resetModalRoleMessage(getEventById(currentEventId), roleMessage);
+        }
+      }
+
+      /**
+       * Restores the shared role-area message to the current event's full-state
+       * notice, or hides it when signup capacity remains.
+       * @param {Object|null} event Event represented by the open modal.
+       * @param {HTMLElement=} messageNode Existing detached node during rebuild.
+       * @returns {void}
+       */
+      function resetModalRoleMessage(event, messageNode) {
+        var roleMessage =
+          messageNode || document.getElementById("modalRoleMessage");
+        if (!roleMessage) return;
+
+        roleMessage.className = "modal-full-message";
+        roleMessage.textContent = "";
+        roleMessage.style.display = "none";
+        if (!event || isEventReadOnly()) return;
+
+        var allFull = ROLE_KEYS.every(function (roleMeta) {
+          var slot = event.slots[roleMeta.key];
+          return slot.max === 0 || slot.filled >= slot.max;
+        });
+        if (allFull) {
+          roleMessage.textContent = FULL_CAPACITY_MESSAGE;
+          roleMessage.style.display = "block";
+        }
       }
 
       /**
@@ -163,6 +196,8 @@
         namesSection.style.display = hasAnySignups ? "block" : "none";
 
         var roleButtons = document.getElementById("roleButtons");
+        var roleMessage = document.getElementById("modalRoleMessage");
+        var roleMessageHost = document.getElementById("modalRoleMessageHost");
         clearElement(roleButtons);
         if (!readOnly) {
           ROLE_KEYS.forEach(function (r) {
@@ -193,18 +228,12 @@
             btn.appendChild(countDiv);
             roleButtons.appendChild(btn);
           });
-
-          var allFull = ROLE_KEYS.every(function (r) {
-            var s = event.slots[r.key];
-            return s.max === 0 || s.filled >= s.max;
-          });
-          if (allFull) {
-            var fullMsg = document.createElement("div");
-            fullMsg.className = "modal-full-message";
-            fullMsg.textContent =
-              "この枠はおかげさまで定員に達しました。ありがとうございます。";
-            roleButtons.appendChild(fullMsg);
-          }
+        }
+        resetModalRoleMessage(event, roleMessage);
+        if (readOnly) {
+          roleMessageHost.appendChild(roleMessage);
+        } else {
+          roleButtons.appendChild(roleMessage);
         }
 
         document.getElementById("modalForm").className = "modal-form";
@@ -687,7 +716,7 @@
           showCancelMessage(message, true);
         } else {
           renderCancelSignupList();
-          showModalMessage(message, true);
+          showMessage("modalRoleMessage", message, true);
         }
         return true;
       }

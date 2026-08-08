@@ -2258,6 +2258,94 @@ test("signup is single-flight and applies canonical success to its captured even
   assert.equal(String(context.currentEventId), "2");
 });
 
+test("successful signup uses the full-capacity message location", () => {
+  const inputName = { ...createElement("input"), value: "Carol" };
+  const inputClass = { ...createElement("input"), value: "2-1" };
+  const modalForm = createElement("div");
+  const modalMessage = createElement("div");
+  modalMessage.style.display = "none";
+  const modalRoleMessage = createElement("div");
+  modalRoleMessage.style.display = "none";
+  const modalOverlay = createElement("div");
+  const roleButtons = createElement("div");
+  const timers = [];
+  const deferred = createDeferredGoogleRun();
+  const { exports: client, context } = loadClient({
+    elements: {
+      honeypot: { ...createElement("input"), value: "" },
+      inputName,
+      inputClass,
+      submitBtn: createElement("button"),
+      modalForm,
+      modalMessage,
+      modalRoleMessage,
+      modalOverlay,
+      roleButtons,
+      mobileAgenda: createElement("div"),
+    },
+    extraGlobals: {
+      google: deferred.google,
+      setTimeout(callback, delay) {
+        timers.push({ callback, delay });
+        return timers.length;
+      },
+    },
+  });
+  context.PAGE_LOAD_TIME = Date.now() - 4000;
+
+  const event = client.getEventById(1);
+  event.slots.general.filled = 2;
+  event.slots.orgCommittee.max = 0;
+  client.openModal(1);
+  assert.equal(
+    modalRoleMessage.textContent,
+    "この枠はおかげさまで定員に達しました。ありがとうございます。",
+  );
+  assert.equal(modalRoleMessage.className, "modal-full-message");
+  assert.equal(modalRoleMessage.style.display, "block");
+  assert.equal(modalRoleMessage.parentNode, roleButtons);
+  assert.equal(roleButtons.children.at(-1), modalRoleMessage);
+
+  event.slots.general.filled = 1;
+  client.openModal(1);
+  context.currentRole = client.ROLE_KEYS[0].label;
+  modalForm.className = "modal-form visible";
+  inputName.value = "Carol";
+  inputClass.value = "2-1";
+  client.submitSignup();
+  deferred.calls.signup[0].succeed({
+    success: true,
+    message: "ありがとうございます！登録が完了しました！",
+    name: "Carol",
+    cls: "2-1",
+    role: client.ROLE_KEYS[0].label,
+    filled: 2,
+    max: 2,
+  });
+
+  assert.equal(modalForm.className, "modal-form");
+  assert.equal(
+    modalRoleMessage.textContent,
+    "ありがとうございます！登録が完了しました！",
+  );
+  assert.equal(modalRoleMessage.className, "modal-message success");
+  assert.equal(modalRoleMessage.style.display, "block");
+  assert.equal(modalRoleMessage.parentNode, roleButtons);
+  assert.equal(roleButtons.children.at(-1), modalRoleMessage);
+  assert.equal(modalOverlay.classList.has("active"), true);
+  assert.equal(timers.length, 1);
+  assert.equal(timers[0].delay, 1500);
+
+  client.switchTab("cancel");
+  client.switchTab("signup");
+  assert.equal(
+    modalRoleMessage.textContent,
+    "この枠はおかげさまで定員に達しました。ありがとうございます。",
+  );
+  assert.equal(modalRoleMessage.className, "modal-full-message");
+  assert.equal(modalRoleMessage.style.display, "block");
+});
+
 test("an older signup timer cannot close a newer pending cancellation", () => {
   const inputName = { ...createElement("input"), value: "Carol" };
   const inputClass = { ...createElement("input"), value: "2-1" };
