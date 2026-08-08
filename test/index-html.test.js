@@ -163,7 +163,8 @@ function createDocument(elements = {}) {
     },
     querySelector(selector) {
       if (elements[selector]) return elements[selector];
-      if (selector.startsWith("#")) return this.getElementById(selector.slice(1));
+      if (selector.startsWith("#"))
+        return this.getElementById(selector.slice(1));
       if (!fallbackElements[selector]) {
         fallbackElements[selector] = createElement("div");
       }
@@ -624,7 +625,10 @@ test("openModal renders an org committee role button when slots exist", () => {
   });
   assert.ok(orgCommitteeButton);
   assert.equal(orgCommitteeButton.className, "role-btn role-btn-orgcommittee");
-  assert.equal(orgCommitteeButton.children[0].textContent, "\u5B9F\u884C\u59D4\u54E1");
+  assert.equal(
+    orgCommitteeButton.children[0].textContent,
+    "\u5B9F\u884C\u59D4\u54E1",
+  );
 });
 
 test("getEffectiveWidth uses the smallest valid viewport width", () => {
@@ -732,11 +736,20 @@ test("mobile availability control lists activity pills and all matching time slo
   client.buildGridIndexes();
   client.updateMobileAvailabilityControl();
 
-  assert.equal(client.getAvailableSlotCount(client.getMobileFilteredEvents()[0]), 1);
+  assert.equal(
+    client.getAvailableSlotCount(client.getMobileFilteredEvents()[0]),
+    1,
+  );
   assert.equal(activityFilter.children.length, 4);
-  assert.equal(activityFilter.children[0].getAttribute("data-mobile-activity-filter"), "__all__");
+  assert.equal(
+    activityFilter.children[0].getAttribute("data-mobile-activity-filter"),
+    "__all__",
+  );
   assert.equal(activityFilter.children[1].textContent, "Gate");
-  assert.equal(timeToggle.textContent, "\u3059\u3079\u3066\u306E\u6642\u9593\u5E2F");
+  assert.equal(
+    timeToggle.textContent,
+    "\u3059\u3079\u3066\u306E\u6642\u9593\u5E2F",
+  );
   assert.equal(timeToggle.getAttribute("aria-expanded"), "false");
   assert.equal(timeFilter.hidden, true);
   assert.equal(timeFilter.children.length, 4);
@@ -754,9 +767,14 @@ test("mobile availability control lists activity pills and all matching time slo
     timeFilter.children[1].getAttribute("data-mobile-time-filter"),
     "09:00",
   );
-  assert.match(timeFilter.children[1].children[1].textContent, /9:00 am - 10:00 am/);
+  assert.match(
+    timeFilter.children[1].children[1].textContent,
+    /9:00 am - 10:00 am/,
+  );
   assert.equal(
-    timeFilter.children[1].children[1].textContent.includes(client.ROLE_KEYS[0].label),
+    timeFilter.children[1].children[1].textContent.includes(
+      client.ROLE_KEYS[0].label,
+    ),
     false,
   );
   assert.equal(
@@ -846,7 +864,9 @@ test("mobile time filter can select a full time slot", () => {
   const onlyCard = onlySection.children[1];
   const titleWrap = onlyCard.children[0].children[0];
 
-  assert.deepEqual(Array.from(client.getMobileAvailableTimeFilters()), ["09:00"]);
+  assert.deepEqual(Array.from(client.getMobileAvailableTimeFilters()), [
+    "09:00",
+  ]);
   assert.equal(mobileNode.children.length, 1);
   assert.equal(onlySection.children[0].textContent, "9:00 am - 10:00 am");
   assert.equal(titleWrap.children[0].textContent, "Gate");
@@ -934,16 +954,28 @@ test("mobile time filter supports multiple selected time slots", () => {
   ]);
   assert.equal(client.getMobileFilteredEvents().length, 2);
   assert.equal(mobileNode.children.length, 2);
-  assert.equal(mobileNode.children[0].children[0].textContent, "9:00 am - 10:00 am");
-  assert.equal(mobileNode.children[1].children[0].textContent, "11:00 am - 12:00 pm");
-  assert.equal(timeToggle.textContent, "2\u3064\u306E\u6642\u9593\u5E2F\u3092\u9078\u629E\u4E2D");
+  assert.equal(
+    mobileNode.children[0].children[0].textContent,
+    "9:00 am - 10:00 am",
+  );
+  assert.equal(
+    mobileNode.children[1].children[0].textContent,
+    "11:00 am - 12:00 pm",
+  );
+  assert.equal(
+    timeToggle.textContent,
+    "2\u3064\u306E\u6642\u9593\u5E2F\u3092\u9078\u629E\u4E2D",
+  );
   assert.equal(timeFilter.children.length, 4);
   assert.equal(timeFilter.hidden, true);
   assert.equal(timeFilter.children[1].className.includes("is-active"), true);
   assert.equal(timeFilter.children[3].className.includes("is-active"), true);
   assert.equal(timeFilter.children[1].children[0].textContent, "\u2713");
   assert.equal(timeFilter.children[3].children[0].textContent, "\u2713");
-  assert.match(detail.textContent, /2\u3064\u306E\u6642\u9593\u5E2F\u306E\u7A7A\u304D/);
+  assert.match(
+    detail.textContent,
+    /2\u3064\u306E\u6642\u9593\u5E2F\u306E\u7A7A\u304D/,
+  );
 
   client.setMobileTimeFilterDropdownOpen(true);
   assert.equal(timeFilter.hidden, false);
@@ -969,7 +1001,10 @@ test("mobile time filter supports multiple selected time slots", () => {
   client.setMobileAvailableTimeFilter("__all__");
   assert.deepEqual(Array.from(client.getMobileAvailableTimeFilters()), []);
   assert.equal(timeFilter.children[0].className.includes("is-active"), true);
-  assert.equal(timeToggle.textContent, "\u3059\u3079\u3066\u306E\u6642\u9593\u5E2F");
+  assert.equal(
+    timeToggle.textContent,
+    "\u3059\u3079\u3066\u306E\u6642\u9593\u5E2F",
+  );
 });
 
 test("empty selected times avoid rebuilding the available-time model", () => {
@@ -1062,7 +1097,10 @@ test("schedule filter changes refresh controls and cards once at desktop width",
     activityFilter.children[2].getAttribute("data-mobile-activity-filter"),
     "Cleanup",
   );
-  assert.equal(activityFilter.children[2].className.includes("is-active"), true);
+  assert.equal(
+    activityFilter.children[2].className.includes("is-active"),
+    true,
+  );
   assert.equal(client.getMobileFilteredEvents().length, 1);
   assert.equal(titleWrap.children[0].textContent, "Cleanup");
 
@@ -1356,17 +1394,28 @@ test("mobile role filter updates pill state and time availability labels", () =>
 
   assert.equal(client.getMobileRoleFilter(), "general");
   assert.equal(roleFilter.children.length, 3);
-  assert.equal(roleFilter.children[1].getAttribute("data-mobile-role-filter"), "general");
+  assert.equal(
+    roleFilter.children[1].getAttribute("data-mobile-role-filter"),
+    "general",
+  );
   assert.equal(roleFilter.children[1].className.includes("is-active"), true);
-  assert.equal(roleFilter.children[2].getAttribute("data-mobile-role-filter"), "classRep");
-  assert.deepEqual(Array.from(client.getMobileAvailableTimeFilters()), ["09:00"]);
+  assert.equal(
+    roleFilter.children[2].getAttribute("data-mobile-role-filter"),
+    "classRep",
+  );
+  assert.deepEqual(Array.from(client.getMobileAvailableTimeFilters()), [
+    "09:00",
+  ]);
   assert.equal(timeFilter.children.length, 3);
   assert.equal(
     timeFilter.children[1].getAttribute("data-mobile-time-filter"),
     "09:00",
   );
   assert.equal(timeFilter.children[1].className.includes("is-active"), true);
-  assert.equal(timeFilter.children[1].children[1].textContent, "9:00 am - 10:00 am");
+  assert.equal(
+    timeFilter.children[1].children[1].textContent,
+    "9:00 am - 10:00 am",
+  );
   assert.equal(
     timeFilter.children[2].getAttribute("data-mobile-time-filter"),
     "10:00",
@@ -1390,7 +1439,10 @@ test("mobile role filter updates pill state and time availability labels", () =>
   assert.equal(client.getMobileRoleFilter(), "__all__");
   assert.equal(roleFilter.children.length, 2);
   assert.equal(roleFilter.children[0].className.includes("is-active"), true);
-  assert.equal(roleFilter.children[1].getAttribute("data-mobile-role-filter"), "classRep");
+  assert.equal(
+    roleFilter.children[1].getAttribute("data-mobile-role-filter"),
+    "classRep",
+  );
   assert.equal(client.getMobileFilteredEvents().length, 1);
 });
 
@@ -1461,7 +1513,10 @@ test("findAndConfirmCancel requires a selected signup", () => {
 
   client.findAndConfirmCancel();
 
-  assert.equal(cancelMessage.textContent, "キャンセルする登録を選んでください。");
+  assert.equal(
+    cancelMessage.textContent,
+    "キャンセルする登録を選んでください。",
+  );
   assert.equal(cancelMessage.className, "modal-message error");
   assert.equal(cancelMessage.style.display, "block");
 });
@@ -1498,7 +1553,10 @@ test("cancellation list renders existing signups and confirms the selected detai
     cancelSignupList.children[0].children[1].textContent,
     "1-1 · 一般保護者",
   );
-  assert.equal(cancelSignupList.children[0].getAttribute("aria-pressed"), "false");
+  assert.equal(
+    cancelSignupList.children[0].getAttribute("aria-pressed"),
+    "false",
+  );
 
   cancelSignupList.dispatchEvent({
     type: "click",
@@ -1506,8 +1564,14 @@ test("cancellation list renders existing signups and confirms the selected detai
   });
 
   assert.equal(cancelSignupList.children[0].classList.has("selected"), true);
-  assert.equal(cancelSignupList.children[0].getAttribute("aria-pressed"), "true");
-  assert.equal(cancelSignupList.children[1].getAttribute("aria-pressed"), "false");
+  assert.equal(
+    cancelSignupList.children[0].getAttribute("aria-pressed"),
+    "true",
+  );
+  assert.equal(
+    cancelSignupList.children[1].getAttribute("aria-pressed"),
+    "false",
+  );
   assert.equal(cancelSubmitBtn.disabled, false);
 
   client.findAndConfirmCancel();
@@ -1685,12 +1749,12 @@ test("confirmed cancellation updates every visible surface before fresh data arr
   assert.equal(client.getEventById(1).signups.length, 2);
   deferred.calls.cancel[0].succeed({
     success: true,
-    message: "キャンセルされました。",
+    message: "登録がキャンセルされました。",
     role: client.ROLE_KEYS[0].label,
     filled: 1,
   });
 
-  assert.equal(cancelMessage.textContent, "キャンセルされました。");
+  assert.equal(cancelMessage.textContent, "登録がキャンセルされました。");
   assert.equal(
     cancelMessage.className,
     "modal-message success cancellation-success",
@@ -1699,7 +1763,7 @@ test("confirmed cancellation updates every visible surface before fresh data arr
   assert.doesNotMatch(cancelMessage.textContent, /リフレッシュしてください/);
   assert.match(
     htmlSource,
-    /\.modal-message\.success\.cancellation-success\s*{[\s\S]*?background:\s*#fff8e1;[\s\S]*?color:\s*#6d4c00;/,
+    /\.modal-message\.success\.cancellation-success\s*{[\s\S]*?border:\s*1px solid #fecdd3;[\s\S]*?background:\s*#fff1f2;[\s\S]*?color:\s*#9f1239;/,
   );
 
   const locallyUpdatedEvent = client.getEventById(1);
@@ -1750,9 +1814,7 @@ test("confirmed cancellation updates every visible surface before fresh data arr
           steeringCommittee: { max: 0, filled: 0 },
           orgCommittee: { max: 1, filled: 0 },
         },
-        signups: [
-          { name: "Bob", cls: "1-2", role: "学年委員" },
-        ],
+        signups: [{ name: "Bob", cls: "1-2", role: "学年委員" }],
       },
       {
         eventId: 2,
@@ -1768,9 +1830,7 @@ test("confirmed cancellation updates every visible surface before fresh data arr
           steeringCommittee: { max: 1, filled: 1 },
           orgCommittee: { max: 0, filled: 0 },
         },
-        signups: [
-          { name: "Carol", cls: "2-1", role: "役員、運営・実行委員" },
-        ],
+        signups: [{ name: "Carol", cls: "2-1", role: "役員、運営・実行委員" }],
       },
     ],
   };
@@ -1790,7 +1850,7 @@ test("confirmed cancellation updates every visible surface before fresh data arr
   assert.equal(topLocation.reloadCalls, 0);
   assert.equal(deferred.calls.deployedUrl.length, 0);
   assert.equal(timers.length, 1);
-  assert.equal(timers[0].delay, 1500);
+  assert.equal(timers[0].delay, 3000);
   assert.equal(modalOverlay.classList.has("active"), true);
   timers[0].callback();
   assert.equal(modalOverlay.classList.has("active"), false);
@@ -1850,10 +1910,7 @@ test("cancellation uses full navigation only when authoritative refresh fails", 
   assert.equal(deferred.calls.deployedUrl.length, 1);
   assert.equal(topLocation.href, "");
   timers[0].callback();
-  assert.equal(
-    topLocation.href,
-    "https://example.com/app?event=test-alias",
-  );
+  assert.equal(topLocation.href, "https://example.com/app?event=test-alias");
   assert.equal(topLocation.reloadCalls, 0);
 });
 
@@ -1901,7 +1958,7 @@ test("slow cancellation refresh stays visibly pending before bounded recovery", 
   deferred.calls.cancel[0].succeed({ success: true, message: "Cancelled." });
 
   assert.equal(timers.length, 1);
-  assert.equal(timers[0].delay, 1500);
+  assert.equal(timers[0].delay, 3000);
   timers[0].callback();
   assert.equal(modalOverlay.classList.has("active"), true);
   assert.equal(cancelSignupList.children[0].disabled, true);
@@ -1910,10 +1967,7 @@ test("slow cancellation refresh stays visibly pending before bounded recovery", 
 
   timers[1].callback();
   assert.equal(deferred.calls.deployedUrl.length, 1);
-  assert.equal(
-    topLocation.href,
-    "https://example.com/app?event=test-alias",
-  );
+  assert.equal(topLocation.href, "https://example.com/app?event=test-alias");
 });
 
 test("invalid cancellation refresh reloads safely when lazy URL resolution fails", () => {
@@ -2049,9 +2103,17 @@ test("registration tab restores role choices and resets retained modal scroll", 
   assert.ok(roleButtons.children.length > 0);
 });
 
-test("cancellation list styling contains highlights inside the scroll area", () => {
+test("cancellation helper and list styling make selection clear", () => {
   const htmlSource = getIndexHtmlSource();
 
+  assert.match(
+    htmlSource,
+    /\.cancel-helper\s*{[\s\S]*?padding:\s*10px 12px;[\s\S]*?border:\s*1px solid #e2e8f0;[\s\S]*?background:\s*#f8fafc;[\s\S]*?font-size:\s*15px;[\s\S]*?font-weight:\s*700;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.compact-layout \.cancel-helper\s*{[\s\S]*?padding:\s*14px 16px;[\s\S]*?font-size:\s*24px;/,
+  );
   assert.match(
     htmlSource,
     /\.cancel-signup-list\s*{[\s\S]*?scrollbar-gutter:\s*stable;/,
@@ -2111,7 +2173,10 @@ test("submitSignup enforces the 50-character name limit client-side", () => {
 
   client.submitSignup();
 
-  assert.equal(modalMessage.textContent, "名前は５０文字以下で入力してください。");
+  assert.equal(
+    modalMessage.textContent,
+    "名前は５０文字以下で入力してください。",
+  );
   assert.equal(modalMessage.className, "modal-message error");
   assert.equal(modalMessage.style.display, "block");
 });
@@ -2224,7 +2289,10 @@ test("signup is single-flight and applies canonical success to its captured even
   const otherEvent = client.getEventById(2);
   assert.equal(originalEvent.signups.length, 3);
   assert.equal(originalEvent.signups[2].role, client.ROLE_KEYS[0].label);
-  assert.equal(originalEvent.signupsByRole[client.ROLE_KEYS[0].label].length, 2);
+  assert.equal(
+    originalEvent.signupsByRole[client.ROLE_KEYS[0].label].length,
+    2,
+  );
   assert.equal(originalEvent.slots.general.filled, 3);
   assert.equal(originalEvent.slots.general.max, 4);
   assert.equal(otherEvent.signups.length, 0);
@@ -2233,6 +2301,7 @@ test("signup is single-flight and applies canonical success to its captured even
 });
 
 test("successful signup uses the full-capacity message location", () => {
+  const htmlSource = getIndexHtmlSource();
   const inputName = { ...createElement("input"), value: "Carol" };
   const inputClass = { ...createElement("input"), value: "2-1" };
   const modalForm = createElement("div");
@@ -2308,7 +2377,15 @@ test("successful signup uses the full-capacity message location", () => {
   assert.equal(roleButtons.children.at(-1), modalRoleMessage);
   assert.equal(modalOverlay.classList.has("active"), true);
   assert.equal(timers.length, 1);
-  assert.equal(timers[0].delay, 1500);
+  assert.equal(timers[0].delay, 3000);
+  assert.match(
+    htmlSource,
+    /\.modal-message\.success\s*{[\s\S]*?font-size:\s*15px;[\s\S]*?font-weight:\s*700;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.compact-layout \.modal-message\.success\s*{[\s\S]*?font-size:\s*20px;/,
+  );
 
   client.switchTab("cancel");
   client.switchTab("signup");
@@ -3189,9 +3266,7 @@ test("desktop registration summary applies selected time filters", () => {
             steeringCommittee: { max: 0, filled: 0 },
             orgCommittee: { max: 0, filled: 0 },
           },
-          signups: [
-            { name: "Alice", cls: "1-1", role: "一般保護者" },
-          ],
+          signups: [{ name: "Alice", cls: "1-1", role: "一般保護者" }],
         },
         {
           eventId: 2,
@@ -3308,10 +3383,7 @@ test("desktop insight scopes reuse current filters and reset to overall", () => 
   assert.equal(filteredButton.getAttribute("aria-pressed"), "true");
   assert.match(description.textContent, /現在の絞り込み/);
   assert.equal(content.children.length, 1);
-  assert.equal(
-    content.children[0].getAttribute("data-insight-eventid"),
-    "2",
-  );
+  assert.equal(content.children[0].getAttribute("data-insight-eventid"), "2");
 
   client.setDesktopInsightView("registrations");
   assert.equal(title.textContent, "現在の登録");
@@ -3320,10 +3392,7 @@ test("desktop insight scopes reuse current filters and reset to overall", () => 
   assert.equal(overallCount.textContent, "1件");
   assert.equal(filteredCount.textContent, "0件");
   assert.equal(content.children.length, 1);
-  assert.equal(
-    content.children[0].getAttribute("data-insight-eventid"),
-    "1",
-  );
+  assert.equal(content.children[0].getAttribute("data-insight-eventid"), "1");
 
   client.setDesktopInsightView("vacancies");
   assert.equal(title.textContent, "空き枠の一覧");
@@ -3374,10 +3443,7 @@ test("desktop insight scopes reuse current filters and reset to overall", () => 
   assert.equal(filteredButton.hidden, false);
   assert.equal(overallButton.classList.has("is-active"), true);
   assert.equal(content.children.length, 1);
-  assert.equal(
-    content.children[0].getAttribute("data-insight-eventid"),
-    "1",
-  );
+  assert.equal(content.children[0].getAttribute("data-insight-eventid"), "1");
 
   panel.dispatchEvent({
     type: "click",
@@ -3393,10 +3459,7 @@ test("desktop insight scopes reuse current filters and reset to overall", () => 
   client.setMobileKeywordSearchQuery("Alice");
   assert.equal(filteredCount.textContent, "1件");
   assert.equal(content.children.length, 1);
-  assert.equal(
-    content.children[0].getAttribute("data-insight-eventid"),
-    "1",
-  );
+  assert.equal(content.children[0].getAttribute("data-insight-eventid"), "1");
   const filteredNames = content.children[0].children.find(function (child) {
     return child.className === "desktop-insight-names";
   });
@@ -3605,7 +3668,6 @@ test("mobile sticky controls use opaque backing so cards do not show through", (
   );
 });
 
-
 test("buildMobileAgenda groups mobile signup names by role", () => {
   const mobileNode = createElement("div");
   mobileNode.style = {};
@@ -3715,7 +3777,10 @@ test("buildMobileDayOverview renders a time-based day timeline", () => {
   const firstItem = firstTimeBlock.children[1].children[0];
   const secondItem = secondTimeBlock.children[1].children[0];
 
-  assert.equal(mobileNode.className, "mobile-agenda mobile-display-by-overview");
+  assert.equal(
+    mobileNode.className,
+    "mobile-agenda mobile-display-by-overview",
+  );
   assert.equal(timeline.className, "mobile-overview-timeline");
   assert.equal(timeline.children.length, 3);
   assert.equal(firstTimeBlock.children[0].textContent, "9:30 am - 10:00 am");
@@ -3724,7 +3789,10 @@ test("buildMobileDayOverview renders a time-based day timeline", () => {
   assert.equal(secondItem.className.includes("activity-accent-1"), true);
   assert.equal(firstItem.children[0].children[0].textContent, "Bake Sale");
   assert.equal(firstItem.children[1].className, "mobile-overview-role-chips");
-  assert.equal(firstItem.children[1].children[0].textContent, "\u52DF\u96C6\u4E2D");
+  assert.equal(
+    firstItem.children[1].children[0].textContent,
+    "\u52DF\u96C6\u4E2D",
+  );
   assert.equal(
     firstItem.children[1].children[1].className,
     "mobile-overview-role-chip role-general",
@@ -3887,11 +3955,23 @@ test("buildMobileAgenda can group mobile cards by time with headings", () => {
   assert.equal(firstTimeSection.children[0].className, "mobile-time-heading");
   assert.equal(firstTimeSection.children[0].textContent, "9:30 am - 10:00 am");
   assert.equal(getTitleWrap(firstCard).children[0].textContent, "Bake Sale");
-  assert.equal(getTitleWrap(firstCard).children[1].className, "mobile-slot-time");
-  assert.equal(getTitleWrap(firstCard).children[1].textContent, "9:30 am - 10:00 am");
-  assert.equal(getTitleWrap(firstCard).children[2].className, "mobile-slot-meta");
+  assert.equal(
+    getTitleWrap(firstCard).children[1].className,
+    "mobile-slot-time",
+  );
+  assert.equal(
+    getTitleWrap(firstCard).children[1].textContent,
+    "9:30 am - 10:00 am",
+  );
+  assert.equal(
+    getTitleWrap(firstCard).children[2].className,
+    "mobile-slot-meta",
+  );
   assert.equal(getTitleWrap(secondCard).children[0].textContent, "Games");
-  assert.equal(secondTimeSection.children[0].textContent, "10:00 am - 10:30 am");
+  assert.equal(
+    secondTimeSection.children[0].textContent,
+    "10:00 am - 10:30 am",
+  );
 });
 
 test("renderResponsiveView only changes responsive classes for the shared view", () => {

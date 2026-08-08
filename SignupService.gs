@@ -177,9 +177,8 @@ function submitSignup(eventId, name, cls, role, alias) {
 
     // Derive sheetId server-side
     const masterSpreadsheet = getMasterSpreadsheet_();
-    const eventSettings = getEventSettings_(masterSpreadsheet)[
-      alias.toLowerCase()
-    ];
+    const eventSettings =
+      getEventSettings_(masterSpreadsheet)[alias.toLowerCase()];
     const sheetId = eventSettings && eventSettings.sheetId;
     if (!sheetId) {
       return { success: false, message: "不正なリクエストです。" };
@@ -270,8 +269,7 @@ function submitSignup(eventId, name, cls, role, alias) {
         ? descriptor
         : matchingDescriptor;
     }, null);
-    const maxSlots =
-      Number(eventRow[roleSlotDescriptor.eventColumnIndex]) || 0;
+    const maxSlots = Number(eventRow[roleSlotDescriptor.eventColumnIndex]) || 0;
     if (maxSlots === 0) {
       return { success: false, message: "このボランティア枠は存在しません。" };
     }
@@ -454,9 +452,8 @@ function cancelSignup(eventId, name, cls, role, alias) {
 
     // Derive sheetId server-side
     const masterSpreadsheet = getMasterSpreadsheet_();
-    const eventSettings = getEventSettings_(masterSpreadsheet)[
-      alias.toLowerCase()
-    ];
+    const eventSettings =
+      getEventSettings_(masterSpreadsheet)[alias.toLowerCase()];
     const sheetId = eventSettings && eventSettings.sheetId;
     if (!sheetId) {
       return { success: false, message: "不正なリクエストです。" };
@@ -522,10 +519,7 @@ function cancelSignup(eventId, name, cls, role, alias) {
       // Compare against the displayed sheet text so values like "1-1" are
       // matched consistently even if Sheets auto-detects the raw cell value.
       const rowCls = normaliseClassComparable_(signupDisplayRows[i][3]);
-      if (
-        rowName === normalisedInput &&
-        rowCls === normalisedCls
-      ) {
+      if (rowName === normalisedInput && rowCls === normalisedCls) {
         matchRowIndex = i + 1;
       }
     }
@@ -549,7 +543,7 @@ function cancelSignup(eventId, name, cls, role, alias) {
 
     return {
       success: true,
-      message: "キャンセルされました。",
+      message: "登録がキャンセルされました。",
       role: canonicalRole,
       filled: roleSignupCount - 1,
     };

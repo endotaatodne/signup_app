@@ -201,6 +201,8 @@
       .modal-message.success {
         background: #e8f5e9;
         color: #2e7d32;
+        font-size: 15px;
+        font-weight: 700;
       }
       .modal-message.error {
         background: #fdecea;
@@ -208,8 +210,9 @@
         font-weight: 500;
       }
       .modal-message.success.cancellation-success {
-        background: #fff8e1;
-        color: #6d4c00;
+        border: 1px solid #fecdd3;
+        background: #fff1f2;
+        color: #9f1239;
       }
       .modal-helper {
         font-size: 19px;
@@ -350,9 +353,14 @@
         display: block;
       }
       .cancel-helper {
-        margin-bottom: 8px;
-        color: #666;
-        font-size: 14px;
+        margin-bottom: 12px;
+        padding: 10px 12px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        background: #f8fafc;
+        color: #334155;
+        font-size: 15px;
+        font-weight: 700;
         line-height: 1.5;
       }
       .cancel-signup-list {
@@ -1423,8 +1431,10 @@
       }
 
       body.compact-layout .cancel-helper {
-        font-size: 22px;
-        margin-bottom: 12px;
+        margin-bottom: 16px;
+        padding: 14px 16px;
+        border-radius: 10px;
+        font-size: 24px;
       }
 
       body.compact-layout .cancel-signup-list {
@@ -1478,6 +1488,9 @@
         padding: 12px 14px;
         border-radius: 10px;
         margin-top: 10px;
+      }
+      body.compact-layout .modal-message.success {
+        font-size: 20px;
       }
 
       /* Form fields */

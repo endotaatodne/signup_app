@@ -88,7 +88,9 @@ function loadBackend(options = {}) {
   const {
     configRows = createConfigRows(),
     eventRows = createEventRows(),
-    signupRows = [["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"]],
+    signupRows = [
+      ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
+    ],
     signupDisplayRows = signupRows,
     activityLimitRows,
     eventSpreadsheetName = "Spring Fete",
@@ -164,7 +166,9 @@ function loadBackend(options = {}) {
 
 test("only intended backend entry points are browser-callable", () => {
   const source = getAppsScriptSource();
-  const publicFunctions = [...source.matchAll(/^function\s+([A-Za-z0-9_]+)\s*\(/gm)]
+  const publicFunctions = [
+    ...source.matchAll(/^function\s+([A-Za-z0-9_]+)\s*\(/gm),
+  ]
     .map((match) => match[1])
     .filter((name) => !name.endsWith("_"))
     .sort();
@@ -218,7 +222,14 @@ test("sanitiseForScript_ escapes script-sensitive characters", () => {
 test("getGridData_ uses display values for class text and computes role counts", () => {
   const signupRows = [
     ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
-    ["s1", 1, "Alice", new Date("2026-04-01T00:00:00Z"), "一般保護者", new Date()],
+    [
+      "s1",
+      1,
+      "Alice",
+      new Date("2026-04-01T00:00:00Z"),
+      "一般保護者",
+      new Date(),
+    ],
     ["s2", 1, "Bob", "2-1", "学年委員", new Date()],
     ["s3", 1, "Carol", "3-1", "\u5B9F\u884C\u59D4\u54E1", new Date()],
   ];
@@ -242,7 +253,10 @@ test("getGridData_ uses display values for class text and computes role counts",
   assert.equal(event.slots.steeringCommittee.filled, 0);
   assert.equal(event.slots.orgCommittee.max, 1);
   assert.equal(event.slots.orgCommittee.filled, 1);
-  assert.equal(event.description, "Guide \\u003cparents\\u003e \\u0026 \\u0022students\\u0022");
+  assert.equal(
+    event.description,
+    "Guide \\u003cparents\\u003e \\u0026 \\u0022students\\u0022",
+  );
 });
 
 test("getGridData_ keeps every role tied to its public slot and sheet column", () => {
@@ -364,11 +378,26 @@ test("checkRateLimit_ keeps event sheet scopes isolated", () => {
   const cacheStore = new Map();
   const { app } = loadBackend({ cacheStore });
 
-  assert.equal(app.checkRateLimit_(1, "Alice", "1-1", "signup", "sheet-a"), true);
-  assert.equal(app.checkRateLimit_(1, "Alice", "1-1", "signup", "sheet-a"), true);
-  assert.equal(app.checkRateLimit_(1, "Alice", "1-1", "signup", "sheet-a"), true);
-  assert.equal(app.checkRateLimit_(1, "Alice", "1-1", "signup", "sheet-a"), false);
-  assert.equal(app.checkRateLimit_(1, "Alice", "1-1", "signup", "sheet-b"), true);
+  assert.equal(
+    app.checkRateLimit_(1, "Alice", "1-1", "signup", "sheet-a"),
+    true,
+  );
+  assert.equal(
+    app.checkRateLimit_(1, "Alice", "1-1", "signup", "sheet-a"),
+    true,
+  );
+  assert.equal(
+    app.checkRateLimit_(1, "Alice", "1-1", "signup", "sheet-a"),
+    true,
+  );
+  assert.equal(
+    app.checkRateLimit_(1, "Alice", "1-1", "signup", "sheet-a"),
+    false,
+  );
+  assert.equal(
+    app.checkRateLimit_(1, "Alice", "1-1", "signup", "sheet-b"),
+    true,
+  );
 
   const { app: eventFloodApp } = loadBackend({ cacheStore: new Map() });
   for (let i = 0; i < 20; i += 1) {
@@ -457,7 +486,9 @@ test("checkRateLimit_ fails closed when durable state cannot be written", () => 
   const { app, logs } = loadBackend({ propertyStore });
 
   assert.equal(app.checkRateLimit_(1, "Alice", "1-1"), false);
-  assert.ok(logs.some((entry) => /Persistent rate limiter error/.test(entry.message)));
+  assert.ok(
+    logs.some((entry) => /Persistent rate limiter error/.test(entry.message)),
+  );
 });
 
 test("submitSignup appends a normalised signup row on success", () => {
@@ -508,10 +539,9 @@ test("submitSignup reads only schema columns and reuses one master spreadsheet h
   const configRows = createConfigRows().map((row, index) =>
     row.concat([`config-extra-${index}`, "unused"]),
   );
-  const eventRows = [
-    ...createEventRows(),
-    createAdditionalEventRow(),
-  ].map((row, index) => row.concat([`event-extra-${index}`, "unused"]));
+  const eventRows = [...createEventRows(), createAdditionalEventRow()].map(
+    (row, index) => row.concat([`event-extra-${index}`, "unused"]),
+  );
   const signupRows = [
     ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
     ["s1", 2, "Existing", "2-1", appRoleGeneral(), new Date()],
@@ -537,15 +567,14 @@ test("submitSignup reads only schema columns and reuses one master spreadsheet h
     "spring-fete",
   );
 
-  const configCalls = spreadsheets[MASTER_SHEET_ID].getSheetByName("Config")
-    .__state.calls;
-  const eventCalls = spreadsheets[EVENT_SHEET_ID].getSheetByName("Events")
-    .__state.calls;
-  const signupCalls = spreadsheets[EVENT_SHEET_ID].getSheetByName("Signups")
-    .__state.calls;
-  const activityCalls = spreadsheets[EVENT_SHEET_ID].getSheetByName(
-    "ActivityLimits",
-  ).__state.calls;
+  const configCalls =
+    spreadsheets[MASTER_SHEET_ID].getSheetByName("Config").__state.calls;
+  const eventCalls =
+    spreadsheets[EVENT_SHEET_ID].getSheetByName("Events").__state.calls;
+  const signupCalls =
+    spreadsheets[EVENT_SHEET_ID].getSheetByName("Signups").__state.calls;
+  const activityCalls =
+    spreadsheets[EVENT_SHEET_ID].getSheetByName("ActivityLimits").__state.calls;
 
   assert.equal(result.success, true);
   assert.equal(serviceCalls.spreadsheetOpenByIdById[MASTER_SHEET_ID], 1);
@@ -708,8 +737,7 @@ test("submitSignup isolates every role capacity to its matching Events column", 
 
     assert.equal(result.success, true, roleKey);
     assert.equal(result.role, app.ROLES[roleKey]);
-    const signupRows = spreadsheets[EVENT_SHEET_ID]
-      .getSheetByName("Signups")
+    const signupRows = spreadsheets[EVENT_SHEET_ID].getSheetByName("Signups")
       .getDataRange()
       .getValues();
     assert.equal(signupRows[signupRows.length - 1][4], app.ROLES[roleKey]);
@@ -868,7 +896,14 @@ test("submitSignup normalises full-width brackets in names before storing", () =
 test("submitSignup treats full-width and half-width brackets as duplicate names", () => {
   const signupRows = [
     ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
-    ["s1", 1, "\u5C71\u7530(\u592A\u90CE)", "1-1", appRoleGeneral(), new Date()],
+    [
+      "s1",
+      1,
+      "\u5C71\u7530(\u592A\u90CE)",
+      "1-1",
+      appRoleGeneral(),
+      new Date(),
+    ],
   ];
   const { app } = loadBackend({ signupRows });
 
@@ -932,7 +967,13 @@ test("submitSignup rejects the same person in an overlapping time slot", () => {
   ];
   const { app } = loadBackend({ eventRows, signupRows });
 
-  const result = app.submitSignup("1", " alice ", "1-1", app.ROLES.general, "spring-fete");
+  const result = app.submitSignup(
+    "1",
+    " alice ",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
 
   assert.equal(result.success, false);
   assert.equal(result.code, "time_conflict");
@@ -947,7 +988,13 @@ test("submitSignup rejects the same name in another class at the same time", () 
   ];
   const { app } = loadBackend({ eventRows, signupRows });
 
-  const result = app.submitSignup("1", "Alice", "1-2", app.ROLES.general, "spring-fete");
+  const result = app.submitSignup(
+    "1",
+    "Alice",
+    "1-2",
+    app.ROLES.general,
+    "spring-fete",
+  );
 
   assert.equal(result.success, false);
   assert.equal(result.code, "time_conflict");
@@ -967,7 +1014,13 @@ test("submitSignup allows the same person in a back-to-back time slot", () => {
   ];
   const { app } = loadBackend({ eventRows, signupRows });
 
-  const result = app.submitSignup("1", "Alice", "1-1", app.ROLES.general, "spring-fete");
+  const result = app.submitSignup(
+    "1",
+    "Alice",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
 
   assert.equal(result.success, true);
 });
@@ -987,7 +1040,13 @@ test("submitSignup allows the same person at the same time on a different date",
   ];
   const { app } = loadBackend({ eventRows, signupRows });
 
-  const result = app.submitSignup("1", "Alice", "1-1", app.ROLES.general, "spring-fete");
+  const result = app.submitSignup(
+    "1",
+    "Alice",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
 
   assert.equal(result.success, true);
 });
@@ -1059,7 +1118,10 @@ test("submitSignup enforces an activity limit across separate time slots", () =>
   const { app, spreadsheets } = loadBackend({
     eventRows,
     signupRows,
-    activityLimitRows: [["Activity", "MaxPerPerson"], [" Hall Monitor ", 1]],
+    activityLimitRows: [
+      ["Activity", "MaxPerPerson"],
+      [" Hall Monitor ", 1],
+    ],
   });
   const signupsSheet = spreadsheets[EVENT_SHEET_ID].getSheetByName("Signups");
 
@@ -1091,7 +1153,10 @@ test("submitSignup prioritises a reached activity limit over a time conflict", (
   const { app } = loadBackend({
     eventRows,
     signupRows,
-    activityLimitRows: [["Activity", "MaxPerPerson"], ["Hall Monitor", 1]],
+    activityLimitRows: [
+      ["Activity", "MaxPerPerson"],
+      ["Hall Monitor", 1],
+    ],
   });
 
   const result = app.submitSignup(
@@ -1122,7 +1187,10 @@ test("submitSignup keeps the time-conflict message below an unreached activity l
   const { app } = loadBackend({
     eventRows,
     signupRows,
-    activityLimitRows: [["Activity", "MaxPerPerson"], ["Hall Monitor", 2]],
+    activityLimitRows: [
+      ["Activity", "MaxPerPerson"],
+      ["Hall Monitor", 2],
+    ],
   });
 
   const result = app.submitSignup(
@@ -1162,7 +1230,10 @@ test("submitSignup honours numeric activity-limit boundaries", () => {
   const { app } = loadBackend({
     eventRows,
     signupRows,
-    activityLimitRows: [["Activity", "MaxPerPerson"], ["Hall Monitor", 2]],
+    activityLimitRows: [
+      ["Activity", "MaxPerPerson"],
+      ["Hall Monitor", 2],
+    ],
   });
 
   const secondSignup = app.submitSignup(
@@ -1201,7 +1272,10 @@ test("submitSignup activity limits match the same name across different classes"
   const { app } = loadBackend({
     eventRows,
     signupRows,
-    activityLimitRows: [["Activity", "MaxPerPerson"], ["Hall Monitor", 1]],
+    activityLimitRows: [
+      ["Activity", "MaxPerPerson"],
+      ["Hall Monitor", 1],
+    ],
   });
 
   const result = app.submitSignup(
@@ -1240,7 +1314,10 @@ test("submitSignup leaves unlisted activities unrestricted", () => {
   const { app } = loadBackend({
     eventRows,
     signupRows,
-    activityLimitRows: [["Activity", "MaxPerPerson"], ["Hall Monitor", 1]],
+    activityLimitRows: [
+      ["Activity", "MaxPerPerson"],
+      ["Hall Monitor", 1],
+    ],
   });
 
   const result = app.submitSignup(
@@ -1270,7 +1347,10 @@ test("cancelling a signup restores its activity-limit allowance", () => {
   const { app } = loadBackend({
     eventRows,
     signupRows,
-    activityLimitRows: [["Activity", "MaxPerPerson"], ["Hall Monitor", 1]],
+    activityLimitRows: [
+      ["Activity", "MaxPerPerson"],
+      ["Hall Monitor", 1],
+    ],
   });
 
   const cancelResult = app.cancelSignup(
@@ -1295,7 +1375,10 @@ test("cancelling a signup restores its activity-limit allowance", () => {
 [
   {
     name: "unknown activities",
-    rows: [["Activity", "MaxPerPerson"], ["Missing Activity", 1]],
+    rows: [
+      ["Activity", "MaxPerPerson"],
+      ["Missing Activity", 1],
+    ],
     logPattern: /Unknown Activity/,
   },
   {
@@ -1309,12 +1392,18 @@ test("cancelling a signup restores its activity-limit allowance", () => {
   },
   {
     name: "invalid limits",
-    rows: [["Activity", "MaxPerPerson"], ["Hall Monitor", 1.5]],
+    rows: [
+      ["Activity", "MaxPerPerson"],
+      ["Hall Monitor", 1.5],
+    ],
     logPattern: /Invalid MaxPerPerson/,
   },
   {
     name: "invalid headers",
-    rows: [["WrongActivity", "MaxPerPerson"], ["Hall Monitor", 1]],
+    rows: [
+      ["WrongActivity", "MaxPerPerson"],
+      ["Hall Monitor", 1],
+    ],
     logPattern: /headers are invalid/,
   },
 ].forEach(({ name, rows, logPattern }) => {
@@ -1331,7 +1420,10 @@ test("cancelling a signup restores its activity-limit allowance", () => {
 
     assert.equal(result.success, false);
     assert.equal(result.code, "configuration_error");
-    assert.doesNotMatch(result.message, /ActivityLimits|Missing Activity|MaxPerPerson/);
+    assert.doesNotMatch(
+      result.message,
+      /ActivityLimits|Missing Activity|MaxPerPerson/,
+    );
     assert.ok(logs.some((entry) => logPattern.test(entry.message)));
     assert.equal(lock.released, true);
   });
@@ -1375,18 +1467,11 @@ test("getEventSettings_ fails closed when Status is missing or invalid", () => {
     missingHeaderApp.getEventSettings_()["spring-fete"].status,
     "READ_ONLY",
   );
-  const missingStatusConfigSheet = missingHeaderSpreadsheets[
-    MASTER_SHEET_ID
-  ].getSheetByName("Config");
+  const missingStatusConfigSheet =
+    missingHeaderSpreadsheets[MASTER_SHEET_ID].getSheetByName("Config");
   assert.equal(missingStatusConfigSheet.__state.maxColumns, 2);
   assert.throws(
-    () =>
-      missingStatusConfigSheet.getRange(
-        1,
-        1,
-        missingStatusRows.length,
-        3,
-      ),
+    () => missingStatusConfigSheet.getRange(1, 1, missingStatusRows.length, 3),
     /columns are out of bounds/,
   );
   assert.deepEqual(missingStatusConfigSheet.__state.calls.valueRanges, [
@@ -1397,13 +1482,17 @@ test("getEventSettings_ fails closed when Status is missing or invalid", () => {
       numColumns: 2,
     },
   ]);
-  assert.ok(missingHeaderLogs.some((entry) => /Status header/.test(entry.message)));
+  assert.ok(
+    missingHeaderLogs.some((entry) => /Status header/.test(entry.message)),
+  );
   assert.equal(
     invalidStatusApp.getEventSettings_()["spring-fete"].status,
     "READ_ONLY",
   );
   assert.ok(
-    invalidStatusLogs.some((entry) => /Invalid or missing Status/.test(entry.message)),
+    invalidStatusLogs.some((entry) =>
+      /Invalid or missing Status/.test(entry.message),
+    ),
   );
 });
 
@@ -1444,7 +1533,13 @@ test("submitSignup rejects a full role slot", () => {
   ];
   const { app } = loadBackend({ signupRows });
 
-  const result = app.submitSignup("1", "Carol", "1-3", app.ROLES.general, "spring-fete");
+  const result = app.submitSignup(
+    "1",
+    "Carol",
+    "1-3",
+    app.ROLES.general,
+    "spring-fete",
+  );
 
   assert.equal(result.success, false);
   assert.equal(result.code, "slot_full");
@@ -1460,10 +1555,19 @@ test("cancelSignup matches normalised class values and deletes the correct row",
     ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
     ["s1", "1", "Alice", "四ー一", "一般保護者", "2026-04-01"],
   ];
-  const { app, spreadsheets, lock } = loadBackend({ signupRows, signupDisplayRows });
+  const { app, spreadsheets, lock } = loadBackend({
+    signupRows,
+    signupDisplayRows,
+  });
   const signupsSheet = spreadsheets[EVENT_SHEET_ID].getSheetByName("Signups");
 
-  const result = app.cancelSignup("1", " Alice ", "4-1", app.ROLES.general, "spring-fete");
+  const result = app.cancelSignup(
+    "1",
+    " Alice ",
+    "4-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
 
   assert.equal(result.success, true);
   assert.deepEqual(signupsSheet.__state.deletedRows, [2]);
@@ -1490,7 +1594,7 @@ test("cancelSignup returns authoritative post-delete role occupancy", () => {
   );
 
   assert.equal(result.success, true);
-  assert.equal(result.message, "キャンセルされました。");
+  assert.equal(result.message, "登録がキャンセルされました。");
   assert.equal(result.role, app.ROLES.general);
   assert.equal(result.filled, 1);
   assert.deepEqual(signupsSheet.__state.deletedRows, [2]);
@@ -1741,7 +1845,13 @@ test("cancelSignup matches submitSignup name-length validation", () => {
 test("cancelSignup rejects non-canonical role labels", () => {
   const { app } = loadBackend();
 
-  const result = app.cancelSignup("1", "Alice", "1-1", "general", "spring-fete");
+  const result = app.cancelSignup(
+    "1",
+    "Alice",
+    "1-1",
+    "general",
+    "spring-fete",
+  );
 
   assert.equal(result.success, false);
   assert.match(result.message, /ポジション/);
@@ -1778,16 +1888,10 @@ test("getGridData_ exposes only public signup fields and sanitised values", () =
   ];
   const signupDisplayRows = [
     ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
-    [
-      "signup-1",
-      "1",
-      "<Alice>",
-      "<1-1>",
-      app.ROLES.general,
-      "2026-04-01",
-    ],
+    ["signup-1", "1", "<Alice>", "<1-1>", app.ROLES.general, "2026-04-01"],
   ];
-  spreadsheets[EVENT_SHEET_ID].getSheetByName("Signups").__state.values = signupRows;
+  spreadsheets[EVENT_SHEET_ID].getSheetByName("Signups").__state.values =
+    signupRows;
   spreadsheets[EVENT_SHEET_ID].getSheetByName("Signups").__state.displayValues =
     signupDisplayRows;
 

@@ -11,6 +11,7 @@
       var activeModalMutationRequest = null;
       var modalSessionToken = 0;
       var modalCompletionRequestToken = null;
+      var MUTATION_SUCCESS_DISPLAY_MS = 3000;
       var CANCELLATION_REFRESH_GRACE_MS = 10500;
       var FULL_CAPACITY_MESSAGE =
         "この枠はおかげさまで定員に達しました。ありがとうございます。";
@@ -870,7 +871,7 @@
               markRefreshFailed();
             }, CANCELLATION_REFRESH_GRACE_MS);
           }
-        }, 1500);
+        }, MUTATION_SUCCESS_DISPLAY_MS);
       }
 
       /**
@@ -1177,7 +1178,7 @@
               );
               setTimeout(function () {
                 closeCompletedMutationModal(request);
-              }, 1500);
+              }, MUTATION_SUCCESS_DISPLAY_MS);
             } else if (shouldRefreshAfterSubmitRejection(result)) {
               if (isModalMutationRequestCurrent(request)) {
                 showModalMessage(
