@@ -393,6 +393,13 @@
        * @returns {void}
        */
       function buildMobileAgenda() {
+        if (
+          !mobileKeywordInputComposing &&
+          mobileKeywordRenderHandle !== null
+        ) {
+          cancelMobileKeywordSearchRender();
+          mobileKeywordRenderDirty = false;
+        }
         var filters = document.getElementById("mobileAvailabilityControl");
         var activeMode = getMobileDisplayMode();
         if (activeMode !== "signup") {

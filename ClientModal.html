@@ -7,6 +7,96 @@
 
       // Modal lifecycle and signup-role selection.
 
+      var nextModalMutationRequestToken = 1;
+      var activeModalMutationRequest = null;
+      var modalSessionToken = 0;
+      var modalCompletionRequestToken = null;
+      var CANCELLATION_REFRESH_GRACE_MS = 10500;
+
+      /**
+       * Captures one immutable signup or cancellation request context.
+       * @param {string} kind Mutation kind, either signup or cancel.
+       * @param {string|number} eventId Event identifier submitted to the server.
+       * @param {string} name Canonical participant name sent to the server.
+       * @param {string} cls Canonical class value sent to the server.
+       * @param {string} role Canonical role label sent to the server.
+       * @returns {Object} Frozen request context with a unique token.
+       */
+      function createModalMutationRequest(kind, eventId, name, cls, role) {
+        var request = {
+          token: nextModalMutationRequestToken,
+          modalSessionToken: modalSessionToken,
+          kind: kind,
+          eventId: eventId,
+          name: name,
+          cls: cls,
+          role: role,
+        };
+        nextModalMutationRequestToken += 1;
+        return Object.freeze ? Object.freeze(request) : request;
+      }
+
+      /**
+       * Reports whether either modal mutation workflow has an active request.
+       * @returns {boolean} True while a signup or cancellation RPC is pending.
+       */
+      function isModalMutationPending() {
+        return activeModalMutationRequest !== null;
+      }
+
+      /**
+       * Reports whether a request still belongs to the currently open modal.
+       * @param {Object} request Captured modal mutation request.
+       * @returns {boolean} True when both modal session and event still match.
+       */
+      function isModalMutationRequestCurrent(request) {
+        return (
+          !!request &&
+          request.modalSessionToken === modalSessionToken &&
+          currentEventId !== null &&
+          String(currentEventId) === String(request.eventId)
+        );
+      }
+
+      /**
+       * Clears an active request only when the callback owns its token.
+       * @param {Object} request Captured modal mutation request.
+       * @returns {boolean} True when the request was current and was cleared.
+       */
+      function finishModalMutationRequest(request) {
+        if (activeModalMutationRequest !== request) return false;
+        activeModalMutationRequest = null;
+        return true;
+      }
+
+      /**
+       * Invalidates delayed success actions after the user starts interacting
+       * with the rebuilt modal or begins another mutation.
+       * @returns {void}
+       */
+      function invalidateModalCompletion() {
+        modalCompletionRequestToken = null;
+      }
+
+      /**
+       * Applies a server read-only decision and rerenders whichever modal is
+       * still open, without reviving a modal the user already closed.
+       * @param {Object} request Captured mutation request receiving the result.
+       * @returns {void}
+       */
+      function applyReadOnlyMutationResult(request) {
+        var visibleEventId = currentEventId;
+        finishModalMutationRequest(request);
+        setEventStatus(EVENT_STATUS_READ_ONLY);
+        if (
+          visibleEventId !== null &&
+          currentEventId !== null &&
+          getEventById(visibleEventId)
+        ) {
+          openModal(visibleEventId);
+        }
+      }
+
       /**
        * Opens and populates the modal for a schedule event.
        * @param {string|number} eventId The event identifier represented by the modal.
@@ -22,6 +112,8 @@
         var event = getEventById(eventId);
         if (!event) return;
 
+        modalSessionToken += 1;
+        modalCompletionRequestToken = null;
         currentEventId = eventId;
         currentRole = null;
         var readOnly = isEventReadOnly();
@@ -137,7 +229,7 @@
           document.getElementById("modalForm").className = "modal-form";
           document.getElementById("cancelForm").className = "cancel-form";
         } else {
-          switchTab("signup");
+          switchTab("signup", true);
         }
 
         document.getElementById("modalOverlay").classList.add("active");
@@ -154,7 +246,8 @@
        * @returns {void}
        */
       function selectRole(roleLabel, btn) {
-        if (isEventReadOnly()) return;
+        if (isEventReadOnly() || isModalMutationPending()) return;
+        invalidateModalCompletion();
         currentRole = roleLabel;
         document.querySelectorAll(".role-btn").forEach(function (b) {
           b.classList.remove("selected");
@@ -184,6 +277,8 @@
        * @returns {void}
        */
       function closeModal() {
+        modalSessionToken += 1;
+        modalCompletionRequestToken = null;
         document.getElementById("modalOverlay").classList.remove("active");
         document.getElementById("cancelForm").className = "cancel-form";
         document.getElementById("confirmBox").style.display = "none";
@@ -208,9 +303,13 @@
       /**
        * Switches the modal between its signup and cancellation workflows.
        * @param {string} tab The target tab, either "signup" or "cancel".
+       * @param {boolean=} allowPending Internal override while rerendering a
+       *   mutation-owned modal.
        * @returns {void}
        */
-      function switchTab(tab) {
+      function switchTab(tab, allowPending) {
+        if (isModalMutationPending() && !allowPending) return;
+        if (!allowPending) invalidateModalCompletion();
         var roleButtons = document.getElementById("roleButtons");
         var modalForm = document.getElementById("modalForm");
         var cancelForm = document.getElementById("cancelForm");
@@ -326,7 +425,8 @@
        * @returns {void}
        */
       function selectCancelSignup(signup, selectedOption) {
-        if (!signup || !selectedOption) return;
+        if (isModalMutationPending() || !signup || !selectedOption) return;
+        invalidateModalCompletion();
 
         if (currentCancelOption && currentCancelOption !== selectedOption) {
           currentCancelOption.classList.remove("selected");
@@ -410,6 +510,341 @@
       }
 
       /**
+       * Resolves the server-returned canonical role, with the captured request
+       * role retained as a compatibility fallback.
+       * @param {Object} result Server mutation result.
+       * @param {Object} request Captured modal mutation request.
+       * @returns {Object|null} Canonical role metadata, or null.
+       */
+      function getModalMutationRoleMeta(result, request) {
+        return (
+          getRoleMetaByLabel(result && result.role) ||
+          getRoleMetaByLabel(request && request.role)
+        );
+      }
+
+      /**
+       * Applies a confirmed signup to the captured event and rebuilds all
+       * schedule-derived browser surfaces.
+       * @param {Object} request Captured signup request.
+       * @param {Object} result Successful server response.
+       * @returns {boolean} True when the captured event was updated.
+       */
+      function applySuccessfulSignupToGrid(request, result) {
+        var event = getEventById(request.eventId);
+        var roleMeta = getModalMutationRoleMeta(result, request);
+        if (!event || !roleMeta) return false;
+
+        var signup = {
+          name: (result && result.name) || request.name,
+          cls: (result && result.cls) || request.cls,
+          role: roleMeta.label,
+        };
+        if (!event.signups) event.signups = [];
+        event.signups.push(signup);
+
+        var slot = event.slots && event.slots[roleMeta.key];
+        if (slot) {
+          if (
+            result &&
+            Number.isFinite(result.max) &&
+            result.max >= 0
+          ) {
+            slot.max = result.max;
+          }
+          var authoritativeFilled = Number(result && result.filled);
+          slot.filled = Number.isFinite(authoritativeFilled)
+            ? Math.max(0, authoritativeFilled)
+            : Math.max(0, (Number(slot.filled) || 0) + 1);
+        }
+
+        buildGridIndexes();
+        buildMobileAgenda();
+        return true;
+      }
+
+      /**
+       * Applies a confirmed cancellation to the captured event and rebuilds all
+       * schedule-derived browser surfaces. Nothing changes before confirmation.
+       * @param {Object} request Captured cancellation request.
+       * @param {Object} result Successful server response.
+       * @returns {boolean} True when one matching local signup was removed.
+       */
+      function applySuccessfulCancellationToGrid(request, result) {
+        var event = getEventById(request.eventId);
+        var roleMeta = getModalMutationRoleMeta(result, request);
+        if (!event || !roleMeta || !event.signups) return false;
+
+        var targetName = (result && result.name) || request.name;
+        var targetClass = (result && result.cls) || request.cls;
+        var comparableTargetName = normaliseComparable(targetName);
+        var comparableTargetClass = normaliseClassComparable(targetClass);
+        var matchingIndex = -1;
+        for (var i = 0; i < event.signups.length; i += 1) {
+          var signup = event.signups[i];
+          if (
+            signup.role === roleMeta.label &&
+            normaliseComparable(signup.name) ===
+              comparableTargetName &&
+            normaliseClassComparable(signup.cls) ===
+              comparableTargetClass
+          ) {
+            matchingIndex = i;
+            break;
+          }
+        }
+        if (matchingIndex === -1) return false;
+
+        event.signups.splice(matchingIndex, 1);
+        var slot = event.slots && event.slots[roleMeta.key];
+        if (slot) {
+          var authoritativeFilled = Number(result && result.filled);
+          slot.filled = Number.isFinite(authoritativeFilled)
+            ? Math.max(0, authoritativeFilled)
+            : Math.max(0, (Number(slot.filled) || 0) - 1);
+        }
+
+        buildGridIndexes();
+        buildMobileAgenda();
+        return true;
+      }
+
+      /**
+       * Applies read-only workflow visibility to the modal already on screen
+       * without changing its session or completion ownership.
+       * @returns {void}
+       */
+      function applyCurrentModalReadOnlyState() {
+        if (!isEventReadOnly() || currentEventId === null) return;
+
+        currentRole = null;
+        resetCancelSignupSelection();
+        document.getElementById("modalTabs").style.display = "none";
+        document.getElementById("modalReadOnlyNotice").style.display =
+          "block";
+        document.getElementById("signupHelper").style.display = "none";
+        document.getElementById("roleButtons").style.display = "none";
+        document.getElementById("modalForm").className = "modal-form";
+        document.getElementById("cancelForm").className = "cancel-form";
+        document.getElementById("confirmBox").style.display = "none";
+      }
+
+      /**
+       * Applies a successful authoritative grid refresh and rerenders the page.
+       * @param {Object} result Grid-data response from the server.
+       * @returns {boolean} True when a valid fresh grid was applied.
+       */
+      function applyFreshGridDataResult(result) {
+        if (
+          !result ||
+          !result.success ||
+          !result.gridData ||
+          !Array.isArray(result.gridData.events) ||
+          !Array.isArray(result.gridData.times) ||
+          !Array.isArray(result.gridData.activities)
+        ) {
+          return false;
+        }
+
+        gridData = result.gridData;
+        if (result.eventStatus) {
+          setEventStatus(result.eventStatus);
+          applyCurrentModalReadOnlyState();
+        }
+        var freshTitle = result.title || result.pageTitle;
+        if (freshTitle) {
+          PAGE_TITLE = String(freshTitle);
+          var pageTitle = document.getElementById("pageTitle");
+          if (pageTitle) pageTitle.textContent = PAGE_TITLE;
+          document.title = PAGE_TITLE;
+        }
+        buildGridIndexes();
+        buildMobileAgenda();
+        return true;
+      }
+
+      /**
+       * Rebuilds a still-current modal from updated event data and restores its
+       * mutation success feedback.
+       * @param {Object} request Completed modal mutation request.
+       * @param {string} tab Signup or cancel tab to restore.
+       * @param {string} message Success message to display.
+       * @returns {boolean} True when the current modal was rebuilt.
+       */
+      function renderCompletedMutationModal(request, tab, message) {
+        var ownsInitialModal = isModalMutationRequestCurrent(request);
+        var ownsCompletedModal =
+          modalCompletionRequestToken === request.token &&
+          currentEventId !== null &&
+          String(currentEventId) === String(request.eventId);
+        if (!ownsInitialModal && !ownsCompletedModal) return false;
+
+        openModal(request.eventId);
+        modalCompletionRequestToken = request.token;
+        if (tab === "cancel" && !isEventReadOnly()) {
+          switchTab("cancel", true);
+          setCancelSignupListDisabled(isModalMutationPending());
+          showCancelMessage(message, true);
+        } else {
+          renderCancelSignupList();
+          showModalMessage(message, true);
+        }
+        return true;
+      }
+
+      /**
+       * Closes only the modal still owned by a completed mutation token.
+       * @param {Object} request Completed modal mutation request.
+       * @returns {void}
+       */
+      function closeCompletedMutationModal(request) {
+        if (
+          modalCompletionRequestToken !== request.token ||
+          currentEventId === null ||
+          String(currentEventId) !== String(request.eventId)
+        ) {
+          return;
+        }
+        closeModal();
+      }
+
+      /**
+       * Resolves and caches the event-specific deployed URL only when a failed
+       * in-place refresh requires full-page recovery.
+       * @param {function(string): void} callback Receives a URL, or an empty
+       *   string when deployed-URL resolution fails.
+       * @returns {void}
+       */
+      function resolveFreshEventUrl(callback) {
+        if (EXEC_URL) {
+          callback(EXEC_URL);
+          return;
+        }
+
+        var responseHandled = false;
+        var finish = function (url) {
+          if (responseHandled) return;
+          responseHandled = true;
+          if (typeof url === "string" && url.trim()) {
+            EXEC_URL =
+              url +
+              (url.indexOf("?") === -1 ? "?" : "&") +
+              "event=" +
+              encodeURIComponent(alias);
+          }
+          callback(EXEC_URL || "");
+        };
+
+        try {
+          google.script.run
+            .withSuccessHandler(function (url) {
+              finish(url);
+            })
+            .withFailureHandler(function () {
+              finish("");
+            })
+            .getDeployedUrl();
+        } catch (_error) {
+          finish("");
+        }
+      }
+
+      /**
+       * Navigates to a fresh full page when an authoritative data refresh fails.
+       * @param {string} freshEventUrl Resolved event-specific deployed URL.
+       * @returns {void}
+       */
+      function navigateToFreshEventPage(freshEventUrl) {
+        if (freshEventUrl) {
+          window.top.location.href = freshEventUrl;
+        } else {
+          window.top.location.reload();
+        }
+      }
+
+      /**
+       * Starts an authoritative post-cancellation refresh immediately, keeps
+       * success feedback visible while it is pending, closes after both the
+       * minimum interval and a successful refresh, and uses bounded full-page
+       * recovery when fresh data cannot be applied.
+       * @param {Object} request Completed cancellation request.
+       * @param {string} message Cancellation success message.
+       * @returns {void}
+       */
+      function refreshGridDataAfterCancellation(request, message) {
+        var refreshFailed = false;
+        var refreshHandled = false;
+        var closeDelayElapsed = false;
+        var fallbackUrlResolved = false;
+        var fallbackUrl = "";
+        var fallbackNavigationStarted = false;
+        var navigateAfterFailure = function (forceReload) {
+          if (
+            !refreshFailed ||
+            !closeDelayElapsed ||
+            fallbackNavigationStarted ||
+            (!fallbackUrlResolved && !forceReload)
+          ) {
+            return;
+          }
+          fallbackNavigationStarted = true;
+          finishModalMutationRequest(request);
+          navigateToFreshEventPage(fallbackUrlResolved ? fallbackUrl : "");
+        };
+        var markRefreshFailed = function () {
+          if (refreshHandled) return;
+          refreshHandled = true;
+          refreshFailed = true;
+          resolveFreshEventUrl(function (url) {
+            fallbackUrl = url;
+            fallbackUrlResolved = true;
+            navigateAfterFailure();
+          });
+          if (
+            closeDelayElapsed &&
+            !fallbackNavigationStarted &&
+            !fallbackUrlResolved
+          ) {
+            setTimeout(function () {
+              navigateAfterFailure(true);
+            }, 1500);
+          }
+        };
+
+        google.script.run
+          .withSuccessHandler(function (result) {
+            if (refreshHandled) return;
+            if (!applyFreshGridDataResult(result)) {
+              markRefreshFailed();
+              return;
+            }
+            refreshHandled = true;
+            finishModalMutationRequest(request);
+            renderCompletedMutationModal(request, "cancel", message);
+            if (closeDelayElapsed) {
+              closeCompletedMutationModal(request);
+            }
+          })
+          .withFailureHandler(function () {
+            markRefreshFailed();
+          })
+          .getGridDataForAlias(alias);
+
+        setTimeout(function () {
+          closeDelayElapsed = true;
+          if (refreshFailed) {
+            navigateAfterFailure(true);
+          } else if (refreshHandled) {
+            closeCompletedMutationModal(request);
+          } else {
+            setTimeout(function () {
+              markRefreshFailed();
+            }, CANCELLATION_REFRESH_GRACE_MS);
+          }
+        }, 1500);
+      }
+
+      /**
        * Sends the selected cancellation to the server and updates modal feedback.
        * @returns {void}
        */
@@ -421,6 +856,7 @@
           );
           return;
         }
+        if (isModalMutationPending()) return;
         if (!currentCancelSignup) {
           showCancelMessage("キャンセルする登録を選んでください。", false);
           return;
@@ -430,6 +866,16 @@
         var cls = currentCancelSignup.cls;
         var role = currentCancelSignup.role;
         var btn = document.getElementById("confirmYes");
+        var request = createModalMutationRequest(
+          "cancel",
+          currentEventId,
+          name,
+          cls,
+          role,
+        );
+        var responseHandled = false;
+        invalidateModalCompletion();
+        activeModalMutationRequest = request;
 
         btn.disabled = true;
         btn.textContent = "キャンセル中...";
@@ -439,24 +885,57 @@
 
         google.script.run
           .withSuccessHandler(function (result) {
-            if (result && result.code === "event_read_only") {
-              var eventId = currentEventId;
-              setEventStatus(EVENT_STATUS_READ_ONLY);
-              if (eventId !== null) openModal(eventId);
+            if (
+              responseHandled ||
+              activeModalMutationRequest !== request
+            ) {
               return;
             }
-            if (result.success) {
-              showCancelMessage(result.message, true);
-              setTimeout(function () {
-                if (EXEC_URL) {
-                  window.top.location.href = EXEC_URL;
-                } else {
-                  // Fallback
-                  window.top.location.reload();
-                }
-              }, 1500);
+            responseHandled = true;
+            if (result && result.code === "event_read_only") {
+              applyReadOnlyMutationResult(request);
+              return;
+            }
+            if (result && result.success) {
+              applySuccessfulCancellationToGrid(request, result);
+              renderCompletedMutationModal(
+                request,
+                "cancel",
+                result.message,
+              );
+              refreshGridDataAfterCancellation(request, result.message);
             } else {
-              showCancelMessage(result.message, false);
+              finishModalMutationRequest(request);
+              if (isModalMutationRequestCurrent(request)) {
+                showCancelMessage(
+                  (result && result.message) ||
+                    "エラーが発生しました。再度試してください。",
+                  false,
+                );
+                document.getElementById("confirmBox").style.display = "none";
+                btn.disabled = false;
+                btn.textContent = "はい、キャンセルします。";
+                document.getElementById("confirmNo").disabled = false;
+                setCancelSignupListDisabled(false);
+                document.getElementById("cancelSubmitBtn").style.display =
+                  "block";
+              }
+            }
+          })
+          .withFailureHandler(function (error) {
+            if (
+              responseHandled ||
+              activeModalMutationRequest !== request
+            ) {
+              return;
+            }
+            responseHandled = true;
+            finishModalMutationRequest(request);
+            if (isModalMutationRequestCurrent(request)) {
+              showCancelMessage(
+                "エラーが発生しました。再度試してください。",
+                false,
+              );
               document.getElementById("confirmBox").style.display = "none";
               btn.disabled = false;
               btn.textContent = "はい、キャンセルします。";
@@ -466,19 +945,13 @@
                 "block";
             }
           })
-          .withFailureHandler(function (error) {
-            showCancelMessage(
-              "エラーが発生しました。再度試してください。",
-              false,
-            );
-            document.getElementById("confirmBox").style.display = "none";
-            btn.disabled = false;
-            btn.textContent = "はい、キャンセルします。";
-            document.getElementById("confirmNo").disabled = false;
-            setCancelSignupListDisabled(false);
-            document.getElementById("cancelSubmitBtn").style.display = "block";
-          })
-          .cancelSignup(currentEventId, name, cls, role, alias);
+          .cancelSignup(
+            request.eventId,
+            request.name,
+            request.cls,
+            request.role,
+            alias,
+          );
       }
 
       // Shared modal feedback and refreshed-data recovery.
@@ -547,30 +1020,52 @@
 
       /**
        * Fetches current grid data after a stale-slot rejection and restores the modal.
-       * @param {string|number} eventId The event that rejected the signup.
+       * @param {Object} request Captured signup request that was rejected.
        * @param {string} message The rejection message to show after refreshing.
        * @returns {void}
        */
-      function refreshGridDataAfterSubmitRejection(eventId, message) {
+      function refreshGridDataAfterSubmitRejection(request, message) {
+        var responseHandled = false;
         google.script.run
           .withSuccessHandler(function (result) {
-            if (!result || !result.success || !result.gridData) return;
-
-            gridData = result.gridData;
-            if (result.eventStatus) setEventStatus(result.eventStatus);
-            buildGridIndexes();
-            rebuildCurrentView();
+            if (
+              responseHandled ||
+              activeModalMutationRequest !== request
+            ) {
+              return;
+            }
+            responseHandled = true;
+            var applied = applyFreshGridDataResult(result);
+            finishModalMutationRequest(request);
 
             if (
-              currentEventId !== null &&
-              String(currentEventId) === String(eventId) &&
-              getEventById(eventId)
+              applied &&
+              isModalMutationRequestCurrent(request) &&
+              getEventById(request.eventId)
             ) {
-              openModal(eventId);
+              openModal(request.eventId);
               showModalMessage(message, false);
+            } else if (isModalMutationRequestCurrent(request)) {
+              var submitButton = document.getElementById("submitBtn");
+              submitButton.disabled = false;
+              submitButton.textContent = SIGNUP_BTN_TEXT;
             }
           })
-          .withFailureHandler(function () {})
+          .withFailureHandler(function () {
+            if (
+              responseHandled ||
+              activeModalMutationRequest !== request
+            ) {
+              return;
+            }
+            responseHandled = true;
+            finishModalMutationRequest(request);
+            if (isModalMutationRequestCurrent(request)) {
+              var submitButton = document.getElementById("submitBtn");
+              submitButton.disabled = false;
+              submitButton.textContent = SIGNUP_BTN_TEXT;
+            }
+          })
           .getGridDataForAlias(alias);
       }
 
@@ -588,6 +1083,7 @@
           );
           return;
         }
+        if (isModalMutationPending()) return;
         // This is intentionally only a low-friction client-side filter. Real
         // abuse protection is enforced server-side via rate limiting.
         if (document.getElementById("honeypot").value !== "") return;
@@ -631,56 +1127,93 @@
           return;
         }
 
+        var request = createModalMutationRequest(
+          "signup",
+          currentEventId,
+          name,
+          cls,
+          currentRole,
+        );
+        var responseHandled = false;
+        invalidateModalCompletion();
+        activeModalMutationRequest = request;
+
         btn.disabled = true;
         btn.textContent = "送信中...";
         document.getElementById("modalMessage").style.display = "none";
 
         google.script.run
           .withSuccessHandler(function (result) {
-            if (result && result.code === "event_read_only") {
-              var eventId = currentEventId;
-              setEventStatus(EVENT_STATUS_READ_ONLY);
-              if (eventId !== null) openModal(eventId);
+            if (
+              responseHandled ||
+              activeModalMutationRequest !== request
+            ) {
               return;
             }
-            showModalMessage(result.message, result.success);
-            if (result.success) {
-              var event = getEventById(currentEventId);
-              if (event) {
-                var signup = {
-                  name: result.name || name,
-                  cls: result.cls || cls,
-                  role: currentRole,
-                };
-                event.signups.push(signup);
-                if (!event.signupsByRole[currentRole]) {
-                  event.signupsByRole[currentRole] = [];
-                }
-                event.signupsByRole[currentRole].push(signup);
-                var roleKey = ROLE_KEYS.find(function (r) {
-                  return r.label === currentRole;
-                });
-                if (roleKey) event.slots[roleKey.key].filled++;
-              }
-              buildMobileAgenda();
-              setTimeout(closeModal, 1500);
-            } else {
-              btn.disabled = false;
-              btn.textContent = SIGNUP_BTN_TEXT;
-              if (shouldRefreshAfterSubmitRejection(result)) {
-                refreshGridDataAfterSubmitRejection(
-                  currentEventId,
-                  result.message,
+            responseHandled = true;
+            if (result && result.code === "event_read_only") {
+              applyReadOnlyMutationResult(request);
+              return;
+            }
+            if (result && result.success) {
+              finishModalMutationRequest(request);
+              applySuccessfulSignupToGrid(request, result);
+              renderCompletedMutationModal(
+                request,
+                "signup",
+                result.message,
+              );
+              setTimeout(function () {
+                closeCompletedMutationModal(request);
+              }, 1500);
+            } else if (shouldRefreshAfterSubmitRejection(result)) {
+              if (isModalMutationRequestCurrent(request)) {
+                showModalMessage(
+                  (result && result.message) ||
+                    "問題が発生しました。再度試してください。",
+                  false,
                 );
+                btn.textContent = SIGNUP_BTN_TEXT;
+              }
+              refreshGridDataAfterSubmitRejection(
+                request,
+                result.message,
+              );
+            } else {
+              finishModalMutationRequest(request);
+              if (isModalMutationRequestCurrent(request)) {
+                showModalMessage(
+                  (result && result.message) ||
+                    "問題が発生しました。再度試してください。",
+                  false,
+                );
+                btn.disabled = false;
+                btn.textContent = SIGNUP_BTN_TEXT;
               }
             }
           })
           .withFailureHandler(function (error) {
-            showModalMessage("問題が発生しました。再度試してください。", false);
-            btn.disabled = false;
-            btn.textContent = SIGNUP_BTN_TEXT;
+            if (
+              responseHandled ||
+              activeModalMutationRequest !== request
+            ) {
+              return;
+            }
+            responseHandled = true;
+            finishModalMutationRequest(request);
+            if (isModalMutationRequestCurrent(request)) {
+              showModalMessage("問題が発生しました。再度試してください。", false);
+              btn.disabled = false;
+              btn.textContent = SIGNUP_BTN_TEXT;
+            }
           })
-          .submitSignup(currentEventId, name, cls, currentRole, alias);
+          .submitSignup(
+            request.eventId,
+            request.name,
+            request.cls,
+            request.role,
+            alias,
+          );
       }
 
       /**

@@ -10,7 +10,8 @@
  * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} spreadsheet - Parent file.
  * @param {string} sheetName - Required sheet tab name.
  * @param {Array<Array<string>>} expectedHeaders - Accepted values per column.
- * @param {boolean} [includeDisplayValues] - Also read formatted cell text.
+ * @param {{valueColumnCount: (number|undefined), displayColumnIndex: (number|undefined)}} [options]
+ *   Explicit raw width and optional zero-based formatted-value column.
  * @returns {{sheet: GoogleAppsScript.Spreadsheet.Sheet, values: Array<Array<*>>, displayValues: (Array<Array<string>>|undefined)}}
  *   Sheet handle and raw values, with formatted values when requested.
  * @throws {Error} If the sheet is missing, empty, or has invalid headers.
@@ -19,18 +20,28 @@ function getSheetData_(
   spreadsheet,
   sheetName,
   expectedHeaders,
-  includeDisplayValues,
+  options,
 ) {
   const sheet = spreadsheet.getSheetByName(sheetName);
   if (!sheet) {
     throw new Error('The "' + sheetName + '" sheet is missing.');
   }
 
-  const range = sheet.getDataRange();
-  const values = range.getValues();
-  if (!values.length) {
+  const dataRange = sheet.getDataRange();
+  const rowCount = dataRange.getNumRows();
+  if (!rowCount) {
     throw new Error('The "' + sheetName + '" sheet is empty.');
   }
+  const readOptions = options || {};
+  const requestedValueColumnCount =
+    readOptions.valueColumnCount || expectedHeaders.length;
+  const valueColumnCount = Math.min(
+    requestedValueColumnCount,
+    dataRange.getNumColumns(),
+  );
+  const values = sheet
+    .getRange(1, 1, rowCount, valueColumnCount)
+    .getValues();
 
   validateSheetHeaders_(values[0], expectedHeaders, sheetName);
 
@@ -39,8 +50,16 @@ function getSheetData_(
     values: values,
   };
 
-  if (includeDisplayValues) {
-    result.displayValues = range.getDisplayValues();
+  if (readOptions.displayColumnIndex !== undefined) {
+    const displayColumnIndex = readOptions.displayColumnIndex;
+    const displayColumnValues = sheet
+      .getRange(1, displayColumnIndex + 1, rowCount, 1)
+      .getDisplayValues();
+    result.displayValues = displayColumnValues.map(function (row) {
+      const displayRow = [];
+      displayRow[displayColumnIndex] = row[0];
+      return displayRow;
+    });
   }
 
   return result;
@@ -69,10 +88,19 @@ function getOptionalActivityLimits_(spreadsheet, eventRows) {
   const sheet = spreadsheet.getSheetByName(SHEET_NAMES.activityLimits);
   if (!sheet) return Object.create(null);
 
-  const values = sheet.getDataRange().getValues();
-  if (!values.length) {
+  const dataRange = sheet.getDataRange();
+  const rowCount = dataRange.getNumRows();
+  if (!rowCount) {
     throw new Error('The "ActivityLimits" sheet is empty.');
   }
+  const values = sheet
+    .getRange(
+      1,
+      1,
+      rowCount,
+      ACTIVITY_LIMIT_HEADER_ALIASES.length,
+    )
+    .getValues();
 
   validateSheetHeaders_(
     values[0],
@@ -150,15 +178,19 @@ function getValidatedEventSpreadsheetData_(spreadsheet) {
     spreadsheet,
     SHEET_NAMES.signups,
     SIGNUP_HEADER_ALIASES,
-    true,
+    { displayColumnIndex: 3 },
   );
 
-  eventsData.values.slice(1).forEach(function (row, index) {
-    validateEventRow_(row, index + 2);
-  });
-  signupsData.values.slice(1).forEach(function (row, index) {
-    validateSignupRow_(row, signupsData.displayValues[index + 1], index + 2);
-  });
+  for (let index = 1; index < eventsData.values.length; index += 1) {
+    validateEventRow_(eventsData.values[index], index + 1);
+  }
+  for (let index = 1; index < signupsData.values.length; index += 1) {
+    validateSignupRow_(
+      signupsData.values[index],
+      signupsData.displayValues[index],
+      index + 1,
+    );
+  }
 
   return {
     eventRows: eventsData.values,

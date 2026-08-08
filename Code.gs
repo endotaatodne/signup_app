@@ -4,7 +4,7 @@
  * configuration and grid-building globals declared in the other server files,
  * plus HtmlService, SpreadsheetApp, Utilities, and ScriptApp.
  * @author endotaatodne
- * @version 0.2.9
+ * @version 0.2.10
  */
 
 /**

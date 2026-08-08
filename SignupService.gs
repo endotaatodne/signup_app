@@ -156,7 +156,7 @@ function getEventRowForRequest_(spreadsheet, eventId) {
  * @param {*} cls - Client-supplied participant class.
  * @param {*} role - Client-supplied canonical role label.
  * @param {*} alias - Event alias from the page URL.
- * @returns {{success: boolean, message: string, code: (string|undefined), name: (string|undefined), cls: (string|undefined), role: (string|undefined)}}
+ * @returns {{success: boolean, message: string, code: (string|undefined), name: (string|undefined), cls: (string|undefined), role: (string|undefined), filled: (number|undefined), max: (number|undefined)}}
  *   Success details or a user-safe rejection/failure payload.
  */
 function submitSignup(eventId, name, cls, role, alias) {
@@ -176,7 +176,10 @@ function submitSignup(eventId, name, cls, role, alias) {
     eventId = parsedEventId;
 
     // Derive sheetId server-side
-    const eventSettings = getEventSettings_()[alias.toLowerCase()];
+    const masterSpreadsheet = getMasterSpreadsheet_();
+    const eventSettings = getEventSettings_(masterSpreadsheet)[
+      alias.toLowerCase()
+    ];
     const sheetId = eventSettings && eventSettings.sheetId;
     if (!sheetId) {
       return { success: false, message: "不正なリクエストです。" };
@@ -276,11 +279,17 @@ function submitSignup(eventId, name, cls, role, alias) {
     const signupRows = data.signupRows;
     // Use loose equality intentionally because stored EventID cells may be
     // typed differently by Sheets while still representing the same ID.
-    const existing = signupRows.slice(1).filter((r) => r[1] == eventId);
+    let roleSignupCount = 0;
+    const existing = [];
+    for (let index = 1; index < signupRows.length; index += 1) {
+      const row = signupRows[index];
+      if (row[1] != eventId) continue;
+      if (row[4] === canonicalRole) roleSignupCount += 1;
+      existing.push(row);
+    }
 
     // Check slot capacity for this role
-    const roleSignups = existing.filter((r) => r[4] === canonicalRole);
-    if (roleSignups.length >= maxSlots) {
+    if (roleSignupCount >= maxSlots) {
       return {
         success: false,
         code: "slot_full",
@@ -357,7 +366,7 @@ function submitSignup(eventId, name, cls, role, alias) {
 
     // Re-read the policy immediately before writing so an already-open page,
     // or a request that began while the event was open, cannot bypass a lock.
-    if (!isEventOpenForWrite_(alias, sheetId)) {
+    if (!isEventOpenForWrite_(alias, sheetId, masterSpreadsheet)) {
       return getEventReadOnlyResult_();
     }
 
@@ -377,6 +386,8 @@ function submitSignup(eventId, name, cls, role, alias) {
       name: name,
       cls: cls,
       role: canonicalRole,
+      filled: roleSignupCount + 1,
+      max: maxSlots,
     };
   } catch (e) {
     console.error("submitSignup error: " + e.message);
@@ -403,7 +414,7 @@ function submitSignup(eventId, name, cls, role, alias) {
  * @param {*} cls - Client-supplied participant class.
  * @param {*} role - Client-supplied canonical role label.
  * @param {*} alias - Event alias from the page URL.
- * @returns {{success: boolean, message: string, code: (string|undefined)}}
+ * @returns {{success: boolean, message: string, code: (string|undefined), role: (string|undefined), filled: (number|undefined)}}
  *   Cancellation confirmation or a user-safe rejection/failure payload.
  */
 function cancelSignup(eventId, name, cls, role, alias) {
@@ -442,7 +453,10 @@ function cancelSignup(eventId, name, cls, role, alias) {
     }
 
     // Derive sheetId server-side
-    const eventSettings = getEventSettings_()[alias.toLowerCase()];
+    const masterSpreadsheet = getMasterSpreadsheet_();
+    const eventSettings = getEventSettings_(masterSpreadsheet)[
+      alias.toLowerCase()
+    ];
     const sheetId = eventSettings && eventSettings.sheetId;
     if (!sheetId) {
       return { success: false, message: "不正なリクエストです。" };
@@ -493,23 +507,26 @@ function cancelSignup(eventId, name, cls, role, alias) {
 
     // Find matching row — name + role + eventId
     let matchRowIndex = -1;
+    let roleSignupCount = 0;
     for (let i = 1; i < signupRows.length; i++) {
       const rowEventId = signupRows[i][1];
+      const rowRole = signupRows[i][4];
+      // Avoid expensive name/class canonicalisation for unrelated rows.
+      if (rowEventId != parsedEventId || rowRole !== canonicalRole) continue;
+      roleSignupCount += 1;
+      // Keep scanning cheap fields after the first match so the response can
+      // report the locked snapshot's authoritative post-delete occupancy.
+      if (matchRowIndex !== -1) continue;
+
       const rowName = normaliseComparable_(signupRows[i][2]);
       // Compare against the displayed sheet text so values like "1-1" are
       // matched consistently even if Sheets auto-detects the raw cell value.
       const rowCls = normaliseClassComparable_(signupDisplayRows[i][3]);
-      const rowRole = signupRows[i][4];
       if (
-        // Use loose equality intentionally because Sheets can return EventID
-        // cells as numbers or strings depending on how the sheet is formatted.
-        rowEventId == parsedEventId &&
         rowName === normalisedInput &&
-        rowCls === normalisedCls &&
-        rowRole === canonicalRole
+        rowCls === normalisedCls
       ) {
         matchRowIndex = i + 1;
-        break;
       }
     }
 
@@ -523,7 +540,7 @@ function cancelSignup(eventId, name, cls, role, alias) {
 
     // Re-read the policy immediately before deleting for the same reason as
     // the final check in submitSignup.
-    if (!isEventOpenForWrite_(alias, sheetId)) {
+    if (!isEventOpenForWrite_(alias, sheetId, masterSpreadsheet)) {
       return getEventReadOnlyResult_();
     }
 
@@ -532,7 +549,9 @@ function cancelSignup(eventId, name, cls, role, alias) {
 
     return {
       success: true,
-      message: "キャンセルされました。ページをリフレッシュしてください。",
+      message: "キャンセルされました。",
+      role: canonicalRole,
+      filled: roleSignupCount - 1,
     };
   } catch (e) {
     console.error("cancelSignup error: " + e.message);

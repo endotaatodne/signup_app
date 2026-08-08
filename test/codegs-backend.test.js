@@ -126,7 +126,7 @@ function loadBackend(options = {}) {
     lockWaitFails,
   });
 
-  const { exports: app } = loadCodeGs(
+  const { exports: app, context } = loadCodeGs(
     [
       "ROLES",
       "doGet",
@@ -157,6 +157,8 @@ function loadBackend(options = {}) {
     lock: mockEnv.lock,
     logs: mockEnv.logs,
     propertyStore: mockEnv.propertyStore,
+    serviceCalls: mockEnv.serviceCalls,
+    context,
   };
 }
 
@@ -316,6 +318,7 @@ test("getGridDataForAlias returns fresh public grid data for a valid alias", () 
   assert.equal(result.gridData.events[0].activity, "Hall Monitor");
   assert.equal(result.gridData.events[0].slots.general.filled, 0);
   assert.equal(result.eventStatus, "OPEN");
+  assert.equal(result.title, "Spring Fete");
 });
 
 test("getGridDataForAlias rejects invalid aliases safely", () => {
@@ -478,6 +481,148 @@ test("submitSignup appends a normalised signup row on success", () => {
   assert.equal(appendedRow[3], "4-2");
   assert.equal(appendedRow[4], app.ROLES.general);
   assert.equal(lock.released, true);
+});
+
+test("submitSignup returns authoritative post-append role occupancy", () => {
+  const signupRows = [
+    ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
+    ["s1", 1, "Bob", "1-2", appRoleGeneral(), new Date()],
+  ];
+  const { app } = loadBackend({ signupRows });
+
+  const result = app.submitSignup(
+    "1",
+    "Alice",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+
+  assert.equal(result.success, true);
+  assert.equal(result.role, app.ROLES.general);
+  assert.equal(result.filled, 2);
+  assert.equal(result.max, 2);
+});
+
+test("submitSignup reads only schema columns and reuses one master spreadsheet handle", () => {
+  const configRows = createConfigRows().map((row, index) =>
+    row.concat([`config-extra-${index}`, "unused"]),
+  );
+  const eventRows = [
+    ...createEventRows(),
+    createAdditionalEventRow(),
+  ].map((row, index) => row.concat([`event-extra-${index}`, "unused"]));
+  const signupRows = [
+    ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
+    ["s1", 2, "Existing", "2-1", appRoleGeneral(), new Date()],
+  ].map((row, index) => row.concat([`signup-extra-${index}`, "unused"]));
+  const signupDisplayRows = signupRows.map((row) => row.map(String));
+  const activityLimitRows = [
+    ["Activity", "MaxPerPerson", "Unused", "UnusedToo"],
+    ["Hall Monitor", 2, "ignored", "ignored"],
+  ];
+  const { app, spreadsheets, serviceCalls } = loadBackend({
+    configRows,
+    eventRows,
+    signupRows,
+    signupDisplayRows,
+    activityLimitRows,
+  });
+
+  const result = app.submitSignup(
+    "1",
+    "Alice",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+
+  const configCalls = spreadsheets[MASTER_SHEET_ID].getSheetByName("Config")
+    .__state.calls;
+  const eventCalls = spreadsheets[EVENT_SHEET_ID].getSheetByName("Events")
+    .__state.calls;
+  const signupCalls = spreadsheets[EVENT_SHEET_ID].getSheetByName("Signups")
+    .__state.calls;
+  const activityCalls = spreadsheets[EVENT_SHEET_ID].getSheetByName(
+    "ActivityLimits",
+  ).__state.calls;
+
+  assert.equal(result.success, true);
+  assert.equal(serviceCalls.spreadsheetOpenByIdById[MASTER_SHEET_ID], 1);
+  assert.equal(serviceCalls.spreadsheetOpenByIdById[EVENT_SHEET_ID], 1);
+  assert.deepEqual(
+    configCalls.valueRanges.map(({ column, numRows, numColumns }) => ({
+      column,
+      numRows,
+      numColumns,
+    })),
+    [
+      { column: 1, numRows: configRows.length, numColumns: 3 },
+      { column: 1, numRows: configRows.length, numColumns: 3 },
+    ],
+  );
+  assert.deepEqual(
+    eventCalls.valueRanges.map(({ column, numRows, numColumns }) => ({
+      column,
+      numRows,
+      numColumns,
+    })),
+    [
+      { column: 1, numRows: eventRows.length, numColumns: 12 },
+      { column: 1, numRows: eventRows.length, numColumns: 12 },
+    ],
+  );
+  assert.deepEqual(signupCalls.valueRanges, [
+    {
+      row: 1,
+      column: 1,
+      numRows: signupRows.length,
+      numColumns: 6,
+    },
+  ]);
+  assert.deepEqual(signupCalls.displayRanges, [
+    {
+      row: 1,
+      column: 4,
+      numRows: signupRows.length,
+      numColumns: 1,
+    },
+  ]);
+  assert.deepEqual(activityCalls.valueRanges, [
+    {
+      row: 1,
+      column: 1,
+      numRows: activityLimitRows.length,
+      numColumns: 2,
+    },
+  ]);
+  assert.equal(signupCalls.valueCellsRead, signupRows.length * 6);
+  assert.equal(signupCalls.displayCellsRead, signupRows.length);
+});
+
+test("submitSignup rereads Config through the reused master handle before append", () => {
+  const { app, spreadsheets, serviceCalls } = loadBackend();
+  const configSheet = spreadsheets[MASTER_SHEET_ID].getSheetByName("Config");
+  const signupsSheet = spreadsheets[EVENT_SHEET_ID].getSheetByName("Signups");
+  configSheet.__state.onGetValues = ({ callNumber }) => {
+    if (callNumber === 2) {
+      configSheet.__state.values[1][2] = "READ_ONLY";
+    }
+  };
+
+  const result = app.submitSignup(
+    "1",
+    "Alice",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+
+  assert.equal(result.success, false);
+  assert.equal(result.code, "event_read_only");
+  assert.equal(signupsSheet.__state.values.length, 1);
+  assert.equal(configSheet.__state.calls.getValues, 2);
+  assert.equal(serviceCalls.spreadsheetOpenByIdById[MASTER_SHEET_ID], 1);
 });
 
 test("submitSignup rejects READ_ONLY events without appending a row", () => {
@@ -1224,12 +1369,15 @@ test("getEventSettings_ normalises supported status values", () => {
 });
 
 test("getEventSettings_ fails closed when Status is missing or invalid", () => {
-  const { app: missingHeaderApp, logs: missingHeaderLogs } = loadBackend({
-    configRows: [
-      ["Alias", "SheetId"],
-      ["Spring-Fete", EVENT_SHEET_ID],
-    ],
-  });
+  const missingStatusRows = [
+    ["Alias", "SheetId"],
+    ["Spring-Fete", EVENT_SHEET_ID],
+  ];
+  const {
+    app: missingHeaderApp,
+    logs: missingHeaderLogs,
+    spreadsheets: missingHeaderSpreadsheets,
+  } = loadBackend({ configRows: missingStatusRows });
   const { app: invalidStatusApp, logs: invalidStatusLogs } = loadBackend({
     configRows: [
       ["Alias", "SheetId", "Status"],
@@ -1241,6 +1389,28 @@ test("getEventSettings_ fails closed when Status is missing or invalid", () => {
     missingHeaderApp.getEventSettings_()["spring-fete"].status,
     "READ_ONLY",
   );
+  const missingStatusConfigSheet = missingHeaderSpreadsheets[
+    MASTER_SHEET_ID
+  ].getSheetByName("Config");
+  assert.equal(missingStatusConfigSheet.__state.maxColumns, 2);
+  assert.throws(
+    () =>
+      missingStatusConfigSheet.getRange(
+        1,
+        1,
+        missingStatusRows.length,
+        3,
+      ),
+    /columns are out of bounds/,
+  );
+  assert.deepEqual(missingStatusConfigSheet.__state.calls.valueRanges, [
+    {
+      row: 1,
+      column: 1,
+      numRows: missingStatusRows.length,
+      numColumns: 2,
+    },
+  ]);
   assert.ok(missingHeaderLogs.some((entry) => /Status header/.test(entry.message)));
   assert.equal(
     invalidStatusApp.getEventSettings_()["spring-fete"].status,
@@ -1312,6 +1482,100 @@ test("cancelSignup matches normalised class values and deletes the correct row",
   assert.equal(result.success, true);
   assert.deepEqual(signupsSheet.__state.deletedRows, [2]);
   assert.equal(lock.released, true);
+});
+
+test("cancelSignup returns authoritative post-delete role occupancy", () => {
+  const signupRows = [
+    ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
+    ["s1", 1, "Alice", "1-1", appRoleGeneral(), new Date()],
+    ["s2", 1, "Bob", "1-2", appRoleGeneral(), new Date()],
+    ["s3", 1, "Carol", "1-3", "学年委員", new Date()],
+    ["s4", 2, "Dan", "1-4", appRoleGeneral(), new Date()],
+  ];
+  const { app, spreadsheets } = loadBackend({ signupRows });
+  const signupsSheet = spreadsheets[EVENT_SHEET_ID].getSheetByName("Signups");
+
+  const result = app.cancelSignup(
+    "1",
+    "Alice",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+
+  assert.equal(result.success, true);
+  assert.equal(result.message, "キャンセルされました。");
+  assert.equal(result.role, app.ROLES.general);
+  assert.equal(result.filled, 1);
+  assert.deepEqual(signupsSheet.__state.deletedRows, [2]);
+  assert.equal(signupsSheet.__state.calls.getValues, 1);
+  assert.equal(signupsSheet.__state.calls.getDisplayValues, 1);
+});
+
+test("cancelSignup reuses one master handle but freshly rechecks Config before delete", () => {
+  const signupRows = [
+    ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
+    ["s1", 1, "Alice", "1-1", appRoleGeneral(), new Date()],
+  ];
+  const { app, spreadsheets, serviceCalls } = loadBackend({ signupRows });
+  const configSheet = spreadsheets[MASTER_SHEET_ID].getSheetByName("Config");
+  const signupsSheet = spreadsheets[EVENT_SHEET_ID].getSheetByName("Signups");
+  configSheet.__state.onGetValues = ({ callNumber }) => {
+    if (callNumber === 2) {
+      configSheet.__state.values[1][2] = "READ_ONLY";
+    }
+  };
+
+  const result = app.cancelSignup(
+    "1",
+    "Alice",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+
+  assert.equal(result.success, false);
+  assert.equal(result.code, "event_read_only");
+  assert.deepEqual(signupsSheet.__state.deletedRows, []);
+  assert.equal(configSheet.__state.calls.getValues, 2);
+  assert.equal(serviceCalls.spreadsheetOpenByIdById[MASTER_SHEET_ID], 1);
+});
+
+test("cancelSignup normalises only rows matching the requested event and role", () => {
+  const eventRows = [...createEventRows(), createAdditionalEventRow()];
+  const signupRows = [
+    ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
+    ["s1", 2, "Other Event", "2-1", appRoleGeneral(), new Date()],
+    ["s2", 1, "Other Role", "2-2", "学年委員", new Date()],
+    ["s3", 1, "Alice", "1-1", appRoleGeneral(), new Date()],
+  ];
+  const { app, context, spreadsheets } = loadBackend({ eventRows, signupRows });
+  const signupsSheet = spreadsheets[EVENT_SHEET_ID].getSheetByName("Signups");
+  const originalNormaliseName = context.normaliseComparable_;
+  const originalNormaliseClass = context.normaliseClassComparable_;
+  let nameNormalisations = 0;
+  let classNormalisations = 0;
+  context.normaliseComparable_ = function (value) {
+    nameNormalisations += 1;
+    return originalNormaliseName(value);
+  };
+  context.normaliseClassComparable_ = function (value) {
+    classNormalisations += 1;
+    return originalNormaliseClass(value);
+  };
+
+  const result = app.cancelSignup(
+    "1",
+    "Alice",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+
+  assert.equal(result.success, true);
+  assert.deepEqual(signupsSheet.__state.deletedRows, [4]);
+  assert.equal(nameNormalisations, 2);
+  assert.equal(classNormalisations, 2);
 });
 
 test("cancelSignup rejects READ_ONLY events without deleting a row", () => {
@@ -1626,6 +1890,33 @@ test("submitSignup fails safely when existing signup rows are malformed", () => 
   );
 
   assert.equal(result.success, false);
+  assert.ok(logs.some((entry) => /Signups/.test(entry.message)));
+});
+
+test("schema-bounded signup reads still validate rows extended by trailing data", () => {
+  const signupRows = [
+    ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
+    ["", "", "", "", "", "", "unexpected trailing value"],
+  ];
+  const { app, logs, spreadsheets } = loadBackend({ signupRows });
+  const signupsSheet = spreadsheets[EVENT_SHEET_ID].getSheetByName("Signups");
+
+  const result = app.submitSignup(
+    "1",
+    "Alice",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+
+  assert.equal(result.success, false);
+  assert.equal(signupsSheet.__state.values.length, signupRows.length);
+  assert.deepEqual(signupsSheet.__state.calls.valueRanges, [
+    { row: 1, column: 1, numRows: signupRows.length, numColumns: 6 },
+  ]);
+  assert.deepEqual(signupsSheet.__state.calls.displayRanges, [
+    { row: 1, column: 4, numRows: signupRows.length, numColumns: 1 },
+  ]);
   assert.ok(logs.some((entry) => /Signups/.test(entry.message)));
 });
 

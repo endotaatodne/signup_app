@@ -189,6 +189,84 @@ function createLocalStorage(initialValues = {}) {
   };
 }
 
+function getRenderedText(element) {
+  if (!element) return "";
+  return [element.textContent]
+    .concat((element.children || []).map(getRenderedText))
+    .join(" ");
+}
+
+function createDeferredGoogleRun(options = {}) {
+  const calls = {
+    signup: [],
+    cancel: [],
+    refresh: [],
+    deployedUrl: [],
+  };
+  const deployedUrl = Object.prototype.hasOwnProperty.call(
+    options,
+    "deployedUrl",
+  )
+    ? options.deployedUrl
+    : "https://example.com/app";
+
+  const google = {
+    script: {
+      run: {
+        withSuccessHandler(successHandler) {
+          let failureHandler = function () {};
+          return {
+            withFailureHandler(handler) {
+              failureHandler = handler;
+              return this;
+            },
+            getDeployedUrl() {
+              calls.deployedUrl.push({
+                succeed: successHandler,
+                fail: failureHandler,
+              });
+              if (!options.deferDeployedUrl) {
+                if (options.deployedUrlFailure) {
+                  failureHandler(new Error("deployment URL unavailable"));
+                } else {
+                  successHandler(deployedUrl);
+                }
+              }
+              return this;
+            },
+            submitSignup(...args) {
+              calls.signup.push({
+                args,
+                succeed: successHandler,
+                fail: failureHandler,
+              });
+              return this;
+            },
+            cancelSignup(...args) {
+              calls.cancel.push({
+                args,
+                succeed: successHandler,
+                fail: failureHandler,
+              });
+              return this;
+            },
+            getGridDataForAlias(...args) {
+              calls.refresh.push({
+                args,
+                succeed: successHandler,
+                fail: failureHandler,
+              });
+              return this;
+            },
+          };
+        },
+      },
+    },
+  };
+
+  return { calls, google };
+}
+
 function loadClient(options = {}) {
   const {
     gridData = {
@@ -894,6 +972,20 @@ test("mobile time filter supports multiple selected time slots", () => {
   assert.equal(timeToggle.textContent, "\u3059\u3079\u3066\u306E\u6642\u9593\u5E2F");
 });
 
+test("empty selected times avoid rebuilding the available-time model", () => {
+  const { exports: client, context } = loadClient();
+  const originalGetOptions = context.getMobileAvailableTimeOptions;
+  let optionBuilds = 0;
+  context.getMobileAvailableTimeOptions = function () {
+    optionBuilds += 1;
+    return originalGetOptions();
+  };
+  context.mobileAvailableTimeFilter = [];
+
+  assert.deepEqual(Array.from(client.getMobileAvailableTimeFilters()), []);
+  assert.equal(optionBuilds, 0);
+});
+
 test("schedule filter changes refresh controls and cards once at desktop width", () => {
   const mobileNode = createElement("div");
   mobileNode.className = "mobile-agenda";
@@ -1122,6 +1214,69 @@ test("mobile keyword search matches activity subtitle and description", () => {
 
   assert.equal(client.getMobileFilteredEvents().length, 1);
   assert.equal(titleWrap.children[0].textContent, "Kitchen");
+});
+
+test("keyword input coalesces rendering and flushes safely around IME composition", () => {
+  const keywordInput = createElement("input");
+  const scheduledFrames = [];
+  const cancelledFrames = new Set();
+  let nextFrameId = 1;
+  const { exports: client, context } = loadClient({
+    elements: {
+      mobileKeywordSearch: keywordInput,
+    },
+    windowOverrides: {
+      requestAnimationFrame(callback) {
+        const id = nextFrameId;
+        nextFrameId += 1;
+        scheduledFrames.push({ callback, id });
+        return id;
+      },
+      cancelAnimationFrame(id) {
+        cancelledFrames.add(id);
+      },
+    },
+  });
+  let renders = 0;
+  context.buildMobileAgenda = function () {
+    renders += 1;
+  };
+
+  keywordInput.value = "a";
+  keywordInput.dispatchEvent({ type: "input" });
+  keywordInput.value = "al";
+  keywordInput.dispatchEvent({ type: "input" });
+  keywordInput.value = "alice";
+  keywordInput.dispatchEvent({ type: "input" });
+
+  assert.equal(renders, 0);
+  assert.equal(scheduledFrames.length, 1);
+  assert.equal(client.getMobileKeywordSearchQuery(), "alice");
+  scheduledFrames[0].callback();
+  assert.equal(renders, 1);
+
+  keywordInput.dispatchEvent({ type: "compositionstart" });
+  keywordInput.value = "\u5C71";
+  keywordInput.dispatchEvent({ type: "input", isComposing: true });
+  keywordInput.value = "\u5C71\u7530";
+  keywordInput.dispatchEvent({ type: "input", isComposing: true });
+  assert.equal(renders, 1);
+  assert.equal(scheduledFrames.length, 1);
+
+  keywordInput.dispatchEvent({ type: "compositionend" });
+  assert.equal(client.getMobileKeywordSearchQuery(), "\u5C71\u7530");
+  assert.equal(renders, 2);
+  keywordInput.dispatchEvent({ type: "input", isComposing: false });
+  keywordInput.dispatchEvent({ type: "blur" });
+  assert.equal(scheduledFrames.length, 1);
+  assert.equal(renders, 2);
+
+  keywordInput.value = "\u5C71\u7530\u592A\u90CE";
+  keywordInput.dispatchEvent({ type: "input" });
+  assert.equal(scheduledFrames.length, 2);
+  keywordInput.dispatchEvent({ type: "keydown", key: "Enter" });
+  assert.equal(renders, 3);
+  assert.equal(cancelledFrames.has(scheduledFrames[1].id), true);
 });
 
 test("mobile role filter updates pill state and time availability labels", () => {
@@ -1485,6 +1640,359 @@ test("confirmCancel sends the selected signup details to the existing backend", 
   assert.equal(selectedOption.disabled, false);
 });
 
+test("confirmed cancellation updates every visible surface before fresh data arrives", () => {
+  const mobileAgenda = createElement("div");
+  mobileAgenda.className = "mobile-agenda";
+  mobileAgenda.style = {};
+  const desktopSignupCount = createElement("strong");
+  const desktopInsightsPanel = createElement("div");
+  desktopInsightsPanel.hidden = true;
+  const desktopInsightsContent = createElement("div");
+  const modalOverlay = createElement("div");
+  const namesGroups = createElement("div");
+  const roleButtons = createElement("div");
+  const cancelSignupList = createElement("div");
+  const cancelMessage = createElement("div");
+  cancelMessage.style = { display: "none" };
+  const pageTitle = createElement("h1");
+  const pageHeading = createElement("h1");
+  pageHeading.scrollIntoView = function () {};
+  const timers = [];
+  const topLocation = {
+    href: "",
+    reloadCalls: 0,
+    reload() {
+      this.reloadCalls += 1;
+    },
+  };
+  const deferred = createDeferredGoogleRun();
+  const { exports: client, context } = loadClient({
+    elements: {
+      mobileAgenda,
+      desktopSignupCount,
+      desktopInsightsPanel,
+      desktopInsightsTitle: createElement("h2"),
+      desktopInsightsDescription: createElement("p"),
+      desktopInsightsContent,
+      modalOverlay,
+      modalTitle: createElement("h2"),
+      modalSubtitle: createElement("div"),
+      namesSection: createElement("div"),
+      namesGroups,
+      roleButtons,
+      modalForm: createElement("div"),
+      inputName: createElement("input"),
+      inputClass: createElement("input"),
+      modalMessage: createElement("div"),
+      modalTabs: createElement("div"),
+      cancelForm: createElement("div"),
+      cancelSignupList,
+      cancelMessage,
+      cancelSubmitBtn: createElement("button"),
+      confirmBox: createElement("div"),
+      confirmText: createElement("div"),
+      confirmYes: createElement("button"),
+      confirmNo: createElement("button"),
+      pageTitle,
+      h1: pageHeading,
+    },
+    windowOverrides: {
+      top: { location: topLocation },
+    },
+    extraGlobals: {
+      google: deferred.google,
+      setTimeout(callback, delay) {
+        timers.push({ callback, delay });
+        return timers.length;
+      },
+    },
+  });
+
+  client.setDesktopInsightView("registrations");
+  client.openModal(1);
+  client.switchTab("cancel");
+  client.selectCancelSignup(
+    cancelSignupList.children[0].cancelSignupData,
+    cancelSignupList.children[0],
+  );
+
+  client.confirmCancel();
+  client.confirmCancel();
+
+  assert.equal(deferred.calls.cancel.length, 1);
+  assert.equal(client.getEventById(1).signups.length, 2);
+  deferred.calls.cancel[0].succeed({
+    success: true,
+    message: "Cancelled.",
+    role: client.ROLE_KEYS[0].label,
+    filled: 1,
+  });
+
+  const locallyUpdatedEvent = client.getEventById(1);
+  assert.equal(locallyUpdatedEvent.signups.length, 1);
+  assert.equal(locallyUpdatedEvent.signups[0].name, "Bob");
+  assert.equal(locallyUpdatedEvent.slots.general.filled, 1);
+  assert.equal(desktopSignupCount.textContent, "1名");
+  assert.doesNotMatch(getRenderedText(mobileAgenda), /Alice/);
+  assert.match(getRenderedText(mobileAgenda), /Bob/);
+  assert.doesNotMatch(getRenderedText(desktopInsightsContent), /Alice/);
+  assert.match(getRenderedText(desktopInsightsContent), /Bob/);
+  assert.doesNotMatch(getRenderedText(namesGroups), /Alice/);
+  assert.match(getRenderedText(namesGroups), /Bob/);
+  assert.equal(cancelSignupList.children.length, 1);
+  assert.equal(cancelSignupList.children[0].cancelSignupData.name, "Bob");
+  assert.equal(cancelSignupList.children[0].disabled, true);
+  client.selectCancelSignup(
+    cancelSignupList.children[0].cancelSignupData,
+    cancelSignupList.children[0],
+  );
+  assert.match(getRenderedText(roleButtons), /残り1枠/);
+  assert.equal(deferred.calls.refresh.length, 1);
+  assert.equal(deferred.calls.deployedUrl.length, 0);
+  context.PAGE_LOAD_TIME = Date.now() - 4000;
+  context.currentRole = client.ROLE_KEYS[0].label;
+  context.document.getElementById("inputName").value = "Later Signup";
+  context.document.getElementById("inputClass").value = "3-1";
+  client.submitSignup();
+  assert.equal(deferred.calls.signup.length, 0);
+  assert.equal(topLocation.href, "");
+  assert.equal(topLocation.reloadCalls, 0);
+
+  const freshGridData = {
+    activities: ["Hall Monitor", "Library Desk"],
+    times: ["09:30"],
+    events: [
+      {
+        eventId: 1,
+        activity: "Hall Monitor",
+        subtitle: "Morning",
+        startTime: "09:30",
+        endTime: "11:00",
+        location: "Gym",
+        description: "Guide arrivals",
+        slots: {
+          general: { max: 2, filled: 0 },
+          classRep: { max: 1, filled: 1 },
+          steeringCommittee: { max: 0, filled: 0 },
+          orgCommittee: { max: 1, filled: 0 },
+        },
+        signups: [
+          { name: "Bob", cls: "1-2", role: "学年委員" },
+        ],
+      },
+      {
+        eventId: 2,
+        activity: "Library Desk",
+        subtitle: "",
+        startTime: "09:30",
+        endTime: "10:30",
+        location: "Library",
+        description: "",
+        slots: {
+          general: { max: 1, filled: 1 },
+          classRep: { max: 0, filled: 0 },
+          steeringCommittee: { max: 1, filled: 1 },
+          orgCommittee: { max: 0, filled: 0 },
+        },
+        signups: [
+          { name: "Carol", cls: "2-1", role: "役員、運営・実行委員" },
+        ],
+      },
+    ],
+  };
+  deferred.calls.refresh[0].succeed({
+    success: true,
+    gridData: freshGridData,
+    eventStatus: "OPEN",
+    title: "Fresh Event Title",
+  });
+
+  assert.equal(client.getEventById(2).signups[0].name, "Carol");
+  assert.equal(client.getEventById(1).slots.general.filled, 0);
+  assert.equal(context.PAGE_TITLE, "Fresh Event Title");
+  assert.equal(pageTitle.textContent, "Fresh Event Title");
+  assert.equal(context.document.title, "Fresh Event Title");
+  assert.equal(topLocation.href, "");
+  assert.equal(topLocation.reloadCalls, 0);
+  assert.equal(deferred.calls.deployedUrl.length, 0);
+  assert.equal(timers.length, 1);
+  assert.equal(timers[0].delay, 1500);
+  assert.equal(modalOverlay.classList.has("active"), true);
+  timers[0].callback();
+  assert.equal(modalOverlay.classList.has("active"), false);
+  assert.equal(topLocation.href, "");
+  assert.equal(topLocation.reloadCalls, 0);
+});
+
+test("cancellation uses full navigation only when authoritative refresh fails", () => {
+  const cancelSignupList = createElement("div");
+  const selectedOption = createElement("button");
+  cancelSignupList.appendChild(selectedOption);
+  const timers = [];
+  const topLocation = {
+    href: "",
+    reloadCalls: 0,
+    reload() {
+      this.reloadCalls += 1;
+    },
+  };
+  const deferred = createDeferredGoogleRun();
+  const { exports: client, context } = loadClient({
+    elements: {
+      cancelSignupList,
+      cancelMessage: createElement("div"),
+      cancelSubmitBtn: createElement("button"),
+      confirmBox: createElement("div"),
+      confirmYes: createElement("button"),
+      confirmNo: createElement("button"),
+    },
+    windowOverrides: {
+      top: { location: topLocation },
+    },
+    extraGlobals: {
+      google: deferred.google,
+      setTimeout(callback, delay) {
+        timers.push({ callback, delay });
+        return timers.length;
+      },
+    },
+  });
+  context.currentEventId = 1;
+  assert.equal(deferred.calls.deployedUrl.length, 0);
+  client.selectCancelSignup(
+    { name: "Alice", cls: "1-1", role: "一般保護者" },
+    selectedOption,
+  );
+
+  client.confirmCancel();
+  deferred.calls.cancel[0].succeed({
+    success: true,
+    message: "Cancelled.",
+  });
+
+  assert.equal(deferred.calls.refresh.length, 1);
+  assert.equal(topLocation.href, "");
+  deferred.calls.refresh[0].fail(new Error("refresh failed"));
+  assert.equal(deferred.calls.deployedUrl.length, 1);
+  assert.equal(topLocation.href, "");
+  timers[0].callback();
+  assert.equal(
+    topLocation.href,
+    "https://example.com/app?event=test-alias",
+  );
+  assert.equal(topLocation.reloadCalls, 0);
+});
+
+test("slow cancellation refresh stays visibly pending before bounded recovery", () => {
+  const modalOverlay = createElement("div");
+  const cancelSignupList = createElement("div");
+  const pageHeading = createElement("h1");
+  pageHeading.scrollIntoView = function () {};
+  const timers = [];
+  const topLocation = {
+    href: "",
+    reload() {},
+  };
+  const deferred = createDeferredGoogleRun();
+  const { exports: client } = loadClient({
+    elements: {
+      modalOverlay,
+      cancelSignupList,
+      cancelMessage: createElement("div"),
+      cancelSubmitBtn: createElement("button"),
+      confirmBox: createElement("div"),
+      confirmYes: createElement("button"),
+      confirmNo: createElement("button"),
+      h1: pageHeading,
+    },
+    windowOverrides: {
+      top: { location: topLocation },
+    },
+    extraGlobals: {
+      google: deferred.google,
+      setTimeout(callback, delay) {
+        timers.push({ callback, delay });
+        return timers.length;
+      },
+    },
+  });
+
+  client.openModal(1);
+  client.switchTab("cancel");
+  client.selectCancelSignup(
+    cancelSignupList.children[0].cancelSignupData,
+    cancelSignupList.children[0],
+  );
+  client.confirmCancel();
+  deferred.calls.cancel[0].succeed({ success: true, message: "Cancelled." });
+
+  assert.equal(timers.length, 1);
+  assert.equal(timers[0].delay, 1500);
+  timers[0].callback();
+  assert.equal(modalOverlay.classList.has("active"), true);
+  assert.equal(cancelSignupList.children[0].disabled, true);
+  assert.equal(timers.length, 2);
+  assert.equal(timers[1].delay, 10500);
+
+  timers[1].callback();
+  assert.equal(deferred.calls.deployedUrl.length, 1);
+  assert.equal(
+    topLocation.href,
+    "https://example.com/app?event=test-alias",
+  );
+});
+
+test("invalid cancellation refresh reloads safely when lazy URL resolution fails", () => {
+  const cancelSignupList = createElement("div");
+  const selectedOption = createElement("button");
+  cancelSignupList.appendChild(selectedOption);
+  const timers = [];
+  const topLocation = {
+    href: "",
+    reloadCalls: 0,
+    reload() {
+      this.reloadCalls += 1;
+    },
+  };
+  const deferred = createDeferredGoogleRun({ deployedUrlFailure: true });
+  const { exports: client, context } = loadClient({
+    elements: {
+      cancelSignupList,
+      cancelMessage: createElement("div"),
+      cancelSubmitBtn: createElement("button"),
+      confirmBox: createElement("div"),
+      confirmYes: createElement("button"),
+      confirmNo: createElement("button"),
+    },
+    windowOverrides: {
+      top: { location: topLocation },
+    },
+    extraGlobals: {
+      google: deferred.google,
+      setTimeout(callback, delay) {
+        timers.push({ callback, delay });
+        return timers.length;
+      },
+    },
+  });
+  context.currentEventId = 1;
+  assert.equal(deferred.calls.deployedUrl.length, 0);
+  client.selectCancelSignup(
+    { name: "Alice", cls: "1-1", role: "ä¸€èˆ¬ä¿è­·è€…" },
+    selectedOption,
+  );
+
+  client.confirmCancel();
+  deferred.calls.cancel[0].succeed({ success: true, message: "Cancelled." });
+  deferred.calls.refresh[0].succeed({ success: true, gridData: {} });
+
+  assert.equal(deferred.calls.deployedUrl.length, 1);
+  assert.equal(topLocation.reloadCalls, 0);
+  timers[0].callback();
+  assert.equal(topLocation.href, "");
+  assert.equal(topLocation.reloadCalls, 1);
+});
+
 test("cancellation selection updates only the previous and current options", () => {
   const cancelSignupList = createElement("div");
   const cancelSubmitBtn = createElement("button");
@@ -1685,6 +2193,332 @@ test("submitSignup normalises Japanese spacing and brackets before sending to ba
   assert.equal(receivedSignupArgs[1], "山田(太郎)");
 });
 
+test("signup is single-flight and applies canonical success to its captured event", () => {
+  const inputName = { ...createElement("input"), value: "Carol" };
+  const inputClass = { ...createElement("input"), value: "2-1" };
+  const submitBtn = createElement("button");
+  const modalMessage = createElement("div");
+  modalMessage.style = { display: "none" };
+  const timers = [];
+  const deferred = createDeferredGoogleRun();
+  const { exports: client, context } = loadClient({
+    elements: {
+      honeypot: { ...createElement("input"), value: "" },
+      inputName,
+      inputClass,
+      submitBtn,
+      modalMessage,
+      mobileAgenda: createElement("div"),
+    },
+    extraGlobals: {
+      google: deferred.google,
+      setTimeout(callback, delay) {
+        timers.push({ callback, delay });
+        return timers.length;
+      },
+    },
+  });
+  context.PAGE_LOAD_TIME = Date.now() - 4000;
+  context.currentEventId = 1;
+  context.currentRole = client.ROLE_KEYS[0].label;
+
+  submitBtn.dispatchEvent({ type: "click" });
+  inputName.dispatchEvent({ type: "keydown", key: "Enter" });
+
+  assert.equal(deferred.calls.signup.length, 1);
+  assert.deepEqual(Array.from(deferred.calls.signup[0].args), [
+    1,
+    "Carol",
+    "2-1",
+    client.ROLE_KEYS[0].label,
+    "test-alias",
+  ]);
+
+  context.currentEventId = 2;
+  context.currentRole = client.ROLE_KEYS[2].label;
+  deferred.calls.signup[0].succeed({
+    success: true,
+    message: "Signed up.",
+    name: "Carol",
+    cls: "2-1",
+    role: client.ROLE_KEYS[0].label,
+    filled: 3,
+    max: 4,
+  });
+
+  const originalEvent = client.getEventById(1);
+  const otherEvent = client.getEventById(2);
+  assert.equal(originalEvent.signups.length, 3);
+  assert.equal(originalEvent.signups[2].role, client.ROLE_KEYS[0].label);
+  assert.equal(originalEvent.signupsByRole[client.ROLE_KEYS[0].label].length, 2);
+  assert.equal(originalEvent.slots.general.filled, 3);
+  assert.equal(originalEvent.slots.general.max, 4);
+  assert.equal(otherEvent.signups.length, 0);
+  assert.equal(otherEvent.slots.steeringCommittee.filled, 0);
+  assert.equal(String(context.currentEventId), "2");
+});
+
+test("an older signup timer cannot close a newer pending cancellation", () => {
+  const inputName = { ...createElement("input"), value: "Carol" };
+  const inputClass = { ...createElement("input"), value: "2-1" };
+  const modalOverlay = createElement("div");
+  const cancelSignupList = createElement("div");
+  const pageHeading = createElement("h1");
+  pageHeading.scrollIntoView = function () {};
+  const timers = [];
+  const deferred = createDeferredGoogleRun();
+  const { exports: client, context } = loadClient({
+    elements: {
+      honeypot: { ...createElement("input"), value: "" },
+      inputName,
+      inputClass,
+      submitBtn: createElement("button"),
+      modalMessage: createElement("div"),
+      modalOverlay,
+      cancelSignupList,
+      cancelMessage: createElement("div"),
+      cancelSubmitBtn: createElement("button"),
+      confirmBox: createElement("div"),
+      confirmYes: createElement("button"),
+      confirmNo: createElement("button"),
+      h1: pageHeading,
+    },
+    extraGlobals: {
+      google: deferred.google,
+      setTimeout(callback, delay) {
+        timers.push({ callback, delay });
+        return timers.length;
+      },
+    },
+  });
+  context.PAGE_LOAD_TIME = Date.now() - 4000;
+  context.currentEventId = 1;
+  context.currentRole = client.ROLE_KEYS[0].label;
+
+  client.submitSignup();
+  deferred.calls.signup[0].succeed({
+    success: true,
+    message: "Signed up.",
+    role: client.ROLE_KEYS[0].label,
+  });
+  assert.equal(timers.length, 1);
+  assert.equal(modalOverlay.classList.has("active"), true);
+
+  client.switchTab("cancel");
+  client.selectCancelSignup(
+    cancelSignupList.children[0].cancelSignupData,
+    cancelSignupList.children[0],
+  );
+  client.confirmCancel();
+  assert.equal(deferred.calls.cancel.length, 1);
+
+  timers[0].callback();
+  assert.equal(modalOverlay.classList.has("active"), true);
+  assert.equal(deferred.calls.cancel.length, 1);
+});
+
+test("read-only mutation responses update only a currently open modal", () => {
+  function createReadOnlyMutationCase() {
+    const modalOverlay = createElement("div");
+    const roleButtons = createElement("div");
+    const modalReadOnlyNotice = createElement("div");
+    const modalForm = createElement("div");
+    const cancelForm = createElement("div");
+    const modalTitle = createElement("h2");
+    const pageHeading = createElement("h1");
+    pageHeading.scrollIntoView = function () {};
+    const deferred = createDeferredGoogleRun();
+    const loaded = loadClient({
+      elements: {
+        honeypot: { ...createElement("input"), value: "" },
+        inputName: { ...createElement("input"), value: "Carol" },
+        inputClass: { ...createElement("input"), value: "2-1" },
+        submitBtn: createElement("button"),
+        modalMessage: createElement("div"),
+        modalOverlay,
+        modalTitle,
+        roleButtons,
+        modalReadOnlyNotice,
+        modalForm,
+        cancelForm,
+        modalTabs: createElement("div"),
+        readOnlyBanner: createElement("div"),
+        h1: pageHeading,
+      },
+      extraGlobals: {
+        google: deferred.google,
+      },
+    });
+    return {
+      ...loaded,
+      deferred,
+      modalOverlay,
+      roleButtons,
+      modalReadOnlyNotice,
+      modalForm,
+      cancelForm,
+      modalTitle,
+    };
+  }
+
+  const visible = createReadOnlyMutationCase();
+  visible.exports.openModal(1);
+  visible.context.PAGE_LOAD_TIME = Date.now() - 4000;
+  visible.context.currentRole = visible.exports.ROLE_KEYS[0].label;
+  visible.context.document.getElementById("inputName").value = "Carol";
+  visible.context.document.getElementById("inputClass").value = "2-1";
+  visible.exports.submitSignup();
+  visible.exports.openModal(2);
+  visible.deferred.calls.signup[0].succeed({
+    success: false,
+    code: "event_read_only",
+    message: "Read only.",
+  });
+
+  assert.equal(visible.exports.isEventReadOnly(), true);
+  assert.equal(String(visible.context.currentEventId), "2");
+  assert.equal(visible.modalTitle.textContent, "Library Desk");
+  assert.equal(visible.modalOverlay.classList.has("active"), true);
+  assert.equal(visible.roleButtons.children.length, 0);
+  assert.equal(visible.roleButtons.style.display, "none");
+  assert.equal(visible.modalReadOnlyNotice.style.display, "block");
+  assert.equal(visible.modalForm.className, "modal-form");
+  assert.equal(visible.cancelForm.className, "cancel-form");
+
+  const closed = createReadOnlyMutationCase();
+  closed.exports.openModal(1);
+  closed.context.PAGE_LOAD_TIME = Date.now() - 4000;
+  closed.context.currentRole = closed.exports.ROLE_KEYS[0].label;
+  closed.context.document.getElementById("inputName").value = "Carol";
+  closed.context.document.getElementById("inputClass").value = "2-1";
+  closed.exports.submitSignup();
+  closed.exports.closeModal();
+  closed.deferred.calls.signup[0].succeed({
+    success: false,
+    code: "event_read_only",
+    message: "Read only.",
+  });
+
+  assert.equal(closed.exports.isEventReadOnly(), true);
+  assert.equal(closed.context.currentEventId, null);
+  assert.equal(closed.modalOverlay.classList.has("active"), false);
+});
+
+test("refresh-driven read-only state updates a newer modal but keeps a closed modal closed", () => {
+  function createReadOnlyRefreshCase() {
+    const modalOverlay = createElement("div");
+    const roleButtons = createElement("div");
+    const modalReadOnlyNotice = createElement("div");
+    const modalForm = createElement("div");
+    const cancelForm = createElement("div");
+    const modalTabs = createElement("div");
+    const signupHelper = createElement("div");
+    const modalTitle = createElement("h2");
+    const cancelSignupList = createElement("div");
+    const pageHeading = createElement("h1");
+    pageHeading.scrollIntoView = function () {};
+    const timers = [];
+    const deferred = createDeferredGoogleRun();
+    const loaded = loadClient({
+      elements: {
+        modalOverlay,
+        modalTitle,
+        roleButtons,
+        modalReadOnlyNotice,
+        modalForm,
+        cancelForm,
+        modalTabs,
+        signupHelper,
+        cancelSignupList,
+        cancelMessage: createElement("div"),
+        cancelSubmitBtn: createElement("button"),
+        confirmBox: createElement("div"),
+        confirmYes: createElement("button"),
+        confirmNo: createElement("button"),
+        readOnlyBanner: createElement("div"),
+        h1: pageHeading,
+      },
+      extraGlobals: {
+        google: deferred.google,
+        setTimeout(callback, delay) {
+          timers.push({ callback, delay });
+          return timers.length;
+        },
+      },
+    });
+    return {
+      ...loaded,
+      deferred,
+      timers,
+      modalOverlay,
+      roleButtons,
+      modalReadOnlyNotice,
+      modalForm,
+      cancelForm,
+      modalTabs,
+      signupHelper,
+      modalTitle,
+      cancelSignupList,
+    };
+  }
+
+  function startConfirmedCancellation(loaded) {
+    loaded.exports.openModal(1);
+    loaded.exports.switchTab("cancel");
+    loaded.exports.selectCancelSignup(
+      loaded.cancelSignupList.children[0].cancelSignupData,
+      loaded.cancelSignupList.children[0],
+    );
+    loaded.exports.confirmCancel();
+    loaded.deferred.calls.cancel[0].succeed({
+      success: true,
+      message: "Cancelled.",
+      role: loaded.exports.ROLE_KEYS[0].label,
+      filled: 0,
+    });
+    return JSON.parse(JSON.stringify(loaded.context.gridData));
+  }
+
+  const visible = createReadOnlyRefreshCase();
+  const visibleFreshGrid = startConfirmedCancellation(visible);
+  visible.exports.closeModal();
+  visible.exports.openModal(2);
+  visible.deferred.calls.refresh[0].succeed({
+    success: true,
+    gridData: visibleFreshGrid,
+    eventStatus: "READ_ONLY",
+  });
+
+  assert.equal(visible.exports.isEventReadOnly(), true);
+  assert.equal(String(visible.context.currentEventId), "2");
+  assert.equal(visible.modalTitle.textContent, "Library Desk");
+  assert.equal(visible.modalOverlay.classList.has("active"), true);
+  assert.equal(visible.modalReadOnlyNotice.style.display, "block");
+  assert.equal(visible.modalTabs.style.display, "none");
+  assert.equal(visible.signupHelper.style.display, "none");
+  assert.equal(visible.roleButtons.style.display, "none");
+  assert.equal(visible.modalForm.className, "modal-form");
+  assert.equal(visible.cancelForm.className, "cancel-form");
+  assert.equal(visible.timers.length, 1);
+  visible.timers[0].callback();
+  assert.equal(visible.modalOverlay.classList.has("active"), true);
+
+  const closed = createReadOnlyRefreshCase();
+  const closedFreshGrid = startConfirmedCancellation(closed);
+  closed.exports.closeModal();
+  closed.deferred.calls.refresh[0].succeed({
+    success: true,
+    gridData: closedFreshGrid,
+    eventStatus: "READ_ONLY",
+  });
+
+  assert.equal(closed.exports.isEventReadOnly(), true);
+  assert.equal(closed.context.currentEventId, null);
+  assert.equal(closed.modalOverlay.classList.has("active"), false);
+  closed.timers[0].callback();
+  assert.equal(closed.modalOverlay.classList.has("active"), false);
+});
+
 test("submitSignup refreshes grid data after a stale full-slot rejection", () => {
   const modalMessage = createElement("div");
   modalMessage.style = { display: "none" };
@@ -1774,6 +2608,56 @@ test("submitSignup refreshes grid data after a stale full-slot rejection", () =>
   assert.equal(modalMessage.className, "modal-message error");
   assert.equal(submitBtn.disabled, false);
   assert.equal(roleButtons.children[0].children[1].textContent, "Full");
+});
+
+test("stale-slot refresh keeps the global mutation guard until it settles", () => {
+  const submitBtn = createElement("button");
+  const modalMessage = createElement("div");
+  modalMessage.style = { display: "none" };
+  const deferred = createDeferredGoogleRun();
+  const { exports: client, context } = loadClient({
+    elements: {
+      honeypot: { ...createElement("input"), value: "" },
+      inputName: { ...createElement("input"), value: "Carol" },
+      inputClass: { ...createElement("input"), value: "2-1" },
+      submitBtn,
+      modalMessage,
+      cancelSignupList: createElement("div"),
+      cancelMessage: createElement("div"),
+      cancelSubmitBtn: createElement("button"),
+      confirmBox: createElement("div"),
+      confirmYes: createElement("button"),
+      confirmNo: createElement("button"),
+    },
+    extraGlobals: {
+      google: deferred.google,
+    },
+  });
+  context.PAGE_LOAD_TIME = Date.now() - 4000;
+  context.currentEventId = 1;
+  context.currentRole = client.ROLE_KEYS[0].label;
+
+  client.submitSignup();
+  deferred.calls.signup[0].succeed({
+    success: false,
+    code: "slot_full",
+    message: "Slot is full.",
+  });
+
+  assert.equal(deferred.calls.refresh.length, 1);
+  assert.equal(submitBtn.disabled, true);
+  context.currentCancelSignup = {
+    name: "Alice",
+    cls: "1-1",
+    role: client.ROLE_KEYS[0].label,
+  };
+  client.confirmCancel();
+  assert.equal(deferred.calls.cancel.length, 0);
+
+  deferred.calls.refresh[0].fail(new Error("refresh failed"));
+  assert.equal(submitBtn.disabled, false);
+  client.confirmCancel();
+  assert.equal(deferred.calls.cancel.length, 1);
 });
 
 test("desktop reuses the responsive filters and card schedule", () => {

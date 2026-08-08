@@ -55,6 +55,12 @@
         .addEventListener("click", submitSignup);
       document
         .getElementById("inputName")
+        .addEventListener("input", invalidateModalCompletion);
+      document
+        .getElementById("inputClass")
+        .addEventListener("input", invalidateModalCompletion);
+      document
+        .getElementById("inputName")
         .addEventListener("keydown", function (e) {
           if (e.key === "Enter") submitSignup();
         });
@@ -207,11 +213,29 @@
           if (!btn) return;
           setMobileRoleFilter(btn.getAttribute("data-mobile-role-filter"));
         });
-      document
-        .getElementById("mobileKeywordSearch")
-        .addEventListener("input", function (e) {
-          setMobileKeywordSearchQuery(e.target.value);
-        });
+      var mobileKeywordSearchInput = document.getElementById(
+        "mobileKeywordSearch",
+      );
+      mobileKeywordSearchInput.addEventListener("compositionstart", function () {
+        setMobileKeywordInputComposing(true);
+      });
+      mobileKeywordSearchInput.addEventListener("input", function (e) {
+        if (e.isComposing) setMobileKeywordInputComposing(true);
+        queueMobileKeywordSearchQuery(e.target.value);
+      });
+      mobileKeywordSearchInput.addEventListener("compositionend", function (e) {
+        setMobileKeywordInputComposing(false);
+        queueMobileKeywordSearchQuery(e.target.value);
+        flushMobileKeywordSearchRender();
+      });
+      mobileKeywordSearchInput.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" && !e.isComposing) {
+          flushMobileKeywordSearchRender();
+        }
+      });
+      mobileKeywordSearchInput.addEventListener("blur", function () {
+        flushMobileKeywordSearchRender();
+      });
       document
         .getElementById("desktopActivityFilterToggle")
         .addEventListener("click", function () {
@@ -290,20 +314,10 @@
         if (toggle && toggle.focus) toggle.focus();
       });
 
-      // Initial page state and the canonical URL used after successful writes.
+      // Initial page state.
       document.getElementById("pageTitle").textContent = PAGE_TITLE;
       setEventStatus(eventStatus);
       updateMobileDisplayModeControl();
-
-      google.script.run
-        .withSuccessHandler(function (url) {
-          EXEC_URL =
-            url +
-            (url.indexOf("?") === -1 ? "?" : "&") +
-            "event=" +
-            encodeURIComponent(alias);
-        })
-        .getDeployedUrl();
 
       // Initial data indexing/rendering and debounced responsive updates.
       buildGridIndexes();

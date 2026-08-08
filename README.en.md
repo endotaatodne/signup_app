@@ -25,6 +25,8 @@ A free, open-source volunteer signup app built on Google Apps Script and Google 
 - Users sign up with name and class — no Google account required
 - Japanese names are stored and matched without spaces, while non-Japanese name spacing is preserved
 - Users can select and cancel their own signup via the modal
+- Confirmed signups and cancellations update the visible schedule and modal immediately; cancellations then reconcile with fresh server data in the background and reload the page only if that refresh cannot be applied
+- Signup and cancellation requests are single-flight in the browser, preventing repeated actions from starting overlapping mutations
 - Names grouped by role in the signup modal
 - Notes shown in the modal when clicking a slot
 - Slot limits enforced server-side with race condition protection
@@ -246,6 +248,8 @@ When a name containing Japanese characters is submitted, spaces (including full-
 
 For duplicate, overlapping-time, and activity-limit checks, the participant is identified by their normalised name only. Class remains free-text information that is stored and displayed with the signup, and it is used when cancelling the selected registration, but changing the class does not create a separate identity for these checks.
 
+After the server confirms a signup or cancellation, the current schedule, counts, and modal state are synchronised immediately. A successful cancellation also requests an authoritative grid snapshot in the background so concurrent changes are reconciled without delaying the confirmation. If that refresh cannot be applied, the app falls back to reloading the deployed event page. While either mutation is pending, repeated clicks do not start another request.
+
 ---
 
 ## Managing Events
@@ -455,6 +459,7 @@ npm run deploy
 - A honeypot field and timing check deter basic bot submissions
 - Rate limiting prevents rapid repeated submissions
 - `LockService` prevents race conditions when multiple users sign up simultaneously
+- Browser-side single-flight guards prevent accidental overlapping requests; server-side validation, rate limiting, and locking remain authoritative
 - Role validation is enforced server-side using canonical values — clients cannot submit invalid roles
 - All user-supplied data is sanitised before embedding in the page
 - Backend cancellation requires the selected signup's name, class, and role to match an existing row
@@ -508,7 +513,9 @@ The main runtime paths are:
 
 - Page load: `doGet` resolves the event configuration, loads validated spreadsheet data, builds the public grid model, and renders `index.html`. The template composes the markup and scripts, then `ClientInit.html` binds the page controls and performs the first render.
 - Schedule interaction: `ClientFilters.html` owns filter state and matching, `ClientSchedule.html` renders the responsive schedule, and `ClientInsights.html` derives desktop summaries from the currently visible events.
-- Signup or cancellation: `ClientModal.html` validates the immediate browser input and calls the public Apps Script service. `SignupService.gs` repeats authoritative validation, checks event policy and rate limits, serialises the sheet mutation with `LockService`, and returns a safe result before the client refreshes the grid.
+- Signup or cancellation: `ClientModal.html` validates the immediate browser input and allows only one mutation request at a time. `SignupService.gs` repeats authoritative validation, checks event policy and rate limits, and serialises the sheet mutation with `LockService`. After a confirmed result, the client updates the visible state immediately; successful cancellations also reconcile with an authoritative background grid refresh and use a page reload only as a fallback.
+
+Required Sheet reads are bounded to the declared schema columns. Repeated Config checks within one server execution reuse the same opened master-spreadsheet handle, but the Config values are still read again immediately before a mutation so a status or target change cannot be bypassed. This is handle reuse, not a cache of event or signup data.
 
 Server helpers whose names end in `_` are internal conventions rather than browser entry points. The intended public server surface is limited to `doGet`, `getGridDataForAlias`, `submitSignup`, `cancelSignup`, and `getDeployedUrl`.
 
@@ -535,6 +542,8 @@ Current test coverage includes:
 - Server-side `.gs` files covering config loading, signup/cancellation flows, rate limiting, spreadsheet validation, sanitisation, and normalisation
 - Shared normalisation behaviour for names (including Japanese spacing), classes, digits, and class separators
 - Composed client-side logic across `Client*.html`, including event indexing, responsive layouts, schedule filters and views, desktop summaries, cancellation selection, message rendering, and client normalisation
+- Post-mutation UI synchronisation, single-flight signup/cancellation requests, authoritative cancellation refresh, and reload fallback behaviour
+- Deterministic spreadsheet-service call counts using synthetic, non-identifying fixtures
 - Source-documentation coverage for every production file and named function
 
 Testing strategy:
@@ -544,6 +553,8 @@ Testing strategy:
 - Keep the test harness aligned with the deployed project by loading every root `.gs` file and resolving the HTML includes from `index.html`
 - Keep Apps Script-specific and browser-specific dependencies mocked in tests so production logic can be exercised without deploying
 - Treat unit tests as regression protection: if you fix a bug, add a test that would have failed before the fix
+
+Performance work is measured with deterministic mock service-call counts and synthetic fixture data rather than real participant records. Local test timings do not represent Google Apps Script or network latency. If deployment-level timings are collected, use only allowlisted operation/outcome values, duration totals, and coarse dataset-size buckets; never record names, classes, roles, aliases, Sheet IDs, Event IDs, search text, messages, or row contents.
 
 Note: the current suite focuses on unit-level behavior. It does not replace full browser interaction testing.
 

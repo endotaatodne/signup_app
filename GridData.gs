@@ -95,7 +95,7 @@ function getGridData_(spreadsheet) {
  * Fetches fresh public schedule data and policy status for an event alias.
  * Validation and spreadsheet errors are logged and converted to safe failures.
  * @param {string} alias - Event alias from the page URL.
- * @returns {{success: boolean, gridData: (Object|undefined), eventStatus: (string|undefined), message: (string|undefined)}}
+ * @returns {{success: boolean, gridData: (Object|undefined), eventStatus: (string|undefined), title: (string|undefined), message: (string|undefined)}}
  *   Success payload or a user-safe failure payload.
  */
 function getGridDataForAlias(alias) {
@@ -115,6 +115,7 @@ function getGridDataForAlias(alias) {
       success: true,
       gridData: getGridData_(spreadsheet),
       eventStatus: eventSettings.status,
+      title: spreadsheet.getName(),
     };
   } catch (e) {
     console.error("getGridDataForAlias error: " + e.message);

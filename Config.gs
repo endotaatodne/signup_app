@@ -91,19 +91,22 @@ const APP_TIME_ZONE = "Australia/Brisbane";
  * Reads the master Config sheet into a case-normalised event-settings map.
  * Rows with invalid aliases or Sheet IDs are ignored. A missing/invalid Status
  * header or value is logged and fails closed to READ_ONLY.
+ * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} [masterSpreadsheet]
+ *   Existing master handle; Config values are freshly read on every call.
  * @returns {Object<string, {sheetId: string, status: string}>} Settings by alias.
  * @throws {Error} If the master spreadsheet or Config sheet cannot be read, or
  *   if the required Config headers are invalid.
  */
-function getEventSettings_() {
+function getEventSettings_(masterSpreadsheet) {
   if (!MASTER_SHEET_ID) {
     console.error("MASTER_SHEET_ID not set in Script Properties");
     return {};
   }
   const rows = getSheetData_(
-    SpreadsheetApp.openById(MASTER_SHEET_ID),
+    masterSpreadsheet || getMasterSpreadsheet_(),
     SHEET_NAMES.config,
     CONFIG_HEADER_ALIASES,
+    { valueColumnCount: 3 },
   ).values;
   const hasValidStatusHeader =
     rows[0].length >= 3 &&
@@ -147,6 +150,18 @@ function getEventSettings_() {
 }
 
 /**
+ * Opens the configured master spreadsheet for reuse within one request.
+ * Values and sheets are not cached by this helper.
+ * @returns {?GoogleAppsScript.Spreadsheet.Spreadsheet} Master handle, or `null`
+ *   when MASTER_SHEET_ID is not configured.
+ * @throws {Error} If Apps Script cannot open the configured spreadsheet.
+ */
+function getMasterSpreadsheet_() {
+  if (!MASTER_SHEET_ID) return null;
+  return SpreadsheetApp.openById(MASTER_SHEET_ID);
+}
+
+/**
  * Builds the backwards-compatible alias-to-Sheet-ID map used by integrations.
  * Access decisions must use getEventSettings_ so event status is not discarded.
  * @returns {Object<string, string>} Sheet ID by lower-case event alias.
@@ -180,11 +195,15 @@ function parseEventStatus_(value) {
  * spreadsheet and remains open. Used immediately before mutations.
  * @param {*} alias - Event alias supplied with the request.
  * @param {string} expectedSheetId - Previously resolved event Sheet ID.
+ * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} [masterSpreadsheet]
+ *   Reusable master handle; Config values are still read again.
  * @returns {boolean} Whether the event is still safe to mutate.
  * @throws {Error} If the Config sheet cannot be read or validated.
  */
-function isEventOpenForWrite_(alias, expectedSheetId) {
-  const eventSettings = getEventSettings_()[String(alias || "").toLowerCase()];
+function isEventOpenForWrite_(alias, expectedSheetId, masterSpreadsheet) {
+  const eventSettings = getEventSettings_(masterSpreadsheet)[
+    String(alias || "").toLowerCase()
+  ];
   return Boolean(
     eventSettings &&
     eventSettings.sheetId === expectedSheetId &&

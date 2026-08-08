@@ -13,24 +13,130 @@ const MONTHS = [
   "Dec",
 ];
 
+function getRangeColumnCount(rows) {
+  return rows.reduce((maximum, row) => Math.max(maximum, row.length), 0);
+}
+
+function readRange(rows, row, column, numRows, numColumns) {
+  const startRow = row - 1;
+  const startColumn = column - 1;
+
+  return Array.from({ length: numRows }, (_, rowOffset) => {
+    const sourceRow = rows[startRow + rowOffset] || [];
+    return Array.from({ length: numColumns }, (_, columnOffset) => {
+      const value = sourceRow[startColumn + columnOffset];
+      return value === undefined ? "" : value;
+    });
+  });
+}
+
+function createRange(state, row, column, numRows, numColumns) {
+  const rangeDetails = { row, column, numRows, numColumns };
+
+  return {
+    getNumRows() {
+      return numRows;
+    },
+    getNumColumns() {
+      return numColumns;
+    },
+    getValues() {
+      state.calls.getValues += 1;
+      state.calls.valueCellsRead += numRows * numColumns;
+      state.calls.valueRanges.push({ ...rangeDetails });
+      if (typeof state.onGetValues === "function") {
+        state.onGetValues({
+          callNumber: state.calls.getValues,
+          ...rangeDetails,
+        });
+      }
+      return readRange(state.values, row, column, numRows, numColumns);
+    },
+    getDisplayValues() {
+      state.calls.getDisplayValues += 1;
+      state.calls.displayCellsRead += numRows * numColumns;
+      state.calls.displayRanges.push({ ...rangeDetails });
+      if (typeof state.onGetDisplayValues === "function") {
+        state.onGetDisplayValues({
+          callNumber: state.calls.getDisplayValues,
+          ...rangeDetails,
+        });
+      }
+      return readRange(
+        state.displayValues,
+        row,
+        column,
+        numRows,
+        numColumns,
+      );
+    },
+  };
+}
+
+function assertRangeWithinSheet(state, row, column, numRows, numColumns) {
+  const maxRows = Math.max(
+    state.maxRows,
+    state.values.length,
+    state.displayValues.length,
+  );
+  const maxColumns = Math.max(
+    state.maxColumns,
+    getRangeColumnCount(state.values),
+    getRangeColumnCount(state.displayValues),
+  );
+
+  if (row < 1 || numRows < 1 || row + numRows - 1 > maxRows) {
+    throw new Error("Those rows are out of bounds.");
+  }
+  if (column < 1 || numColumns < 1 || column + numColumns - 1 > maxColumns) {
+    throw new Error("Those columns are out of bounds.");
+  }
+}
+
 function createSheet(values, displayValues = values) {
+  const initialRowCount = Math.max(values.length, displayValues.length);
+  const initialColumnCount = Math.max(
+    getRangeColumnCount(values),
+    getRangeColumnCount(displayValues),
+  );
   const state = {
     values: values.map((row) => row.slice()),
     displayValues: displayValues.map((row) => row.slice()),
+    maxRows: Math.max(initialRowCount, 1),
+    maxColumns: Math.max(initialColumnCount, 1),
     deletedRows: [],
+    onGetValues: null,
+    onGetDisplayValues: null,
+    calls: {
+      getDataRange: 0,
+      getRange: 0,
+      getValues: 0,
+      getDisplayValues: 0,
+      valueCellsRead: 0,
+      displayCellsRead: 0,
+      valueRanges: [],
+      displayRanges: [],
+    },
   };
 
   return {
     __state: state,
     getDataRange() {
-      return {
-        getValues() {
-          return state.values.map((row) => row.slice());
-        },
-        getDisplayValues() {
-          return state.displayValues.map((row) => row.slice());
-        },
-      };
+      state.calls.getDataRange += 1;
+      const numRows = Math.max(
+        state.values.length,
+        state.displayValues.length,
+      );
+      const numColumns = Math.max(
+        getRangeColumnCount(state.values),
+        getRangeColumnCount(state.displayValues),
+      );
+      return createRange(state, 1, 1, numRows, numColumns);
+    },
+    getRange(row, column, numRows, numColumns) {
+      state.calls.getRange += 1;
+      assertRangeWithinSheet(state, row, column, numRows, numColumns);
+      return createRange(state, row, column, numRows, numColumns);
     },
     appendRow(row) {
       state.values.push(row.slice());
@@ -45,11 +151,22 @@ function createSheet(values, displayValues = values) {
 }
 
 function createSpreadsheet(name, sheets) {
+  const state = {
+    calls: {
+      getSheetByName: 0,
+      getSheetByNameByName: Object.create(null),
+    },
+  };
+
   return {
+    __state: state,
     getName() {
       return name;
     },
     getSheetByName(sheetName) {
+      state.calls.getSheetByName += 1;
+      state.calls.getSheetByNameByName[sheetName] =
+        (state.calls.getSheetByNameByName[sheetName] || 0) + 1;
       return sheets[sheetName] || null;
     },
   };
@@ -166,6 +283,10 @@ function createGasMocks(options = {}) {
     nowValue = "2026-04-19T00:00:00Z",
     lockWaitFails = false,
     propertyStore = new Map(),
+    serviceCalls = {
+      spreadsheetOpenById: 0,
+      spreadsheetOpenByIdById: Object.create(null),
+    },
   } = options;
 
   let uuidIndex = 0;
@@ -176,6 +297,7 @@ function createGasMocks(options = {}) {
     logs,
     lock,
     propertyStore,
+    serviceCalls,
     globals: {
       console: {
         error(message) {
@@ -200,6 +322,9 @@ function createGasMocks(options = {}) {
       },
       SpreadsheetApp: {
         openById(id) {
+          serviceCalls.spreadsheetOpenById += 1;
+          serviceCalls.spreadsheetOpenByIdById[id] =
+            (serviceCalls.spreadsheetOpenByIdById[id] || 0) + 1;
           const spreadsheet = spreadsheets[id];
           if (!spreadsheet) {
             throw new Error(`Unknown spreadsheet: ${id}`);

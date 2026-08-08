@@ -6,6 +6,11 @@
        * DOM helpers, plus formatting and schedule helpers that are available
        * before user-driven rendering begins.
        */
+      var mobileKeywordRenderHandle = null;
+      var mobileKeywordRenderUsesAnimationFrame = false;
+      var mobileKeywordInputComposing = false;
+      var mobileKeywordRenderDirty = false;
+
       /**
        * Reports whether at least one configured role has remaining capacity.
        * @param {Object<string, {max: number, filled: number}>} slots Slots by role key.
@@ -184,6 +189,86 @@
       }
 
       /**
+       * Cancels a queued keyword-driven schedule render, if one exists.
+       * Side effect: clears the pending animation-frame or timeout callback.
+       * @returns {void}
+       */
+      function cancelMobileKeywordSearchRender() {
+        if (mobileKeywordRenderHandle === null) return;
+        if (
+          mobileKeywordRenderUsesAnimationFrame &&
+          window.cancelAnimationFrame
+        ) {
+          window.cancelAnimationFrame(mobileKeywordRenderHandle);
+        } else {
+          window.clearTimeout(mobileKeywordRenderHandle);
+        }
+        mobileKeywordRenderHandle = null;
+        mobileKeywordRenderUsesAnimationFrame = false;
+      }
+
+      /**
+       * Queues one schedule render for the latest keyword value.
+       * Side effect: schedules an animation-frame callback or timeout fallback.
+       * @returns {void}
+       */
+      function scheduleMobileKeywordSearchRender() {
+        if (
+          mobileKeywordInputComposing ||
+          mobileKeywordRenderHandle !== null
+        ) {
+          return;
+        }
+        mobileKeywordRenderUsesAnimationFrame = !!window.requestAnimationFrame;
+        var schedule = mobileKeywordRenderUsesAnimationFrame
+          ? window.requestAnimationFrame.bind(window)
+          : window.setTimeout.bind(window);
+        mobileKeywordRenderHandle = schedule(function () {
+          mobileKeywordRenderHandle = null;
+          mobileKeywordRenderUsesAnimationFrame = false;
+          if (!mobileKeywordInputComposing && mobileKeywordRenderDirty) {
+            mobileKeywordRenderDirty = false;
+            buildMobileAgenda();
+          }
+        }, 0);
+      }
+
+      /**
+       * Flushes the latest queued keyword value into the rendered schedule.
+       * Side effect: cancels any queued callback and rebuilds immediately when
+       * Japanese input composition is not active.
+       * @returns {void}
+       */
+      function flushMobileKeywordSearchRender() {
+        if (mobileKeywordInputComposing || !mobileKeywordRenderDirty) return;
+        cancelMobileKeywordSearchRender();
+        mobileKeywordRenderDirty = false;
+        buildMobileAgenda();
+      }
+
+      /**
+       * Records whether the keyword input is inside an IME composition session.
+       * @param {*} composing Truthy while text composition is active.
+       * @returns {void}
+       */
+      function setMobileKeywordInputComposing(composing) {
+        mobileKeywordInputComposing = !!composing;
+      }
+
+      /**
+       * Stores the latest user-entered keyword and coalesces its schedule render.
+       * @param {*} value Raw keyword input.
+       * @returns {void}
+       */
+      function queueMobileKeywordSearchQuery(value) {
+        var nextValue = String(value || "");
+        if (mobileKeywordSearchQuery === nextValue) return;
+        mobileKeywordSearchQuery = nextValue;
+        mobileKeywordRenderDirty = true;
+        scheduleMobileKeywordSearchRender();
+      }
+
+      /**
        * Provides the legacy volunteer-name query alias.
        * @returns {string} The current normalised keyword query.
        */
@@ -226,6 +311,8 @@
        * @returns {void}
        */
       function setMobileKeywordSearchQuery(value) {
+        cancelMobileKeywordSearchRender();
+        mobileKeywordRenderDirty = false;
         mobileKeywordSearchQuery = String(value || "");
         mobileAvailableTimeFilter = normaliseMobileAvailableTimeFilter(
           mobileAvailableTimeFilter,
@@ -239,6 +326,8 @@
        * @returns {void}
        */
       function resetScheduleFilters() {
+        cancelMobileKeywordSearchRender();
+        mobileKeywordRenderDirty = false;
         mobileActivityFilter = MOBILE_ACTIVITY_FILTER_ALL;
         mobileRoleAvailabilityFilter = MOBILE_ROLE_FILTER_ALL;
         mobileAvailableTimeFilter = [];
@@ -529,6 +618,12 @@
        * @returns {string[]} Selected start times.
        */
       function getMobileAvailableTimeFilters() {
+        if (
+          Array.isArray(mobileAvailableTimeFilter) &&
+          mobileAvailableTimeFilter.length === 0
+        ) {
+          return [];
+        }
         mobileAvailableTimeFilter = normaliseMobileAvailableTimeFilter(
           mobileAvailableTimeFilter,
         );

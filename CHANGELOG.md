@@ -1,3 +1,15 @@
+## v0.2.10 - 2026-08-08
+
+- Patch
+  - Updates the visible schedule and modal immediately after the server confirms a signup or cancellation.
+  - Reconciles successful cancellations with an authoritative background grid refresh, with a full-page reload fallback when fresh data cannot be applied.
+  - Keeps signup and cancellation mutations single-flight in the browser so repeated actions cannot start overlapping requests.
+  - Coalesces keyword-search rendering to one animation frame, handles IME composition safely, and skips unnecessary available-time derivation when no time filter is selected.
+  - Defers deployment-URL lookup until it is actually needed for cancellation refresh recovery, removing an RPC from normal page loads.
+  - Narrows spreadsheet reads to the declared schema columns and reuses the opened master-spreadsheet handle within one server execution while preserving validation, locking, and final policy checks.
+  - Adds privacy-safe performance measurement based on deterministic service-call counts and synthetic, non-identifying fixtures.
+  - Bumps the app version to 0.2.10.
+
 ## v0.2.9 - 2026-08-08
 
 - Patch
