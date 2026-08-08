@@ -994,29 +994,8 @@
        */
       function showMessage(targetId, message, success) {
         var msgDiv = document.getElementById(targetId);
-        var refreshPrompt = "ページをリフレッシュしてください。";
-        msgDiv.textContent = "";
         msgDiv.className = "modal-message " + (success ? "success" : "error");
-
-        if (success && message.indexOf(refreshPrompt) !== -1) {
-          msgDiv.className += " action-needed";
-
-          var mainText = message.replace(refreshPrompt, "").trim();
-          if (mainText) {
-            var mainSpan = document.createElement("span");
-            mainSpan.className = "modal-message-main";
-            mainSpan.textContent = mainText;
-            msgDiv.appendChild(mainSpan);
-          }
-
-          var emphasisSpan = document.createElement("span");
-          emphasisSpan.className = "modal-message-emphasis";
-          emphasisSpan.textContent = refreshPrompt;
-          msgDiv.appendChild(emphasisSpan);
-        } else {
-          msgDiv.textContent = message;
-        }
-
+        msgDiv.textContent = message;
         msgDiv.style.display = "block";
       }
 
@@ -1028,6 +1007,10 @@
        */
       function showCancelMessage(message, success) {
         showMessage("cancelMessage", message, success);
+        if (success) {
+          document.getElementById("cancelMessage").className +=
+            " cancellation-success";
+        }
       }
 
       /**

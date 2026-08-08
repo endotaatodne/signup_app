@@ -1428,45 +1428,6 @@ test("name normalization in index.html converts full-width brackets", () => {
   assert.equal(client.isValidNameValue("山田（太郎）"), false);
 });
 
-test("showMessage renders refresh prompts with emphasis spans", () => {
-  const messageNode = createElement("div");
-  messageNode.style = { display: "none" };
-  const { exports: client } = loadClient({
-    elements: {
-      modalMessage: messageNode,
-      cancelMessage: createElement("div"),
-    },
-  });
-
-  client.showMessage(
-    "modalMessage",
-    "キャンセルされました。ページをリフレッシュしてください。",
-    true,
-  );
-
-  assert.equal(messageNode.className, "modal-message success action-needed");
-  assert.equal(messageNode.style.display, "block");
-  assert.equal(messageNode.children.length, 2);
-  assert.equal(messageNode.children[0].className, "modal-message-main");
-  assert.equal(messageNode.children[1].className, "modal-message-emphasis");
-});
-
-test("showCancelMessage forwards to the cancel message target", () => {
-  const cancelNode = createElement("div");
-  cancelNode.style = { display: "none" };
-  const { exports: client } = loadClient({
-    elements: {
-      cancelMessage: cancelNode,
-    },
-  });
-
-  client.showCancelMessage("入力内容をご確認ください。", false);
-
-  assert.equal(cancelNode.textContent, "入力内容をご確認ください。");
-  assert.equal(cancelNode.className, "modal-message error");
-  assert.equal(cancelNode.style.display, "block");
-});
-
 test("index.html keeps signup validation inputs and uses a cancellation selection list", () => {
   const htmlSource = getIndexHtmlSource();
   function getInputBlock(id) {
@@ -1641,6 +1602,7 @@ test("confirmCancel sends the selected signup details to the existing backend", 
 });
 
 test("confirmed cancellation updates every visible surface before fresh data arrives", () => {
+  const htmlSource = getIndexHtmlSource();
   const mobileAgenda = createElement("div");
   mobileAgenda.className = "mobile-agenda";
   mobileAgenda.style = {};
@@ -1723,10 +1685,22 @@ test("confirmed cancellation updates every visible surface before fresh data arr
   assert.equal(client.getEventById(1).signups.length, 2);
   deferred.calls.cancel[0].succeed({
     success: true,
-    message: "Cancelled.",
+    message: "キャンセルされました。",
     role: client.ROLE_KEYS[0].label,
     filled: 1,
   });
+
+  assert.equal(cancelMessage.textContent, "キャンセルされました。");
+  assert.equal(
+    cancelMessage.className,
+    "modal-message success cancellation-success",
+  );
+  assert.equal(cancelMessage.style.display, "block");
+  assert.doesNotMatch(cancelMessage.textContent, /リフレッシュしてください/);
+  assert.match(
+    htmlSource,
+    /\.modal-message\.success\.cancellation-success\s*{[\s\S]*?background:\s*#e3f2fd;[\s\S]*?color:\s*#1565c0;/,
+  );
 
   const locallyUpdatedEvent = client.getEventById(1);
   assert.equal(locallyUpdatedEvent.signups.length, 1);

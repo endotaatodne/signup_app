@@ -686,25 +686,6 @@ test("submitSignup does not persist rate-limit keys for unknown EventIDs", () =>
   assert.equal(lock.released, false);
 });
 
-test("submitSignup accepts org committee role using OrgCommitteeSlots capacity", () => {
-  const { app, spreadsheets } = loadBackend();
-  const signupsSheet = spreadsheets[EVENT_SHEET_ID].getSheetByName("Signups");
-
-  const result = app.submitSignup(
-    "1",
-    "Carol",
-    "3-1",
-    app.ROLES.orgCommittee,
-    "spring-fete",
-  );
-  const signupRows = signupsSheet.getDataRange().getValues();
-  const appendedRow = signupRows[signupRows.length - 1];
-
-  assert.equal(result.success, true);
-  assert.equal(result.role, app.ROLES.orgCommittee);
-  assert.equal(appendedRow[4], app.ROLES.orgCommittee);
-});
-
 test("submitSignup isolates every role capacity to its matching Events column", () => {
   [
     ["general", 8],
@@ -715,7 +696,7 @@ test("submitSignup isolates every role capacity to its matching Events column", 
     const eventRows = createEventRows();
     eventRows[1].fill(0, 8, 12);
     eventRows[1][columnIndex] = 1;
-    const { app } = loadBackend({ eventRows });
+    const { app, spreadsheets } = loadBackend({ eventRows });
 
     const result = app.submitSignup(
       "1",
@@ -727,6 +708,11 @@ test("submitSignup isolates every role capacity to its matching Events column", 
 
     assert.equal(result.success, true, roleKey);
     assert.equal(result.role, app.ROLES[roleKey]);
+    const signupRows = spreadsheets[EVENT_SHEET_ID]
+      .getSheetByName("Signups")
+      .getDataRange()
+      .getValues();
+    assert.equal(signupRows[signupRows.length - 1][4], app.ROLES[roleKey]);
 
     const decoyRows = createEventRows();
     decoyRows[1].fill(0, 8, 12);
