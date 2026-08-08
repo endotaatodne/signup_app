@@ -1699,7 +1699,7 @@ test("confirmed cancellation updates every visible surface before fresh data arr
   assert.doesNotMatch(cancelMessage.textContent, /リフレッシュしてください/);
   assert.match(
     htmlSource,
-    /\.modal-message\.success\.cancellation-success\s*{[\s\S]*?background:\s*#e3f2fd;[\s\S]*?color:\s*#1565c0;/,
+    /\.modal-message\.success\.cancellation-success\s*{[\s\S]*?background:\s*#fff8e1;[\s\S]*?color:\s*#6d4c00;/,
   );
 
   const locallyUpdatedEvent = client.getEventById(1);
