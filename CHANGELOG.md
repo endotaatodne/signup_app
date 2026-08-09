@@ -1,3 +1,50 @@
+## v0.2.11 - 2026-08-09
+
+- Patch
+  - Adds server-only NFKC participant identity keys for duplicate, overlap, and activity-limit checks without changing existing display, storage, or browser-filter normalisation.
+  - Makes cancellation exact-first and collision-safe across legacy and NFKC compatibility tiers, and returns the deleted row's actual name and displayed class for immediate client reconciliation.
+  - Uses hashed transient NFKC name/class limiter keys (first 3 attempts per 60 seconds), an advisory emergency attempt fuse (first 100 per 10 seconds), and a durable v3 validated-write budget (first 20 admissions per 60 seconds) scoped independently by Sheet, event, and action.
+  - Replaces the long lock wait with a 250 ms `ScriptLock` attempt and at most one 400–799 ms client retry when the server explicitly confirms pre-write contention and the captured modal session is still current; ambiguous and transport failures are never retried.
+  - Rechecks final event policy and business rules under the lock, then flushes each confirmed Sheet mutation before releasing it.
+  - Documents exact-value transport through Base64-encoded template values, JSON for structured payloads, and `textContent` rendering instead of destructive input rewriting.
+  - Documents exact limiter accounting and generated v3 Script Properties, clarifies the remaining anonymous read-path/global-lock limits and lack of CAPTCHA, and narrows the Unicode input claim to the validated character set.
+  - Leaves legacy `signup_app_rate_limit_v2_*` Script Properties unused by the v3 limiter; existing values can remain safely.
+  - Expands backend and browser regression coverage for exact rate-limit boundaries, lock contention, Unicode identities, collision-safe cancellation, exact-value round trips, and a same-event modal reopened while a safe retry is already in flight.
+  - Bumps the app version to 0.2.11.
+
+## v0.2.10 - 2026-08-08
+
+- Patch
+  - Updates the visible schedule and modal immediately after the server confirms a signup or cancellation.
+  - Reconciles successful cancellations with an authoritative background grid refresh, with a full-page reload fallback when fresh data cannot be applied.
+  - Keeps signup and cancellation mutations single-flight in the browser so repeated actions cannot start overlapping requests.
+  - Coalesces keyword-search rendering to one animation frame, handles IME composition safely, and skips unnecessary available-time derivation when no time filter is selected.
+  - Defers deployment-URL lookup until it is actually needed for cancellation refresh recovery, removing an RPC from normal page loads.
+  - Narrows spreadsheet reads to the declared schema columns and reuses the opened master-spreadsheet handle within one server execution while preserving validation, locking, and final policy checks.
+  - Adds privacy-safe performance measurement based on deterministic service-call counts and synthetic, non-identifying fixtures.
+  - Bumps the app version to 0.2.10.
+
+## v0.2.9 - 2026-08-08
+
+- Patch
+  - Removes redundant filter-control renders while preserving all filter state, matching, fallback, ordering, and display behaviour.
+  - Centralises role-slot metadata used by public grid data and signup capacity enforcement.
+  - Reuses the shared timezone, alias validator, and DOM-clearing helper.
+  - Consolidates common desktop insight scope and list rendering without changing either view's predicates, messages, or ordering.
+  - Adds regression coverage for single-pass filter rendering and every role-to-sheet-column mapping.
+  - Bumps the app version to 0.2.9.
+
+## v0.2.8 - 2026-08-08
+
+- Patch
+  - Splits the Apps Script backend into responsibility-focused server files while preserving the existing public entry points and behaviour.
+  - Splits the page structure, styles, and client-side logic into composed HTML partials without changing the rendered application.
+  - Updates the test harnesses to load every backend file and resolve frontend template includes during regression testing.
+  - Updates the English and Japanese customisation, project structure, and testing documentation.
+  - Adds file-level responsibility notes and function-level JSDoc across the production source files.
+  - Adds regression coverage that requires documentation for every production file and named function.
+  - Bumps the app version to 0.2.8.
+
 ## v0.2.7 - 2026-08-02
 
 - Patch

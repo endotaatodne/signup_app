@@ -1,0 +1,208 @@
+    <script>
+      /**
+       * @fileoverview Client-side time formatting and input canonicalisation.
+       * These helpers mirror the backend name and class normalisation contract
+       * so browser validation and server validation interpret values alike.
+       */
+
+      /**
+       * Formats a 24-hour time value for display with a 12-hour suffix.
+       * @param {string} time A time in HH:mm form.
+       * @returns {string} The display time, or an empty string for no value.
+       */
+      function formatTime(time) {
+        if (!time) return "";
+        var parts = time.split(":");
+        var h = parseInt(parts[0]);
+        var m = parts[1] || "00";
+        var ampm = h >= 12 ? "pm" : "am";
+        h = h % 12 || 12;
+        return h + ":" + m + " " + ampm;
+      }
+
+      /**
+       * Formats the start and end of an event as a display range.
+       * @param {string} startTime A start time in HH:mm form.
+       * @param {string} endTime An end time in HH:mm form.
+       * @returns {string} The formatted start and end times.
+       */
+      function formatTimeRange(startTime, endTime) {
+        return formatTime(startTime) + " - " + formatTime(endTime);
+      }
+
+      /**
+       * Collapses ASCII and full-width whitespace and trims the result.
+       * @param {*} value The value to canonicalise as text.
+       * @returns {string} Text containing only single ASCII word spaces.
+       */
+      function normaliseWhitespace(value) {
+        return String(value)
+          .replace(/[\s\u3000]+/g, " ")
+          .trim();
+      }
+
+      // Class matching canonicalises a narrow Kanji digit set. Names must
+      // preserve these characters verbatim.
+      var CLASS_KANJI_DIGITS = {
+        "\u3007": "0",
+        "\u96F6": "0",
+        "\u4E00": "1",
+        "\u4E8C": "2",
+        "\u4E09": "3",
+        "\u56DB": "4",
+        "\u4E94": "5",
+        "\u516D": "6",
+        "\u4E03": "7",
+        "\u516B": "8",
+        "\u4E5D": "9",
+      };
+
+      /**
+       * Converts full-width decimal digits to their ASCII equivalents.
+       * @param {*} value The value to canonicalise as text.
+       * @returns {string} Text with full-width digits converted.
+       */
+      function normaliseAsciiDigits(value) {
+        return String(value).replace(/[\uFF10-\uFF19]/g, function (char) {
+          return String.fromCharCode(char.charCodeAt(0) - 0xfee0);
+        });
+      }
+
+      /**
+       * Converts full-width round brackets to ASCII round brackets.
+       * @param {*} value The value to canonicalise as text.
+       * @returns {string} Text using canonical round brackets.
+       */
+      function normaliseBrackets(value) {
+        return String(value)
+          .replace(/\uFF08/g, "(")
+          .replace(/\uFF09/g, ")");
+      }
+
+      /**
+       * Reports whether a value contains characters commonly used in Japanese names.
+       * @param {*} value The value to inspect as text.
+       * @returns {boolean} Whether at least one Japanese name character is present.
+       */
+      function hasJapaneseNameCharacters(value) {
+        return /[\u3005\u3006\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF\uFF66-\uFF9F]/.test(
+          String(value),
+        );
+      }
+
+      /**
+       * Removes all spacing from Japanese names while retaining normalised word
+       * spacing for other names.
+       * @param {*} value The name value to canonicalise.
+       * @returns {string} The name with its expected spacing convention applied.
+       */
+      function normaliseNameSpacing(value) {
+        var normalisedValue = normaliseWhitespace(value);
+        if (hasJapaneseNameCharacters(normalisedValue)) {
+          return normalisedValue.replace(/[\s\u3000]+/g, "");
+        }
+        return normalisedValue;
+      }
+
+      /**
+       * Applies the complete client-side canonical form for a person's name.
+       * @param {*} value The name value to canonicalise.
+       * @returns {string} The canonical name value.
+       */
+      function normaliseNameValue(value) {
+        return normaliseNameSpacing(normaliseBrackets(value));
+      }
+
+      /**
+       * Validates the characters allowed in a canonical name value.
+       * @param {string} value The already-normalised name to validate.
+       * @returns {boolean} Whether the name contains only supported characters.
+       */
+      function isValidNameValue(value) {
+        return /^[\p{L}\p{N}\s\-'.()]+$/u.test(value);
+      }
+
+      /**
+       * Converts the supported Kanji digit characters to ASCII digits.
+       * @param {*} value The class value to canonicalise as text.
+       * @returns {string} Text with supported Kanji digits converted.
+       */
+      function normaliseKanjiDigits(value) {
+        return String(value).replace(
+          /[\u3007\u96F6\u4E00\u4E8C\u4E09\u56DB\u4E94\u516D\u4E03\u516B\u4E5D]/g,
+          function (char) {
+            return CLASS_KANJI_DIGITS[char];
+          },
+        );
+      }
+
+      /**
+       * Reports whether a character can border a separator in a class token.
+       * @param {string} char The single character to inspect.
+       * @returns {boolean} Whether the character is an ASCII/full-width letter or digit.
+       */
+      function isClassTokenChar(char) {
+        return /^[0-9A-Za-z\uFF10-\uFF19\uFF21-\uFF3A\uFF41-\uFF5A]$/.test(char);
+      }
+
+      /**
+       * Converts dash variants, and contextual prolonged-sound marks, to ASCII hyphens.
+       * @param {*} value The class value to canonicalise as text.
+       * @returns {string} Text using canonical class separators.
+       */
+      function normaliseClassSeparators(value) {
+        var source = String(value);
+        var result = "";
+
+        for (var i = 0; i < source.length; i += 1) {
+          var char = source.charAt(i);
+          if (/[\u2010-\u2015\u2212\uFF0D]/.test(char)) {
+            result += "-";
+            continue;
+          }
+
+          if (
+            char === "\u30FC" &&
+            isClassTokenChar(source.charAt(i - 1)) &&
+            isClassTokenChar(source.charAt(i + 1))
+          ) {
+            result += "-";
+            continue;
+          }
+
+          result += char;
+        }
+
+        return result;
+      }
+
+      /**
+       * Applies the complete client-side canonical form for a class value.
+       * @param {*} value The class value to canonicalise.
+       * @returns {string} The canonical class value.
+       */
+      function normaliseClassValue(value) {
+        return normaliseClassSeparators(
+          normaliseWhitespace(normaliseKanjiDigits(normaliseAsciiDigits(value))),
+        );
+      }
+
+      /**
+       * Produces a case-insensitive canonical name for comparisons and searches.
+       * @param {*} value The name value to canonicalise.
+       * @returns {string} A lower-case canonical name.
+       */
+      function normaliseComparable(value) {
+        return normaliseNameValue(value).toLowerCase();
+      }
+
+      /**
+       * Produces a case-insensitive canonical class value for comparisons.
+       * @param {*} value The class value to canonicalise.
+       * @returns {string} A lower-case canonical class value.
+       */
+      function normaliseClassComparable(value) {
+        return normaliseClassValue(value).toLowerCase();
+      }
+
+    </script>

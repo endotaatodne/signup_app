@@ -1,9 +1,12 @@
-const fs = require("node:fs");
-const path = require("node:path");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { loadIndexHtml } = require("../test-support/load-index-html");
+const {
+  getHtmlPartialFileNames,
+  getIndexHtmlSource,
+  getRawIndexHtmlSource,
+  loadIndexHtml,
+} = require("../test-support/load-index-html");
 
 function elementMatchesSelector(element, selector) {
   if (!element || !selector) return false;
@@ -160,7 +163,8 @@ function createDocument(elements = {}) {
     },
     querySelector(selector) {
       if (elements[selector]) return elements[selector];
-      if (selector.startsWith("#")) return this.getElementById(selector.slice(1));
+      if (selector.startsWith("#"))
+        return this.getElementById(selector.slice(1));
       if (!fallbackElements[selector]) {
         fallbackElements[selector] = createElement("div");
       }
@@ -184,6 +188,84 @@ function createLocalStorage(initialValues = {}) {
       values[key] = String(value);
     },
   };
+}
+
+function getRenderedText(element) {
+  if (!element) return "";
+  return [element.textContent]
+    .concat((element.children || []).map(getRenderedText))
+    .join(" ");
+}
+
+function createDeferredGoogleRun(options = {}) {
+  const calls = {
+    signup: [],
+    cancel: [],
+    refresh: [],
+    deployedUrl: [],
+  };
+  const deployedUrl = Object.prototype.hasOwnProperty.call(
+    options,
+    "deployedUrl",
+  )
+    ? options.deployedUrl
+    : "https://example.com/app";
+
+  const google = {
+    script: {
+      run: {
+        withSuccessHandler(successHandler) {
+          let failureHandler = function () {};
+          return {
+            withFailureHandler(handler) {
+              failureHandler = handler;
+              return this;
+            },
+            getDeployedUrl() {
+              calls.deployedUrl.push({
+                succeed: successHandler,
+                fail: failureHandler,
+              });
+              if (!options.deferDeployedUrl) {
+                if (options.deployedUrlFailure) {
+                  failureHandler(new Error("deployment URL unavailable"));
+                } else {
+                  successHandler(deployedUrl);
+                }
+              }
+              return this;
+            },
+            submitSignup(...args) {
+              calls.signup.push({
+                args,
+                succeed: successHandler,
+                fail: failureHandler,
+              });
+              return this;
+            },
+            cancelSignup(...args) {
+              calls.cancel.push({
+                args,
+                succeed: successHandler,
+                fail: failureHandler,
+              });
+              return this;
+            },
+            getGridDataForAlias(...args) {
+              calls.refresh.push({
+                args,
+                succeed: successHandler,
+                fail: failureHandler,
+              });
+              return this;
+            },
+          };
+        },
+      },
+    },
+  };
+
+  return { calls, google };
 }
 
 function loadClient(options = {}) {
@@ -304,6 +386,7 @@ function loadClient(options = {}) {
       "setMobileRoleFilter",
       "getMobileKeywordSearchQuery",
       "setMobileKeywordSearchQuery",
+      "resetScheduleFilters",
       "getMobileVolunteerNameQuery",
       "setMobileVolunteerNameQuery",
       "getMobileFilteredEvents",
@@ -360,10 +443,7 @@ test("b64decode restores UTF-8 text", () => {
 });
 
 test("server template data is injected only as quoted base64 values", () => {
-  const htmlSource = fs.readFileSync(
-    path.resolve(__dirname, "..", "index.html"),
-    "utf8",
-  );
+  const htmlSource = getRawIndexHtmlSource();
 
   assert.match(htmlSource, /JSON\.parse\(b64decode\("<\?!= gridData \?>"\)\)/);
   assert.match(htmlSource, /var alias = b64decode\("<\?!= alias \?>"\);/);
@@ -373,6 +453,28 @@ test("server template data is injected only as quoted base64 values", () => {
   );
   assert.match(htmlSource, /JSON\.parse\(b64decode\("<\?!= roles \?>"\)\)/);
   assert.match(htmlSource, /var PAGE_TITLE = b64decode\("<\?!= title \?>"\);/);
+});
+
+test("index.html composes every static partial in dependency order", () => {
+  assert.deepEqual(getHtmlPartialFileNames(), [
+    "Styles",
+    "Schedule",
+    "SignupModal",
+    "ClientCore",
+    "ClientFilters",
+    "ClientInsights",
+    "ClientSchedule",
+    "ClientFormatting",
+    "ClientModal",
+    "ClientInit",
+  ]);
+
+  const htmlSource = getIndexHtmlSource();
+  assert.equal((htmlSource.match(/<style>/g) || []).length, 1);
+  assert.equal((htmlSource.match(/<\/style>/g) || []).length, 1);
+  assert.equal((htmlSource.match(/<script>/g) || []).length, 8);
+  assert.equal((htmlSource.match(/<\/script>/g) || []).length, 8);
+  assert.doesNotMatch(htmlSource, /<\?!=\s*include_\(/);
 });
 
 test("buildGridIndexes creates the event lookup and groups signups by role", () => {
@@ -425,10 +527,7 @@ test("READ_ONLY status shows the banner and removes modal write controls", () =>
 });
 
 test("read-only banner and displaced controls stay sticky on mobile and desktop", () => {
-  const htmlSource = fs.readFileSync(
-    path.resolve(__dirname, "..", "index.html"),
-    "utf8",
-  );
+  const htmlSource = getIndexHtmlSource();
 
   assert.match(
     htmlSource,
@@ -453,10 +552,7 @@ test("read-only banner and displaced controls stay sticky on mobile and desktop"
 });
 
 test("page title scrolls on desktop and stays centered across layouts", () => {
-  const htmlSource = fs.readFileSync(
-    path.resolve(__dirname, "..", "index.html"),
-    "utf8",
-  );
+  const htmlSource = getIndexHtmlSource();
 
   assert.match(
     htmlSource,
@@ -469,10 +565,7 @@ test("page title scrolls on desktop and stays centered across layouts", () => {
 });
 
 test("desktop sticky surfaces fully obscure scrolling cards", () => {
-  const htmlSource = fs.readFileSync(
-    path.resolve(__dirname, "..", "index.html"),
-    "utf8",
-  );
+  const htmlSource = getIndexHtmlSource();
 
   assert.match(
     htmlSource,
@@ -532,7 +625,10 @@ test("openModal renders an org committee role button when slots exist", () => {
   });
   assert.ok(orgCommitteeButton);
   assert.equal(orgCommitteeButton.className, "role-btn role-btn-orgcommittee");
-  assert.equal(orgCommitteeButton.children[0].textContent, "\u5B9F\u884C\u59D4\u54E1");
+  assert.equal(
+    orgCommitteeButton.children[0].textContent,
+    "\u5B9F\u884C\u59D4\u54E1",
+  );
 });
 
 test("getEffectiveWidth uses the smallest valid viewport width", () => {
@@ -640,11 +736,20 @@ test("mobile availability control lists activity pills and all matching time slo
   client.buildGridIndexes();
   client.updateMobileAvailabilityControl();
 
-  assert.equal(client.getAvailableSlotCount(client.getMobileFilteredEvents()[0]), 1);
+  assert.equal(
+    client.getAvailableSlotCount(client.getMobileFilteredEvents()[0]),
+    1,
+  );
   assert.equal(activityFilter.children.length, 4);
-  assert.equal(activityFilter.children[0].getAttribute("data-mobile-activity-filter"), "__all__");
+  assert.equal(
+    activityFilter.children[0].getAttribute("data-mobile-activity-filter"),
+    "__all__",
+  );
   assert.equal(activityFilter.children[1].textContent, "Gate");
-  assert.equal(timeToggle.textContent, "\u3059\u3079\u3066\u306E\u6642\u9593\u5E2F");
+  assert.equal(
+    timeToggle.textContent,
+    "\u3059\u3079\u3066\u306E\u6642\u9593\u5E2F",
+  );
   assert.equal(timeToggle.getAttribute("aria-expanded"), "false");
   assert.equal(timeFilter.hidden, true);
   assert.equal(timeFilter.children.length, 4);
@@ -662,9 +767,14 @@ test("mobile availability control lists activity pills and all matching time slo
     timeFilter.children[1].getAttribute("data-mobile-time-filter"),
     "09:00",
   );
-  assert.match(timeFilter.children[1].children[1].textContent, /9:00 am - 10:00 am/);
+  assert.match(
+    timeFilter.children[1].children[1].textContent,
+    /9:00 am - 10:00 am/,
+  );
   assert.equal(
-    timeFilter.children[1].children[1].textContent.includes(client.ROLE_KEYS[0].label),
+    timeFilter.children[1].children[1].textContent.includes(
+      client.ROLE_KEYS[0].label,
+    ),
     false,
   );
   assert.equal(
@@ -685,10 +795,7 @@ test("mobile availability control lists activity pills and all matching time slo
 });
 
 test("mobile filters render directly without collapsed summary state", () => {
-  const htmlSource = fs.readFileSync(
-    path.resolve(__dirname, "..", "index.html"),
-    "utf8",
-  );
+  const htmlSource = getIndexHtmlSource();
 
   assert.doesNotMatch(htmlSource, /mobileFilterSummaryBar/);
   assert.doesNotMatch(htmlSource, /mobileFilterSummaryText/);
@@ -757,7 +864,9 @@ test("mobile time filter can select a full time slot", () => {
   const onlyCard = onlySection.children[1];
   const titleWrap = onlyCard.children[0].children[0];
 
-  assert.deepEqual(Array.from(client.getMobileAvailableTimeFilters()), ["09:00"]);
+  assert.deepEqual(Array.from(client.getMobileAvailableTimeFilters()), [
+    "09:00",
+  ]);
   assert.equal(mobileNode.children.length, 1);
   assert.equal(onlySection.children[0].textContent, "9:00 am - 10:00 am");
   assert.equal(titleWrap.children[0].textContent, "Gate");
@@ -845,16 +954,28 @@ test("mobile time filter supports multiple selected time slots", () => {
   ]);
   assert.equal(client.getMobileFilteredEvents().length, 2);
   assert.equal(mobileNode.children.length, 2);
-  assert.equal(mobileNode.children[0].children[0].textContent, "9:00 am - 10:00 am");
-  assert.equal(mobileNode.children[1].children[0].textContent, "11:00 am - 12:00 pm");
-  assert.equal(timeToggle.textContent, "2\u3064\u306E\u6642\u9593\u5E2F\u3092\u9078\u629E\u4E2D");
+  assert.equal(
+    mobileNode.children[0].children[0].textContent,
+    "9:00 am - 10:00 am",
+  );
+  assert.equal(
+    mobileNode.children[1].children[0].textContent,
+    "11:00 am - 12:00 pm",
+  );
+  assert.equal(
+    timeToggle.textContent,
+    "2\u3064\u306E\u6642\u9593\u5E2F\u3092\u9078\u629E\u4E2D",
+  );
   assert.equal(timeFilter.children.length, 4);
   assert.equal(timeFilter.hidden, true);
   assert.equal(timeFilter.children[1].className.includes("is-active"), true);
   assert.equal(timeFilter.children[3].className.includes("is-active"), true);
   assert.equal(timeFilter.children[1].children[0].textContent, "\u2713");
   assert.equal(timeFilter.children[3].children[0].textContent, "\u2713");
-  assert.match(detail.textContent, /2\u3064\u306E\u6642\u9593\u5E2F\u306E\u7A7A\u304D/);
+  assert.match(
+    detail.textContent,
+    /2\u3064\u306E\u6642\u9593\u5E2F\u306E\u7A7A\u304D/,
+  );
 
   client.setMobileTimeFilterDropdownOpen(true);
   assert.equal(timeFilter.hidden, false);
@@ -880,14 +1001,37 @@ test("mobile time filter supports multiple selected time slots", () => {
   client.setMobileAvailableTimeFilter("__all__");
   assert.deepEqual(Array.from(client.getMobileAvailableTimeFilters()), []);
   assert.equal(timeFilter.children[0].className.includes("is-active"), true);
-  assert.equal(timeToggle.textContent, "\u3059\u3079\u3066\u306E\u6642\u9593\u5E2F");
+  assert.equal(
+    timeToggle.textContent,
+    "\u3059\u3079\u3066\u306E\u6642\u9593\u5E2F",
+  );
 });
 
-test("activity filter refreshes the shared card renderer at desktop width", () => {
+test("empty selected times avoid rebuilding the available-time model", () => {
+  const { exports: client, context } = loadClient();
+  const originalGetOptions = context.getMobileAvailableTimeOptions;
+  let optionBuilds = 0;
+  context.getMobileAvailableTimeOptions = function () {
+    optionBuilds += 1;
+    return originalGetOptions();
+  };
+  context.mobileAvailableTimeFilter = [];
+
+  assert.deepEqual(Array.from(client.getMobileAvailableTimeFilters()), []);
+  assert.equal(optionBuilds, 0);
+});
+
+test("schedule filter changes refresh controls and cards once at desktop width", () => {
   const mobileNode = createElement("div");
   mobileNode.className = "mobile-agenda";
   mobileNode.style = {};
   const activityFilter = createElement("div");
+  const appendActivityOption = activityFilter.appendChild;
+  let activityOptionAppendCount = 0;
+  activityFilter.appendChild = function (child) {
+    activityOptionAppendCount += 1;
+    return appendActivityOption.call(this, child);
+  };
   const { exports: client } = loadClient({
     gridData: {
       activities: ["Gate", "Cleanup"],
@@ -937,7 +1081,9 @@ test("activity filter refreshes the shared card renderer at desktop width", () =
     },
   });
 
+  assert.equal(activityOptionAppendCount, 3);
   client.buildGridIndexes();
+  activityOptionAppendCount = 0;
   client.setMobileActivityFilter("Cleanup");
 
   const onlySection = mobileNode.children[0];
@@ -946,13 +1092,29 @@ test("activity filter refreshes the shared card renderer at desktop width", () =
 
   assert.equal(client.getMobileActivityFilter(), "Cleanup");
   assert.equal(activityFilter.children.length, 3);
+  assert.equal(activityOptionAppendCount, 3);
   assert.equal(
     activityFilter.children[2].getAttribute("data-mobile-activity-filter"),
     "Cleanup",
   );
-  assert.equal(activityFilter.children[2].className.includes("is-active"), true);
+  assert.equal(
+    activityFilter.children[2].className.includes("is-active"),
+    true,
+  );
   assert.equal(client.getMobileFilteredEvents().length, 1);
   assert.equal(titleWrap.children[0].textContent, "Cleanup");
+
+  [
+    ["activity reset", () => client.setMobileActivityFilter("__all__")],
+    ["role", () => client.setMobileRoleFilter("general")],
+    ["keyword", () => client.setMobileKeywordSearchQuery("Gate")],
+    ["time", () => client.setMobileAvailableTimeFilter("09:00")],
+    ["full reset", () => client.resetScheduleFilters()],
+  ].forEach(function ([label, changeFilter]) {
+    activityOptionAppendCount = 0;
+    changeFilter();
+    assert.equal(activityOptionAppendCount, 3, label);
+  });
 });
 
 test("mobile keyword search narrows the mobile agenda by volunteer name", () => {
@@ -1092,6 +1254,69 @@ test("mobile keyword search matches activity subtitle and description", () => {
   assert.equal(titleWrap.children[0].textContent, "Kitchen");
 });
 
+test("keyword input coalesces rendering and flushes safely around IME composition", () => {
+  const keywordInput = createElement("input");
+  const scheduledFrames = [];
+  const cancelledFrames = new Set();
+  let nextFrameId = 1;
+  const { exports: client, context } = loadClient({
+    elements: {
+      mobileKeywordSearch: keywordInput,
+    },
+    windowOverrides: {
+      requestAnimationFrame(callback) {
+        const id = nextFrameId;
+        nextFrameId += 1;
+        scheduledFrames.push({ callback, id });
+        return id;
+      },
+      cancelAnimationFrame(id) {
+        cancelledFrames.add(id);
+      },
+    },
+  });
+  let renders = 0;
+  context.buildMobileAgenda = function () {
+    renders += 1;
+  };
+
+  keywordInput.value = "a";
+  keywordInput.dispatchEvent({ type: "input" });
+  keywordInput.value = "al";
+  keywordInput.dispatchEvent({ type: "input" });
+  keywordInput.value = "alice";
+  keywordInput.dispatchEvent({ type: "input" });
+
+  assert.equal(renders, 0);
+  assert.equal(scheduledFrames.length, 1);
+  assert.equal(client.getMobileKeywordSearchQuery(), "alice");
+  scheduledFrames[0].callback();
+  assert.equal(renders, 1);
+
+  keywordInput.dispatchEvent({ type: "compositionstart" });
+  keywordInput.value = "\u5C71";
+  keywordInput.dispatchEvent({ type: "input", isComposing: true });
+  keywordInput.value = "\u5C71\u7530";
+  keywordInput.dispatchEvent({ type: "input", isComposing: true });
+  assert.equal(renders, 1);
+  assert.equal(scheduledFrames.length, 1);
+
+  keywordInput.dispatchEvent({ type: "compositionend" });
+  assert.equal(client.getMobileKeywordSearchQuery(), "\u5C71\u7530");
+  assert.equal(renders, 2);
+  keywordInput.dispatchEvent({ type: "input", isComposing: false });
+  keywordInput.dispatchEvent({ type: "blur" });
+  assert.equal(scheduledFrames.length, 1);
+  assert.equal(renders, 2);
+
+  keywordInput.value = "\u5C71\u7530\u592A\u90CE";
+  keywordInput.dispatchEvent({ type: "input" });
+  assert.equal(scheduledFrames.length, 2);
+  keywordInput.dispatchEvent({ type: "keydown", key: "Enter" });
+  assert.equal(renders, 3);
+  assert.equal(cancelledFrames.has(scheduledFrames[1].id), true);
+});
+
 test("mobile role filter updates pill state and time availability labels", () => {
   const timeFilter = createElement("div");
   const timeToggle = createElement("button");
@@ -1169,17 +1394,28 @@ test("mobile role filter updates pill state and time availability labels", () =>
 
   assert.equal(client.getMobileRoleFilter(), "general");
   assert.equal(roleFilter.children.length, 3);
-  assert.equal(roleFilter.children[1].getAttribute("data-mobile-role-filter"), "general");
+  assert.equal(
+    roleFilter.children[1].getAttribute("data-mobile-role-filter"),
+    "general",
+  );
   assert.equal(roleFilter.children[1].className.includes("is-active"), true);
-  assert.equal(roleFilter.children[2].getAttribute("data-mobile-role-filter"), "classRep");
-  assert.deepEqual(Array.from(client.getMobileAvailableTimeFilters()), ["09:00"]);
+  assert.equal(
+    roleFilter.children[2].getAttribute("data-mobile-role-filter"),
+    "classRep",
+  );
+  assert.deepEqual(Array.from(client.getMobileAvailableTimeFilters()), [
+    "09:00",
+  ]);
   assert.equal(timeFilter.children.length, 3);
   assert.equal(
     timeFilter.children[1].getAttribute("data-mobile-time-filter"),
     "09:00",
   );
   assert.equal(timeFilter.children[1].className.includes("is-active"), true);
-  assert.equal(timeFilter.children[1].children[1].textContent, "9:00 am - 10:00 am");
+  assert.equal(
+    timeFilter.children[1].children[1].textContent,
+    "9:00 am - 10:00 am",
+  );
   assert.equal(
     timeFilter.children[2].getAttribute("data-mobile-time-filter"),
     "10:00",
@@ -1203,7 +1439,10 @@ test("mobile role filter updates pill state and time availability labels", () =>
   assert.equal(client.getMobileRoleFilter(), "__all__");
   assert.equal(roleFilter.children.length, 2);
   assert.equal(roleFilter.children[0].className.includes("is-active"), true);
-  assert.equal(roleFilter.children[1].getAttribute("data-mobile-role-filter"), "classRep");
+  assert.equal(
+    roleFilter.children[1].getAttribute("data-mobile-role-filter"),
+    "classRep",
+  );
   assert.equal(client.getMobileFilteredEvents().length, 1);
 });
 
@@ -1241,50 +1480,8 @@ test("name normalization in index.html converts full-width brackets", () => {
   assert.equal(client.isValidNameValue("山田（太郎）"), false);
 });
 
-test("showMessage renders refresh prompts with emphasis spans", () => {
-  const messageNode = createElement("div");
-  messageNode.style = { display: "none" };
-  const { exports: client } = loadClient({
-    elements: {
-      modalMessage: messageNode,
-      cancelMessage: createElement("div"),
-    },
-  });
-
-  client.showMessage(
-    "modalMessage",
-    "キャンセルされました。ページをリフレッシュしてください。",
-    true,
-  );
-
-  assert.equal(messageNode.className, "modal-message success action-needed");
-  assert.equal(messageNode.style.display, "block");
-  assert.equal(messageNode.children.length, 2);
-  assert.equal(messageNode.children[0].className, "modal-message-main");
-  assert.equal(messageNode.children[1].className, "modal-message-emphasis");
-});
-
-test("showCancelMessage forwards to the cancel message target", () => {
-  const cancelNode = createElement("div");
-  cancelNode.style = { display: "none" };
-  const { exports: client } = loadClient({
-    elements: {
-      cancelMessage: cancelNode,
-    },
-  });
-
-  client.showCancelMessage("入力内容をご確認ください。", false);
-
-  assert.equal(cancelNode.textContent, "入力内容をご確認ください。");
-  assert.equal(cancelNode.className, "modal-message error");
-  assert.equal(cancelNode.style.display, "block");
-});
-
 test("index.html keeps signup validation inputs and uses a cancellation selection list", () => {
-  const htmlSource = fs.readFileSync(
-    path.resolve(__dirname, "..", "index.html"),
-    "utf8",
-  );
+  const htmlSource = getIndexHtmlSource();
   function getInputBlock(id) {
     const afterId = htmlSource.split(`id="${id}"`)[1];
     if (!afterId) return null;
@@ -1316,7 +1513,10 @@ test("findAndConfirmCancel requires a selected signup", () => {
 
   client.findAndConfirmCancel();
 
-  assert.equal(cancelMessage.textContent, "キャンセルする登録を選んでください。");
+  assert.equal(
+    cancelMessage.textContent,
+    "キャンセルする登録を選んでください。",
+  );
   assert.equal(cancelMessage.className, "modal-message error");
   assert.equal(cancelMessage.style.display, "block");
 });
@@ -1353,7 +1553,10 @@ test("cancellation list renders existing signups and confirms the selected detai
     cancelSignupList.children[0].children[1].textContent,
     "1-1 · 一般保護者",
   );
-  assert.equal(cancelSignupList.children[0].getAttribute("aria-pressed"), "false");
+  assert.equal(
+    cancelSignupList.children[0].getAttribute("aria-pressed"),
+    "false",
+  );
 
   cancelSignupList.dispatchEvent({
     type: "click",
@@ -1361,8 +1564,14 @@ test("cancellation list renders existing signups and confirms the selected detai
   });
 
   assert.equal(cancelSignupList.children[0].classList.has("selected"), true);
-  assert.equal(cancelSignupList.children[0].getAttribute("aria-pressed"), "true");
-  assert.equal(cancelSignupList.children[1].getAttribute("aria-pressed"), "false");
+  assert.equal(
+    cancelSignupList.children[0].getAttribute("aria-pressed"),
+    "true",
+  );
+  assert.equal(
+    cancelSignupList.children[1].getAttribute("aria-pressed"),
+    "false",
+  );
   assert.equal(cancelSubmitBtn.disabled, false);
 
   client.findAndConfirmCancel();
@@ -1456,6 +1665,362 @@ test("confirmCancel sends the selected signup details to the existing backend", 
   assert.equal(selectedOption.disabled, false);
 });
 
+test("confirmed cancellation updates every visible surface before fresh data arrives", () => {
+  const htmlSource = getIndexHtmlSource();
+  const mobileAgenda = createElement("div");
+  mobileAgenda.className = "mobile-agenda";
+  mobileAgenda.style = {};
+  const desktopSignupCount = createElement("strong");
+  const desktopInsightsPanel = createElement("div");
+  desktopInsightsPanel.hidden = true;
+  const desktopInsightsContent = createElement("div");
+  const modalOverlay = createElement("div");
+  const namesGroups = createElement("div");
+  const roleButtons = createElement("div");
+  const cancelSignupList = createElement("div");
+  const cancelMessage = createElement("div");
+  cancelMessage.style = { display: "none" };
+  const pageTitle = createElement("h1");
+  const pageHeading = createElement("h1");
+  pageHeading.scrollIntoView = function () {};
+  const timers = [];
+  const topLocation = {
+    href: "",
+    reloadCalls: 0,
+    reload() {
+      this.reloadCalls += 1;
+    },
+  };
+  const deferred = createDeferredGoogleRun();
+  const { exports: client, context } = loadClient({
+    elements: {
+      mobileAgenda,
+      desktopSignupCount,
+      desktopInsightsPanel,
+      desktopInsightsTitle: createElement("h2"),
+      desktopInsightsDescription: createElement("p"),
+      desktopInsightsContent,
+      modalOverlay,
+      modalTitle: createElement("h2"),
+      modalSubtitle: createElement("div"),
+      namesSection: createElement("div"),
+      namesGroups,
+      roleButtons,
+      modalForm: createElement("div"),
+      inputName: createElement("input"),
+      inputClass: createElement("input"),
+      modalMessage: createElement("div"),
+      modalTabs: createElement("div"),
+      cancelForm: createElement("div"),
+      cancelSignupList,
+      cancelMessage,
+      cancelSubmitBtn: createElement("button"),
+      confirmBox: createElement("div"),
+      confirmText: createElement("div"),
+      confirmYes: createElement("button"),
+      confirmNo: createElement("button"),
+      pageTitle,
+      h1: pageHeading,
+    },
+    windowOverrides: {
+      top: { location: topLocation },
+    },
+    extraGlobals: {
+      google: deferred.google,
+      setTimeout(callback, delay) {
+        timers.push({ callback, delay });
+        return timers.length;
+      },
+    },
+  });
+
+  client.setDesktopInsightView("registrations");
+  client.openModal(1);
+  client.switchTab("cancel");
+  client.selectCancelSignup(
+    cancelSignupList.children[0].cancelSignupData,
+    cancelSignupList.children[0],
+  );
+
+  client.confirmCancel();
+  client.confirmCancel();
+
+  assert.equal(deferred.calls.cancel.length, 1);
+  assert.equal(client.getEventById(1).signups.length, 2);
+  deferred.calls.cancel[0].succeed({
+    success: true,
+    message: "登録がキャンセルされました。",
+    role: client.ROLE_KEYS[0].label,
+    filled: 1,
+  });
+
+  assert.equal(cancelMessage.textContent, "登録がキャンセルされました。");
+  assert.equal(
+    cancelMessage.className,
+    "modal-message success cancellation-success",
+  );
+  assert.equal(cancelMessage.style.display, "block");
+  assert.doesNotMatch(cancelMessage.textContent, /リフレッシュしてください/);
+  assert.match(
+    htmlSource,
+    /\.modal-message\.success\.cancellation-success\s*{[\s\S]*?border:\s*1px solid #fecdd3;[\s\S]*?background:\s*#fff1f2;[\s\S]*?color:\s*#9f1239;/,
+  );
+
+  const locallyUpdatedEvent = client.getEventById(1);
+  assert.equal(locallyUpdatedEvent.signups.length, 1);
+  assert.equal(locallyUpdatedEvent.signups[0].name, "Bob");
+  assert.equal(locallyUpdatedEvent.slots.general.filled, 1);
+  assert.equal(desktopSignupCount.textContent, "1名");
+  assert.doesNotMatch(getRenderedText(mobileAgenda), /Alice/);
+  assert.match(getRenderedText(mobileAgenda), /Bob/);
+  assert.doesNotMatch(getRenderedText(desktopInsightsContent), /Alice/);
+  assert.match(getRenderedText(desktopInsightsContent), /Bob/);
+  assert.doesNotMatch(getRenderedText(namesGroups), /Alice/);
+  assert.match(getRenderedText(namesGroups), /Bob/);
+  assert.equal(cancelSignupList.children.length, 1);
+  assert.equal(cancelSignupList.children[0].cancelSignupData.name, "Bob");
+  assert.equal(cancelSignupList.children[0].disabled, true);
+  client.selectCancelSignup(
+    cancelSignupList.children[0].cancelSignupData,
+    cancelSignupList.children[0],
+  );
+  assert.match(getRenderedText(roleButtons), /残り1枠/);
+  assert.equal(deferred.calls.refresh.length, 1);
+  assert.equal(deferred.calls.deployedUrl.length, 0);
+  context.PAGE_LOAD_TIME = Date.now() - 4000;
+  context.currentRole = client.ROLE_KEYS[0].label;
+  context.document.getElementById("inputName").value = "Later Signup";
+  context.document.getElementById("inputClass").value = "3-1";
+  client.submitSignup();
+  assert.equal(deferred.calls.signup.length, 0);
+  assert.equal(topLocation.href, "");
+  assert.equal(topLocation.reloadCalls, 0);
+
+  const freshGridData = {
+    activities: ["Hall Monitor", "Library Desk"],
+    times: ["09:30"],
+    events: [
+      {
+        eventId: 1,
+        activity: "Hall Monitor",
+        subtitle: "Morning",
+        startTime: "09:30",
+        endTime: "11:00",
+        location: "Gym",
+        description: "Guide arrivals",
+        slots: {
+          general: { max: 2, filled: 0 },
+          classRep: { max: 1, filled: 1 },
+          steeringCommittee: { max: 0, filled: 0 },
+          orgCommittee: { max: 1, filled: 0 },
+        },
+        signups: [{ name: "Bob", cls: "1-2", role: "学年委員" }],
+      },
+      {
+        eventId: 2,
+        activity: "Library Desk",
+        subtitle: "",
+        startTime: "09:30",
+        endTime: "10:30",
+        location: "Library",
+        description: "",
+        slots: {
+          general: { max: 1, filled: 1 },
+          classRep: { max: 0, filled: 0 },
+          steeringCommittee: { max: 1, filled: 1 },
+          orgCommittee: { max: 0, filled: 0 },
+        },
+        signups: [{ name: "Carol", cls: "2-1", role: "役員、運営・実行委員" }],
+      },
+    ],
+  };
+  deferred.calls.refresh[0].succeed({
+    success: true,
+    gridData: freshGridData,
+    eventStatus: "OPEN",
+    title: "Fresh Event Title",
+  });
+
+  assert.equal(client.getEventById(2).signups[0].name, "Carol");
+  assert.equal(client.getEventById(1).slots.general.filled, 0);
+  assert.equal(context.PAGE_TITLE, "Fresh Event Title");
+  assert.equal(pageTitle.textContent, "Fresh Event Title");
+  assert.equal(context.document.title, "Fresh Event Title");
+  assert.equal(topLocation.href, "");
+  assert.equal(topLocation.reloadCalls, 0);
+  assert.equal(deferred.calls.deployedUrl.length, 0);
+  assert.equal(timers.length, 1);
+  assert.equal(timers[0].delay, 3000);
+  assert.equal(modalOverlay.classList.has("active"), true);
+  timers[0].callback();
+  assert.equal(modalOverlay.classList.has("active"), false);
+  assert.equal(topLocation.href, "");
+  assert.equal(topLocation.reloadCalls, 0);
+});
+
+test("cancellation uses full navigation only when authoritative refresh fails", () => {
+  const cancelSignupList = createElement("div");
+  const selectedOption = createElement("button");
+  cancelSignupList.appendChild(selectedOption);
+  const timers = [];
+  const topLocation = {
+    href: "",
+    reloadCalls: 0,
+    reload() {
+      this.reloadCalls += 1;
+    },
+  };
+  const deferred = createDeferredGoogleRun();
+  const { exports: client, context } = loadClient({
+    elements: {
+      cancelSignupList,
+      cancelMessage: createElement("div"),
+      cancelSubmitBtn: createElement("button"),
+      confirmBox: createElement("div"),
+      confirmYes: createElement("button"),
+      confirmNo: createElement("button"),
+    },
+    windowOverrides: {
+      top: { location: topLocation },
+    },
+    extraGlobals: {
+      google: deferred.google,
+      setTimeout(callback, delay) {
+        timers.push({ callback, delay });
+        return timers.length;
+      },
+    },
+  });
+  context.currentEventId = 1;
+  assert.equal(deferred.calls.deployedUrl.length, 0);
+  client.selectCancelSignup(
+    { name: "Alice", cls: "1-1", role: "一般保護者" },
+    selectedOption,
+  );
+
+  client.confirmCancel();
+  deferred.calls.cancel[0].succeed({
+    success: true,
+    message: "Cancelled.",
+  });
+
+  assert.equal(deferred.calls.refresh.length, 1);
+  assert.equal(topLocation.href, "");
+  deferred.calls.refresh[0].fail(new Error("refresh failed"));
+  assert.equal(deferred.calls.deployedUrl.length, 1);
+  assert.equal(topLocation.href, "");
+  timers[0].callback();
+  assert.equal(topLocation.href, "https://example.com/app?event=test-alias");
+  assert.equal(topLocation.reloadCalls, 0);
+});
+
+test("slow cancellation refresh stays visibly pending before bounded recovery", () => {
+  const modalOverlay = createElement("div");
+  const cancelSignupList = createElement("div");
+  const pageHeading = createElement("h1");
+  pageHeading.scrollIntoView = function () {};
+  const timers = [];
+  const topLocation = {
+    href: "",
+    reload() {},
+  };
+  const deferred = createDeferredGoogleRun();
+  const { exports: client } = loadClient({
+    elements: {
+      modalOverlay,
+      cancelSignupList,
+      cancelMessage: createElement("div"),
+      cancelSubmitBtn: createElement("button"),
+      confirmBox: createElement("div"),
+      confirmYes: createElement("button"),
+      confirmNo: createElement("button"),
+      h1: pageHeading,
+    },
+    windowOverrides: {
+      top: { location: topLocation },
+    },
+    extraGlobals: {
+      google: deferred.google,
+      setTimeout(callback, delay) {
+        timers.push({ callback, delay });
+        return timers.length;
+      },
+    },
+  });
+
+  client.openModal(1);
+  client.switchTab("cancel");
+  client.selectCancelSignup(
+    cancelSignupList.children[0].cancelSignupData,
+    cancelSignupList.children[0],
+  );
+  client.confirmCancel();
+  deferred.calls.cancel[0].succeed({ success: true, message: "Cancelled." });
+
+  assert.equal(timers.length, 1);
+  assert.equal(timers[0].delay, 3000);
+  timers[0].callback();
+  assert.equal(modalOverlay.classList.has("active"), true);
+  assert.equal(cancelSignupList.children[0].disabled, true);
+  assert.equal(timers.length, 2);
+  assert.equal(timers[1].delay, 10500);
+
+  timers[1].callback();
+  assert.equal(deferred.calls.deployedUrl.length, 1);
+  assert.equal(topLocation.href, "https://example.com/app?event=test-alias");
+});
+
+test("invalid cancellation refresh reloads safely when lazy URL resolution fails", () => {
+  const cancelSignupList = createElement("div");
+  const selectedOption = createElement("button");
+  cancelSignupList.appendChild(selectedOption);
+  const timers = [];
+  const topLocation = {
+    href: "",
+    reloadCalls: 0,
+    reload() {
+      this.reloadCalls += 1;
+    },
+  };
+  const deferred = createDeferredGoogleRun({ deployedUrlFailure: true });
+  const { exports: client, context } = loadClient({
+    elements: {
+      cancelSignupList,
+      cancelMessage: createElement("div"),
+      cancelSubmitBtn: createElement("button"),
+      confirmBox: createElement("div"),
+      confirmYes: createElement("button"),
+      confirmNo: createElement("button"),
+    },
+    windowOverrides: {
+      top: { location: topLocation },
+    },
+    extraGlobals: {
+      google: deferred.google,
+      setTimeout(callback, delay) {
+        timers.push({ callback, delay });
+        return timers.length;
+      },
+    },
+  });
+  context.currentEventId = 1;
+  assert.equal(deferred.calls.deployedUrl.length, 0);
+  client.selectCancelSignup(
+    { name: "Alice", cls: "1-1", role: "ä¸€èˆ¬ä¿è­·è€…" },
+    selectedOption,
+  );
+
+  client.confirmCancel();
+  deferred.calls.cancel[0].succeed({ success: true, message: "Cancelled." });
+  deferred.calls.refresh[0].succeed({ success: true, gridData: {} });
+
+  assert.equal(deferred.calls.deployedUrl.length, 1);
+  assert.equal(topLocation.reloadCalls, 0);
+  timers[0].callback();
+  assert.equal(topLocation.href, "");
+  assert.equal(topLocation.reloadCalls, 1);
+});
+
 test("cancellation selection updates only the previous and current options", () => {
   const cancelSignupList = createElement("div");
   const cancelSubmitBtn = createElement("button");
@@ -1538,12 +2103,17 @@ test("registration tab restores role choices and resets retained modal scroll", 
   assert.ok(roleButtons.children.length > 0);
 });
 
-test("cancellation list styling contains highlights inside the scroll area", () => {
-  const htmlSource = fs.readFileSync(
-    path.resolve(__dirname, "..", "index.html"),
-    "utf8",
-  );
+test("cancellation helper and list styling make selection clear", () => {
+  const htmlSource = getIndexHtmlSource();
 
+  assert.match(
+    htmlSource,
+    /\.cancel-helper\s*{[\s\S]*?padding:\s*10px 12px;[\s\S]*?border:\s*1px solid #e2e8f0;[\s\S]*?background:\s*#f8fafc;[\s\S]*?font-size:\s*15px;[\s\S]*?font-weight:\s*700;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.compact-layout \.cancel-helper\s*{[\s\S]*?padding:\s*14px 16px;[\s\S]*?font-size:\s*24px;/,
+  );
   assert.match(
     htmlSource,
     /\.cancel-signup-list\s*{[\s\S]*?scrollbar-gutter:\s*stable;/,
@@ -1567,10 +2137,7 @@ test("cancellation list styling contains highlights inside the scroll area", () 
 });
 
 test("cancellation confirmation prominently centres the selected signup", () => {
-  const htmlSource = fs.readFileSync(
-    path.resolve(__dirname, "..", "index.html"),
-    "utf8",
-  );
+  const htmlSource = getIndexHtmlSource();
 
   assert.match(
     htmlSource,
@@ -1606,9 +2173,55 @@ test("submitSignup enforces the 50-character name limit client-side", () => {
 
   client.submitSignup();
 
-  assert.equal(modalMessage.textContent, "名前は５０文字以下で入力してください。");
+  assert.equal(
+    modalMessage.textContent,
+    "名前は５０文字以下で入力してください。",
+  );
   assert.equal(modalMessage.className, "modal-message error");
   assert.equal(modalMessage.style.display, "block");
+});
+
+test("signup honeypot and post-load delay remain low-friction pre-RPC checks", () => {
+  const now = 10000;
+  class MockDate extends Date {
+    static now() {
+      return now;
+    }
+  }
+
+  const honeypot = { ...createElement("input"), value: "bot-value" };
+  const modalMessage = createElement("div");
+  const deferred = createDeferredGoogleRun();
+  const { exports: client, context } = loadClient({
+    elements: {
+      honeypot,
+      inputName: { ...createElement("input"), value: "Carol" },
+      inputClass: { ...createElement("input"), value: "2-1" },
+      submitBtn: createElement("button"),
+      modalMessage,
+    },
+    extraGlobals: {
+      Date: MockDate,
+      google: deferred.google,
+    },
+  });
+  context.currentEventId = 1;
+  context.currentRole = client.ROLE_KEYS[0].label;
+  context.PAGE_LOAD_TIME = now - 4000;
+
+  client.submitSignup();
+  assert.equal(deferred.calls.signup.length, 0);
+
+  honeypot.value = "";
+  context.PAGE_LOAD_TIME = now - 2999;
+  client.submitSignup();
+  assert.equal(deferred.calls.signup.length, 0);
+  assert.equal(modalMessage.textContent, "少し待ってから送信してください。");
+  assert.equal(modalMessage.className, "modal-message error");
+
+  context.PAGE_LOAD_TIME = now - 3000;
+  client.submitSignup();
+  assert.equal(deferred.calls.signup.length, 1);
 });
 
 test("submitSignup normalises Japanese spacing and brackets before sending to backend", () => {
@@ -1660,6 +2273,1319 @@ test("submitSignup normalises Japanese spacing and brackets before sending to ba
 
   assert.ok(receivedSignupArgs);
   assert.equal(receivedSignupArgs[1], "山田(太郎)");
+});
+
+test("signup is single-flight and applies canonical success to its captured event", () => {
+  const inputName = { ...createElement("input"), value: "Carol" };
+  const inputClass = { ...createElement("input"), value: "2-1" };
+  const submitBtn = createElement("button");
+  const modalMessage = createElement("div");
+  modalMessage.style = { display: "none" };
+  const timers = [];
+  const deferred = createDeferredGoogleRun();
+  const { exports: client, context } = loadClient({
+    elements: {
+      honeypot: { ...createElement("input"), value: "" },
+      inputName,
+      inputClass,
+      submitBtn,
+      modalMessage,
+      mobileAgenda: createElement("div"),
+    },
+    extraGlobals: {
+      google: deferred.google,
+      setTimeout(callback, delay) {
+        timers.push({ callback, delay });
+        return timers.length;
+      },
+    },
+  });
+  context.PAGE_LOAD_TIME = Date.now() - 4000;
+  context.currentEventId = 1;
+  context.currentRole = client.ROLE_KEYS[0].label;
+
+  submitBtn.dispatchEvent({ type: "click" });
+  inputName.dispatchEvent({ type: "keydown", key: "Enter" });
+
+  assert.equal(deferred.calls.signup.length, 1);
+  assert.deepEqual(Array.from(deferred.calls.signup[0].args), [
+    1,
+    "Carol",
+    "2-1",
+    client.ROLE_KEYS[0].label,
+    "test-alias",
+  ]);
+
+  context.currentEventId = 2;
+  context.currentRole = client.ROLE_KEYS[2].label;
+  deferred.calls.signup[0].succeed({
+    success: true,
+    message: "Signed up.",
+    name: "Carol",
+    cls: "2-1",
+    role: client.ROLE_KEYS[0].label,
+    filled: 3,
+    max: 4,
+  });
+
+  const originalEvent = client.getEventById(1);
+  const otherEvent = client.getEventById(2);
+  assert.equal(originalEvent.signups.length, 3);
+  assert.equal(originalEvent.signups[2].role, client.ROLE_KEYS[0].label);
+  assert.equal(
+    originalEvent.signupsByRole[client.ROLE_KEYS[0].label].length,
+    2,
+  );
+  assert.equal(originalEvent.slots.general.filled, 3);
+  assert.equal(originalEvent.slots.general.max, 4);
+  assert.equal(otherEvent.signups.length, 0);
+  assert.equal(otherEvent.slots.steeringCommittee.filled, 0);
+  assert.equal(String(context.currentEventId), "2");
+});
+
+test("signup retries an explicit pre-write busy result with its captured request", () => {
+  const inputName = { ...createElement("input"), value: "Carol" };
+  const inputClass = { ...createElement("input"), value: "2-1" };
+  const submitBtn = createElement("button");
+  const timers = [];
+  const deferred = createDeferredGoogleRun();
+  const { exports: client, context } = loadClient({
+    elements: {
+      honeypot: { ...createElement("input"), value: "" },
+      inputName,
+      inputClass,
+      submitBtn,
+      modalMessage: createElement("div"),
+      mobileAgenda: createElement("div"),
+    },
+    extraGlobals: {
+      google: deferred.google,
+      setTimeout(callback, delay) {
+        timers.push({ callback, delay });
+        return timers.length;
+      },
+    },
+  });
+  context.PAGE_LOAD_TIME = Date.now() - 4000;
+  context.currentEventId = 1;
+  context.currentRole = client.ROLE_KEYS[0].label;
+
+  client.submitSignup();
+  deferred.calls.signup[0].succeed({
+    success: false,
+    code: "busy_retryable",
+    message: "Please wait.",
+  });
+  deferred.calls.signup[0].succeed({
+    success: false,
+    code: "busy_retryable",
+    message: "Duplicate callback.",
+  });
+
+  assert.equal(deferred.calls.signup.length, 1);
+  assert.equal(timers.length, 1);
+  assert.ok(timers[0].delay >= 400 && timers[0].delay < 800);
+  assert.equal(submitBtn.disabled, true);
+  client.submitSignup();
+  assert.equal(deferred.calls.signup.length, 1);
+
+  inputName.value = "Wrong Person";
+  inputClass.value = "9-9";
+  context.currentRole = client.ROLE_KEYS[2].label;
+  timers[0].callback();
+  timers[0].callback();
+
+  assert.equal(deferred.calls.signup.length, 2);
+  assert.deepEqual(Array.from(deferred.calls.signup[1].args), [
+    1,
+    "Carol",
+    "2-1",
+    client.ROLE_KEYS[0].label,
+    "test-alias",
+  ]);
+
+  deferred.calls.signup[1].succeed({
+    success: true,
+    message: "Signed up.",
+    name: "Carol",
+    cls: "2-1",
+    role: client.ROLE_KEYS[0].label,
+    filled: 2,
+    max: 4,
+  });
+  deferred.calls.signup[1].succeed({
+    success: true,
+    message: "Duplicate success.",
+    name: "Carol",
+    cls: "2-1",
+    role: client.ROLE_KEYS[0].label,
+    filled: 3,
+    max: 4,
+  });
+
+  assert.equal(
+    client
+      .getEventById(1)
+      .signups.filter((signup) => signup.name === "Carol").length,
+    1,
+  );
+  assert.equal(client.getEventById(2).signups.length, 0);
+});
+
+test("cancellation retries busy with captured fields and removes the canonical server match", () => {
+  const generalRole = "一般保護者";
+  const gridData = {
+    activities: ["Hall Monitor", "Library Desk"],
+    times: ["09:30"],
+    events: [
+      {
+        eventId: 1,
+        activity: "Hall Monitor",
+        subtitle: "Morning",
+        startTime: "09:30",
+        endTime: "11:00",
+        location: "Gym",
+        description: "Guide arrivals",
+        slots: {
+          general: { max: 2, filled: 1 },
+          classRep: { max: 0, filled: 0 },
+          steeringCommittee: { max: 0, filled: 0 },
+          orgCommittee: { max: 0, filled: 0 },
+        },
+        signups: [{ name: "Alice", cls: "1-1", role: generalRole }],
+      },
+      {
+        eventId: 2,
+        activity: "Library Desk",
+        subtitle: "",
+        startTime: "09:30",
+        endTime: "10:30",
+        location: "Library",
+        description: "",
+        slots: {
+          general: { max: 1, filled: 0 },
+          classRep: { max: 0, filled: 0 },
+          steeringCommittee: { max: 0, filled: 0 },
+          orgCommittee: { max: 0, filled: 0 },
+        },
+        signups: [],
+      },
+    ],
+  };
+  const cancelSignupList = createElement("div");
+  const selectedOption = createElement("button");
+  cancelSignupList.appendChild(selectedOption);
+  const timers = [];
+  const deferred = createDeferredGoogleRun();
+  const { exports: client, context } = loadClient({
+    gridData,
+    elements: {
+      cancelSignupList,
+      cancelMessage: createElement("div"),
+      cancelSubmitBtn: createElement("button"),
+      confirmBox: createElement("div"),
+      confirmYes: createElement("button"),
+      confirmNo: createElement("button"),
+      mobileAgenda: createElement("div"),
+    },
+    extraGlobals: {
+      google: deferred.google,
+      setTimeout(callback, delay) {
+        timers.push({ callback, delay });
+        return timers.length;
+      },
+    },
+  });
+  context.currentEventId = 1;
+  client.selectCancelSignup(
+    { name: "Ａｌｉｃｅ", cls: "1-1", role: generalRole },
+    selectedOption,
+  );
+
+  client.confirmCancel();
+  deferred.calls.cancel[0].succeed({
+    success: false,
+    code: "busy_retryable",
+    message: "Please wait.",
+  });
+
+  assert.equal(deferred.calls.cancel.length, 1);
+  assert.equal(timers.length, 1);
+  assert.ok(timers[0].delay >= 400 && timers[0].delay < 800);
+  assert.equal(selectedOption.disabled, true);
+  client.confirmCancel();
+  assert.equal(deferred.calls.cancel.length, 1);
+
+  timers[0].callback();
+  timers[0].callback();
+
+  assert.equal(deferred.calls.cancel.length, 2);
+  assert.deepEqual(Array.from(deferred.calls.cancel[1].args), [
+    1,
+    "Ａｌｉｃｅ",
+    "1-1",
+    generalRole,
+    "test-alias",
+  ]);
+
+  deferred.calls.cancel[1].succeed({
+    success: true,
+    message: "Cancelled.",
+    name: "Alice",
+    cls: "1-1",
+    role: generalRole,
+    filled: 0,
+  });
+  deferred.calls.cancel[1].succeed({
+    success: true,
+    message: "Duplicate success.",
+    name: "Alice",
+    cls: "1-1",
+    role: generalRole,
+    filled: 0,
+  });
+
+  assert.equal(client.getEventById(1).signups.length, 0);
+  assert.equal(client.getEventById(1).slots.general.filled, 0);
+  assert.equal(client.getEventById(2).signups.length, 0);
+  assert.equal(deferred.calls.refresh.length, 1);
+});
+
+test("busy mutation retries stop after one jittered attempt", () => {
+  const submitBtn = createElement("button");
+  const modalMessage = createElement("div");
+  const timers = [];
+  const deferred = createDeferredGoogleRun();
+  const { exports: client, context } = loadClient({
+    elements: {
+      honeypot: { ...createElement("input"), value: "" },
+      inputName: { ...createElement("input"), value: "Carol" },
+      inputClass: { ...createElement("input"), value: "2-1" },
+      submitBtn,
+      modalMessage,
+    },
+    extraGlobals: {
+      google: deferred.google,
+      setTimeout(callback, delay) {
+        timers.push({ callback, delay });
+        return timers.length;
+      },
+    },
+  });
+  context.PAGE_LOAD_TIME = Date.now() - 4000;
+  context.currentEventId = 1;
+  context.currentRole = client.ROLE_KEYS[0].label;
+
+  client.submitSignup();
+  deferred.calls.signup[0].succeed({
+    success: false,
+    code: "busy_retryable",
+    message: "Busy one.",
+  });
+  timers[0].callback();
+  timers[0].callback();
+  deferred.calls.signup[1].succeed({
+    success: false,
+    code: "busy_retryable",
+    message: "Still busy.",
+  });
+
+  assert.equal(deferred.calls.signup.length, 2);
+  assert.equal(timers.length, 1);
+  assert.ok(timers[0].delay >= 400 && timers[0].delay < 800);
+  assert.equal(submitBtn.disabled, false);
+  assert.equal(modalMessage.textContent, "Still busy.");
+});
+
+test("cancellation settles after its one busy retry and restores its controls", () => {
+  const cancelSignupList = createElement("div");
+  const selectedOption = createElement("button");
+  cancelSignupList.appendChild(selectedOption);
+  const cancelMessage = createElement("div");
+  const cancelSubmitBtn = createElement("button");
+  const confirmBox = createElement("div");
+  confirmBox.style.display = "block";
+  const confirmYes = createElement("button");
+  const confirmNo = createElement("button");
+  const timers = [];
+  const deferred = createDeferredGoogleRun();
+  const { exports: client, context } = loadClient({
+    elements: {
+      cancelSignupList,
+      cancelMessage,
+      cancelSubmitBtn,
+      confirmBox,
+      confirmYes,
+      confirmNo,
+    },
+    extraGlobals: {
+      google: deferred.google,
+      setTimeout(callback, delay) {
+        timers.push({ callback, delay });
+        return timers.length;
+      },
+    },
+  });
+  context.currentEventId = 1;
+  client.selectCancelSignup(
+    { name: "Alice", cls: "1-1", role: "一般保護者" },
+    selectedOption,
+  );
+
+  client.confirmCancel();
+  deferred.calls.cancel[0].succeed({
+    success: false,
+    code: "busy_retryable",
+    message: "Busy once.",
+  });
+  timers[0].callback();
+  timers[0].callback();
+  deferred.calls.cancel[1].succeed({
+    success: false,
+    code: "busy_retryable",
+    message: "Still busy.",
+  });
+  deferred.calls.cancel[1].succeed({
+    success: false,
+    code: "busy_retryable",
+    message: "Duplicate callback.",
+  });
+
+  assert.equal(deferred.calls.cancel.length, 2);
+  assert.equal(timers.length, 1);
+  assert.equal(cancelMessage.textContent, "Still busy.");
+  assert.equal(confirmBox.style.display, "none");
+  assert.equal(confirmYes.disabled, false);
+  assert.equal(confirmNo.disabled, false);
+  assert.equal(selectedOption.disabled, false);
+  assert.equal(cancelSubmitBtn.style.display, "block");
+});
+
+test("generic retry hints and transport failures never retry mutations", () => {
+  const signupTimers = [];
+  const signupDeferred = createDeferredGoogleRun();
+  const signup = loadClient({
+    elements: {
+      honeypot: { ...createElement("input"), value: "" },
+      inputName: { ...createElement("input"), value: "Carol" },
+      inputClass: { ...createElement("input"), value: "2-1" },
+      submitBtn: createElement("button"),
+      modalMessage: createElement("div"),
+    },
+    extraGlobals: {
+      google: signupDeferred.google,
+      setTimeout(callback, delay) {
+        signupTimers.push({ callback, delay });
+        return signupTimers.length;
+      },
+    },
+  });
+  signup.context.PAGE_LOAD_TIME = Date.now() - 4000;
+  signup.context.currentEventId = 1;
+  signup.context.currentRole = signup.exports.ROLE_KEYS[0].label;
+  signup.exports.submitSignup();
+  signupDeferred.calls.signup[0].succeed({
+    success: false,
+    code: "write_outcome_unknown",
+    retryable: true,
+    message: "Do not retry.",
+  });
+
+  assert.equal(signupDeferred.calls.signup.length, 1);
+  assert.equal(signupTimers.length, 0);
+
+  const cancelTimers = [];
+  const cancelDeferred = createDeferredGoogleRun();
+  const cancelSignupList = createElement("div");
+  const selectedOption = createElement("button");
+  cancelSignupList.appendChild(selectedOption);
+  const cancellation = loadClient({
+    elements: {
+      cancelSignupList,
+      cancelMessage: createElement("div"),
+      cancelSubmitBtn: createElement("button"),
+      confirmBox: createElement("div"),
+      confirmYes: createElement("button"),
+      confirmNo: createElement("button"),
+    },
+    extraGlobals: {
+      google: cancelDeferred.google,
+      setTimeout(callback, delay) {
+        cancelTimers.push({ callback, delay });
+        return cancelTimers.length;
+      },
+    },
+  });
+  cancellation.context.currentEventId = 1;
+  cancellation.exports.selectCancelSignup(
+    { name: "Alice", cls: "1-1", role: "一般保護者" },
+    selectedOption,
+  );
+  cancellation.exports.confirmCancel();
+  cancelDeferred.calls.cancel[0].fail(new Error("Transport failed."));
+
+  assert.equal(cancelDeferred.calls.cancel.length, 1);
+  assert.equal(cancelTimers.length, 0);
+  assert.equal(cancellation.context.document.getElementById("confirmYes").disabled, false);
+});
+
+test("a busy retry timer aborts after the user opens another event", () => {
+  const inputName = { ...createElement("input"), value: "Carol" };
+  const inputClass = { ...createElement("input"), value: "2-1" };
+  const timers = [];
+  const deferred = createDeferredGoogleRun();
+  const { exports: client, context } = loadClient({
+    elements: {
+      honeypot: { ...createElement("input"), value: "" },
+      inputName,
+      inputClass,
+      submitBtn: createElement("button"),
+      modalMessage: createElement("div"),
+      modalOverlay: createElement("div"),
+    },
+    extraGlobals: {
+      google: deferred.google,
+      setTimeout(callback, delay) {
+        timers.push({ callback, delay });
+        return timers.length;
+      },
+    },
+  });
+  context.PAGE_LOAD_TIME = Date.now() - 4000;
+  context.currentEventId = 1;
+  context.currentRole = client.ROLE_KEYS[0].label;
+
+  client.submitSignup();
+  deferred.calls.signup[0].succeed({
+    success: false,
+    code: "busy_retryable",
+    message: "Please wait.",
+  });
+  client.openModal(2);
+  timers[0].callback();
+  timers[0].callback();
+
+  assert.equal(deferred.calls.signup.length, 1);
+
+  inputName.value = "Dana";
+  inputClass.value = "3-1";
+  context.currentRole = client.ROLE_KEYS[2].label;
+  client.submitSignup();
+
+  assert.equal(deferred.calls.signup.length, 2);
+  assert.deepEqual(Array.from(deferred.calls.signup[1].args), [
+    2,
+    "Dana",
+    "3-1",
+    client.ROLE_KEYS[2].label,
+    "test-alias",
+  ]);
+});
+
+test("a busy retry timer aborts after reopening the same event", () => {
+  const inputName = { ...createElement("input"), value: "Carol" };
+  const inputClass = { ...createElement("input"), value: "2-1" };
+  const pageHeading = createElement("h1");
+  pageHeading.scrollIntoView = function () {};
+  const timers = [];
+  const deferred = createDeferredGoogleRun();
+  const { exports: client, context } = loadClient({
+    elements: {
+      honeypot: { ...createElement("input"), value: "" },
+      inputName,
+      inputClass,
+      submitBtn: createElement("button"),
+      modalMessage: createElement("div"),
+      modalOverlay: createElement("div"),
+      h1: pageHeading,
+    },
+    extraGlobals: {
+      google: deferred.google,
+      setTimeout(callback, delay) {
+        timers.push({ callback, delay });
+        return timers.length;
+      },
+    },
+  });
+  context.PAGE_LOAD_TIME = Date.now() - 4000;
+  context.currentEventId = 1;
+  context.currentRole = client.ROLE_KEYS[0].label;
+
+  client.submitSignup();
+  deferred.calls.signup[0].succeed({
+    success: false,
+    code: "busy_retryable",
+    message: "Please wait.",
+  });
+  client.closeModal();
+  client.openModal(1);
+  timers[0].callback();
+  timers[0].callback();
+
+  assert.equal(deferred.calls.signup.length, 1);
+
+  inputName.value = "Dana";
+  inputClass.value = "3-1";
+  context.currentRole = client.ROLE_KEYS[0].label;
+  client.submitSignup();
+
+  assert.equal(deferred.calls.signup.length, 2);
+  assert.deepEqual(Array.from(deferred.calls.signup[1].args), [
+    1,
+    "Dana",
+    "3-1",
+    client.ROLE_KEYS[0].label,
+    "test-alias",
+  ]);
+});
+
+test("a dispatched busy retry refreshes a reopened same-event modal without closing it", () => {
+  const inputName = { ...createElement("input"), value: "" };
+  const inputClass = { ...createElement("input"), value: "" };
+  const namesGroups = createElement("div");
+  const roleButtons = createElement("div");
+  const modalOverlay = createElement("div");
+  const pageHeading = createElement("h1");
+  pageHeading.scrollIntoView = function () {};
+  const timers = [];
+  const deferred = createDeferredGoogleRun();
+  const { exports: client, context } = loadClient({
+    elements: {
+      honeypot: { ...createElement("input"), value: "" },
+      inputName,
+      inputClass,
+      namesGroups,
+      roleButtons,
+      modalOverlay,
+      submitBtn: createElement("button"),
+      modalMessage: createElement("div"),
+      modalRoleMessage: createElement("div"),
+      h1: pageHeading,
+    },
+    extraGlobals: {
+      google: deferred.google,
+      setTimeout(callback, delay) {
+        timers.push({ callback, delay });
+        return timers.length;
+      },
+    },
+  });
+  context.PAGE_LOAD_TIME = Date.now() - 4000;
+  client.openModal(1);
+  inputName.value = "Carol";
+  inputClass.value = "2-1";
+  context.currentRole = client.ROLE_KEYS[0].label;
+
+  client.submitSignup();
+  deferred.calls.signup[0].succeed({
+    success: false,
+    code: "busy_retryable",
+    message: "Please wait.",
+  });
+  timers[0].callback();
+  assert.equal(deferred.calls.signup.length, 2);
+
+  client.closeModal();
+  client.openModal(1);
+  inputName.value = "Preserve this draft";
+  inputClass.value = "4-1";
+  deferred.calls.signup[1].succeed({
+    success: true,
+    message: "Registered.",
+    name: "Carol",
+    cls: "2-1",
+    role: client.ROLE_KEYS[0].label,
+    filled: 2,
+    max: 2,
+  });
+
+  assert.equal(client.getEventById(1).signups.at(-1).name, "Carol");
+  assert.match(getRenderedText(namesGroups), /Carol/);
+  assert.match(getRenderedText(roleButtons), /Full/);
+  assert.equal(inputName.value, "Preserve this draft");
+  assert.equal(inputClass.value, "4-1");
+  assert.equal(modalOverlay.classList.has("active"), true);
+  assert.equal(context.currentEventId, 1);
+
+  assert.equal(timers.length, 2);
+  timers[1].callback();
+  assert.equal(modalOverlay.classList.has("active"), true);
+  assert.equal(context.currentEventId, 1);
+});
+
+test("a reopened same-event cancellation applies local and authoritative retry results without closing", () => {
+  const inputName = createElement("input");
+  const inputClass = createElement("input");
+  const namesGroups = createElement("div");
+  const roleButtons = createElement("div");
+  const modalOverlay = createElement("div");
+  const cancelSignupList = createElement("div");
+  const pageHeading = createElement("h1");
+  pageHeading.scrollIntoView = function () {};
+  const timers = [];
+  const deferred = createDeferredGoogleRun();
+  const { exports: client, context } = loadClient({
+    elements: {
+      inputName,
+      inputClass,
+      namesGroups,
+      roleButtons,
+      modalOverlay,
+      cancelSignupList,
+      cancelMessage: createElement("div"),
+      cancelSubmitBtn: createElement("button"),
+      confirmBox: createElement("div"),
+      confirmYes: createElement("button"),
+      confirmNo: createElement("button"),
+      modalRoleMessage: createElement("div"),
+      h1: pageHeading,
+    },
+    extraGlobals: {
+      google: deferred.google,
+      setTimeout(callback, delay) {
+        timers.push({ callback, delay });
+        return timers.length;
+      },
+    },
+  });
+  client.openModal(1);
+  client.switchTab("cancel");
+  client.selectCancelSignup(
+    cancelSignupList.children[0].cancelSignupData,
+    cancelSignupList.children[0],
+  );
+
+  client.confirmCancel();
+  deferred.calls.cancel[0].succeed({
+    success: false,
+    code: "busy_retryable",
+    message: "Please wait.",
+  });
+  timers[0].callback();
+  assert.equal(deferred.calls.cancel.length, 2);
+
+  client.closeModal();
+  client.openModal(1);
+  inputName.value = "Preserve this cancellation draft";
+  inputClass.value = "5-1";
+  deferred.calls.cancel[1].succeed({
+    success: true,
+    message: "Cancelled.",
+    name: "Alice",
+    cls: "1-1",
+    role: client.ROLE_KEYS[0].label,
+    filled: 0,
+  });
+
+  assert.doesNotMatch(getRenderedText(namesGroups), /Alice/);
+  assert.doesNotMatch(getRenderedText(namesGroups), /Fresh Server/);
+  assert.equal(inputName.value, "Preserve this cancellation draft");
+  assert.equal(inputClass.value, "5-1");
+  assert.equal(modalOverlay.classList.has("active"), true);
+  assert.equal(deferred.calls.refresh.length, 1);
+
+  deferred.calls.refresh[0].succeed({
+    success: true,
+    eventStatus: "OPEN",
+    title: "Fresh title",
+    gridData: {
+      activities: ["Hall Monitor", "Library Desk"],
+      times: ["09:30"],
+      events: [
+        {
+          eventId: 1,
+          activity: "Hall Monitor",
+          subtitle: "Morning",
+          startTime: "09:30",
+          endTime: "11:00",
+          location: "Gym",
+          description: "Guide arrivals",
+          slots: {
+            general: { max: 2, filled: 0 },
+            classRep: { max: 1, filled: 1 },
+            steeringCommittee: { max: 0, filled: 0 },
+            orgCommittee: { max: 1, filled: 1 },
+          },
+          signups: [
+            { name: "Bob", cls: "1-2", role: client.ROLE_KEYS[1].label },
+            {
+              name: "Fresh Server",
+              cls: "6-1",
+              role: client.ROLE_KEYS[3].label,
+            },
+          ],
+        },
+        {
+          eventId: 2,
+          activity: "Library Desk",
+          subtitle: "",
+          startTime: "09:30",
+          endTime: "10:30",
+          location: "Library",
+          description: "",
+          slots: {
+            general: { max: 1, filled: 1 },
+            classRep: { max: 0, filled: 0 },
+            steeringCommittee: { max: 1, filled: 0 },
+            orgCommittee: { max: 0, filled: 0 },
+          },
+          signups: [],
+        },
+      ],
+    },
+  });
+
+  assert.match(getRenderedText(namesGroups), /Fresh Server/);
+  assert.equal(inputName.value, "Preserve this cancellation draft");
+  assert.equal(inputClass.value, "5-1");
+  assert.equal(modalOverlay.classList.has("active"), true);
+  assert.equal(context.currentEventId, 1);
+
+  assert.equal(timers.length, 2);
+  timers[1].callback();
+  assert.equal(modalOverlay.classList.has("active"), true);
+  assert.equal(context.currentEventId, 1);
+});
+
+test("canonical cancellation identity removes exact rows before safe compatibility fallback", () => {
+  const generalRole = "一般保護者";
+
+  function runCancellation(signups, resultName) {
+    const cancelSignupList = createElement("div");
+    const selectedOption = createElement("button");
+    cancelSignupList.appendChild(selectedOption);
+    const timers = [];
+    const deferred = createDeferredGoogleRun();
+    const loaded = loadClient({
+      gridData: {
+        activities: ["Hall Monitor"],
+        times: ["09:30"],
+        events: [
+          {
+            eventId: 1,
+            activity: "Hall Monitor",
+            subtitle: "Morning",
+            startTime: "09:30",
+            endTime: "11:00",
+            location: "Gym",
+            description: "Guide arrivals",
+            slots: {
+              general: { max: 3, filled: signups.length },
+              classRep: { max: 0, filled: 0 },
+              steeringCommittee: { max: 0, filled: 0 },
+              orgCommittee: { max: 0, filled: 0 },
+            },
+            signups,
+          },
+        ],
+      },
+      elements: {
+        cancelSignupList,
+        cancelMessage: createElement("div"),
+        cancelSubmitBtn: createElement("button"),
+        confirmBox: createElement("div"),
+        confirmYes: createElement("button"),
+        confirmNo: createElement("button"),
+        mobileAgenda: createElement("div"),
+      },
+      extraGlobals: {
+        google: deferred.google,
+        setTimeout(callback, delay) {
+          timers.push({ callback, delay });
+          return timers.length;
+        },
+      },
+    });
+    loaded.context.currentEventId = 1;
+    loaded.exports.selectCancelSignup(
+      { name: "Ａｌｉｃｅ", cls: "1-1", role: generalRole },
+      selectedOption,
+    );
+    loaded.exports.confirmCancel();
+    deferred.calls.cancel[0].succeed({
+      success: true,
+      message: "Cancelled.",
+      name: resultName,
+      cls: "1-1",
+      role: generalRole,
+      filled: Math.max(0, signups.length - 1),
+    });
+    return loaded.exports.getEventById(1);
+  }
+
+  const exactCollision = runCancellation(
+    [
+      { name: "Alice", cls: "1-1", role: generalRole },
+      { name: "Ａｌｉｃｅ", cls: "1-1", role: generalRole },
+    ],
+    "Alice",
+  );
+  assert.deepEqual(
+    Array.from(exactCollision.signups, (signup) => signup.name),
+    ["Ａｌｉｃｅ"],
+  );
+
+  const ambiguousFallback = runCancellation(
+    [
+      { name: "Alice", cls: "1-1", role: generalRole },
+      { name: "alice", cls: "1-1", role: generalRole },
+    ],
+    "ALICE",
+  );
+  assert.deepEqual(
+    Array.from(ambiguousFallback.signups, (signup) => signup.name),
+    ["Alice", "alice"],
+  );
+  assert.equal(ambiguousFallback.slots.general.filled, 2);
+
+  const uniqueFallback = runCancellation(
+    [{ name: "Alice", cls: "1-1", role: generalRole }],
+    "ALICE",
+  );
+  assert.equal(uniqueFallback.signups.length, 0);
+  assert.equal(uniqueFallback.slots.general.filled, 0);
+});
+
+test("apostrophe cancellation identity round-trips unchanged through the client", () => {
+  const generalRole = "一般保護者";
+  const cancelSignupList = createElement("div");
+  const cancelSubmitBtn = createElement("button");
+  const timers = [];
+  const deferred = createDeferredGoogleRun();
+  const { exports: client, context } = loadClient({
+    gridData: {
+      activities: ["Hall Monitor"],
+      times: ["09:30"],
+      events: [
+        {
+          eventId: 1,
+          activity: "Hall Monitor",
+          subtitle: "Morning",
+          startTime: "09:30",
+          endTime: "11:00",
+          location: "Gym",
+          description: "Guide arrivals",
+          slots: {
+            general: { max: 2, filled: 1 },
+            classRep: { max: 0, filled: 0 },
+            steeringCommittee: { max: 0, filled: 0 },
+            orgCommittee: { max: 0, filled: 0 },
+          },
+          signups: [{ name: "O'Neil", cls: "1-A", role: generalRole }],
+        },
+      ],
+    },
+    elements: {
+      cancelSignupList,
+      cancelSubmitBtn,
+      cancelMessage: createElement("div"),
+      confirmBox: createElement("div"),
+      confirmYes: createElement("button"),
+      confirmNo: createElement("button"),
+      mobileAgenda: createElement("div"),
+    },
+    extraGlobals: {
+      google: deferred.google,
+      setTimeout(callback, delay) {
+        timers.push({ callback, delay });
+        return timers.length;
+      },
+    },
+  });
+  context.currentEventId = 1;
+
+  client.renderCancelSignupList();
+  assert.match(getRenderedText(cancelSignupList), /O'Neil/);
+  assert.equal(cancelSignupList.children.length, 1);
+  assert.deepEqual(
+    { ...cancelSignupList.children[0].cancelSignupData },
+    { name: "O'Neil", cls: "1-A", role: generalRole },
+  );
+
+  cancelSignupList.dispatchEvent({
+    type: "click",
+    target: cancelSignupList.children[0].children[0],
+  });
+  assert.equal(cancelSubmitBtn.disabled, false);
+  client.confirmCancel();
+
+  assert.deepEqual(Array.from(deferred.calls.cancel[0].args), [
+    1,
+    "O'Neil",
+    "1-A",
+    generalRole,
+    "test-alias",
+  ]);
+
+  deferred.calls.cancel[0].succeed({
+    success: true,
+    message: "Cancelled.",
+    name: "O'Neil",
+    cls: "1-A",
+    role: generalRole,
+    filled: 0,
+  });
+
+  assert.equal(client.getEventById(1).signups.length, 0);
+  assert.equal(client.getEventById(1).slots.general.filled, 0);
+});
+
+test("successful signup uses the full-capacity message location", () => {
+  const htmlSource = getIndexHtmlSource();
+  const inputName = { ...createElement("input"), value: "Carol" };
+  const inputClass = { ...createElement("input"), value: "2-1" };
+  const modalForm = createElement("div");
+  const modalMessage = createElement("div");
+  modalMessage.style.display = "none";
+  const modalRoleMessage = createElement("div");
+  modalRoleMessage.style.display = "none";
+  const modalOverlay = createElement("div");
+  const roleButtons = createElement("div");
+  const timers = [];
+  const deferred = createDeferredGoogleRun();
+  const { exports: client, context } = loadClient({
+    elements: {
+      honeypot: { ...createElement("input"), value: "" },
+      inputName,
+      inputClass,
+      submitBtn: createElement("button"),
+      modalForm,
+      modalMessage,
+      modalRoleMessage,
+      modalOverlay,
+      roleButtons,
+      mobileAgenda: createElement("div"),
+    },
+    extraGlobals: {
+      google: deferred.google,
+      setTimeout(callback, delay) {
+        timers.push({ callback, delay });
+        return timers.length;
+      },
+    },
+  });
+  context.PAGE_LOAD_TIME = Date.now() - 4000;
+
+  const event = client.getEventById(1);
+  event.slots.general.filled = 2;
+  event.slots.orgCommittee.max = 0;
+  client.openModal(1);
+  assert.equal(
+    modalRoleMessage.textContent,
+    "この枠はおかげさまで定員に達しました。ありがとうございます。",
+  );
+  assert.equal(modalRoleMessage.className, "modal-full-message");
+  assert.equal(modalRoleMessage.style.display, "block");
+  assert.equal(modalRoleMessage.parentNode, roleButtons);
+  assert.equal(roleButtons.children.at(-1), modalRoleMessage);
+
+  event.slots.general.filled = 1;
+  client.openModal(1);
+  context.currentRole = client.ROLE_KEYS[0].label;
+  modalForm.className = "modal-form visible";
+  inputName.value = "Carol";
+  inputClass.value = "2-1";
+  client.submitSignup();
+  deferred.calls.signup[0].succeed({
+    success: true,
+    message: "ありがとうございます！登録が完了しました！",
+    name: "Carol",
+    cls: "2-1",
+    role: client.ROLE_KEYS[0].label,
+    filled: 2,
+    max: 2,
+  });
+
+  assert.equal(modalForm.className, "modal-form");
+  assert.equal(
+    modalRoleMessage.textContent,
+    "ありがとうございます！登録が完了しました！",
+  );
+  assert.equal(modalRoleMessage.className, "modal-message success");
+  assert.equal(modalRoleMessage.style.display, "block");
+  assert.equal(modalRoleMessage.parentNode, roleButtons);
+  assert.equal(roleButtons.children.at(-1), modalRoleMessage);
+  assert.equal(modalOverlay.classList.has("active"), true);
+  assert.equal(timers.length, 1);
+  assert.equal(timers[0].delay, 3000);
+  assert.match(
+    htmlSource,
+    /\.modal-message\.success\s*{[\s\S]*?font-size:\s*15px;[\s\S]*?font-weight:\s*700;/,
+  );
+  assert.match(
+    htmlSource,
+    /body\.compact-layout \.modal-message\.success\s*{[\s\S]*?font-size:\s*20px;/,
+  );
+
+  client.switchTab("cancel");
+  client.switchTab("signup");
+  assert.equal(
+    modalRoleMessage.textContent,
+    "この枠はおかげさまで定員に達しました。ありがとうございます。",
+  );
+  assert.equal(modalRoleMessage.className, "modal-full-message");
+  assert.equal(modalRoleMessage.style.display, "block");
+});
+
+test("an older signup timer cannot close a newer pending cancellation", () => {
+  const inputName = { ...createElement("input"), value: "Carol" };
+  const inputClass = { ...createElement("input"), value: "2-1" };
+  const modalOverlay = createElement("div");
+  const cancelSignupList = createElement("div");
+  const pageHeading = createElement("h1");
+  pageHeading.scrollIntoView = function () {};
+  const timers = [];
+  const deferred = createDeferredGoogleRun();
+  const { exports: client, context } = loadClient({
+    elements: {
+      honeypot: { ...createElement("input"), value: "" },
+      inputName,
+      inputClass,
+      submitBtn: createElement("button"),
+      modalMessage: createElement("div"),
+      modalOverlay,
+      cancelSignupList,
+      cancelMessage: createElement("div"),
+      cancelSubmitBtn: createElement("button"),
+      confirmBox: createElement("div"),
+      confirmYes: createElement("button"),
+      confirmNo: createElement("button"),
+      h1: pageHeading,
+    },
+    extraGlobals: {
+      google: deferred.google,
+      setTimeout(callback, delay) {
+        timers.push({ callback, delay });
+        return timers.length;
+      },
+    },
+  });
+  context.PAGE_LOAD_TIME = Date.now() - 4000;
+  context.currentEventId = 1;
+  context.currentRole = client.ROLE_KEYS[0].label;
+
+  client.submitSignup();
+  deferred.calls.signup[0].succeed({
+    success: true,
+    message: "Signed up.",
+    role: client.ROLE_KEYS[0].label,
+  });
+  assert.equal(timers.length, 1);
+  assert.equal(modalOverlay.classList.has("active"), true);
+
+  client.switchTab("cancel");
+  client.selectCancelSignup(
+    cancelSignupList.children[0].cancelSignupData,
+    cancelSignupList.children[0],
+  );
+  client.confirmCancel();
+  assert.equal(deferred.calls.cancel.length, 1);
+
+  timers[0].callback();
+  assert.equal(modalOverlay.classList.has("active"), true);
+  assert.equal(deferred.calls.cancel.length, 1);
+});
+
+test("read-only mutation responses update only a currently open modal", () => {
+  function createReadOnlyMutationCase() {
+    const modalOverlay = createElement("div");
+    const roleButtons = createElement("div");
+    const modalReadOnlyNotice = createElement("div");
+    const modalForm = createElement("div");
+    const cancelForm = createElement("div");
+    const modalTitle = createElement("h2");
+    const pageHeading = createElement("h1");
+    pageHeading.scrollIntoView = function () {};
+    const deferred = createDeferredGoogleRun();
+    const loaded = loadClient({
+      elements: {
+        honeypot: { ...createElement("input"), value: "" },
+        inputName: { ...createElement("input"), value: "Carol" },
+        inputClass: { ...createElement("input"), value: "2-1" },
+        submitBtn: createElement("button"),
+        modalMessage: createElement("div"),
+        modalOverlay,
+        modalTitle,
+        roleButtons,
+        modalReadOnlyNotice,
+        modalForm,
+        cancelForm,
+        modalTabs: createElement("div"),
+        readOnlyBanner: createElement("div"),
+        h1: pageHeading,
+      },
+      extraGlobals: {
+        google: deferred.google,
+      },
+    });
+    return {
+      ...loaded,
+      deferred,
+      modalOverlay,
+      roleButtons,
+      modalReadOnlyNotice,
+      modalForm,
+      cancelForm,
+      modalTitle,
+    };
+  }
+
+  const visible = createReadOnlyMutationCase();
+  visible.exports.openModal(1);
+  visible.context.PAGE_LOAD_TIME = Date.now() - 4000;
+  visible.context.currentRole = visible.exports.ROLE_KEYS[0].label;
+  visible.context.document.getElementById("inputName").value = "Carol";
+  visible.context.document.getElementById("inputClass").value = "2-1";
+  visible.exports.submitSignup();
+  visible.exports.openModal(2);
+  visible.deferred.calls.signup[0].succeed({
+    success: false,
+    code: "event_read_only",
+    message: "Read only.",
+  });
+
+  assert.equal(visible.exports.isEventReadOnly(), true);
+  assert.equal(String(visible.context.currentEventId), "2");
+  assert.equal(visible.modalTitle.textContent, "Library Desk");
+  assert.equal(visible.modalOverlay.classList.has("active"), true);
+  assert.equal(visible.roleButtons.children.length, 0);
+  assert.equal(visible.roleButtons.style.display, "none");
+  assert.equal(visible.modalReadOnlyNotice.style.display, "block");
+  assert.equal(visible.modalForm.className, "modal-form");
+  assert.equal(visible.cancelForm.className, "cancel-form");
+
+  const closed = createReadOnlyMutationCase();
+  closed.exports.openModal(1);
+  closed.context.PAGE_LOAD_TIME = Date.now() - 4000;
+  closed.context.currentRole = closed.exports.ROLE_KEYS[0].label;
+  closed.context.document.getElementById("inputName").value = "Carol";
+  closed.context.document.getElementById("inputClass").value = "2-1";
+  closed.exports.submitSignup();
+  closed.exports.closeModal();
+  closed.deferred.calls.signup[0].succeed({
+    success: false,
+    code: "event_read_only",
+    message: "Read only.",
+  });
+
+  assert.equal(closed.exports.isEventReadOnly(), true);
+  assert.equal(closed.context.currentEventId, null);
+  assert.equal(closed.modalOverlay.classList.has("active"), false);
+});
+
+test("refresh-driven read-only state updates a newer modal but keeps a closed modal closed", () => {
+  function createReadOnlyRefreshCase() {
+    const modalOverlay = createElement("div");
+    const roleButtons = createElement("div");
+    const modalReadOnlyNotice = createElement("div");
+    const modalForm = createElement("div");
+    const cancelForm = createElement("div");
+    const modalTabs = createElement("div");
+    const signupHelper = createElement("div");
+    const modalTitle = createElement("h2");
+    const cancelSignupList = createElement("div");
+    const pageHeading = createElement("h1");
+    pageHeading.scrollIntoView = function () {};
+    const timers = [];
+    const deferred = createDeferredGoogleRun();
+    const loaded = loadClient({
+      elements: {
+        modalOverlay,
+        modalTitle,
+        roleButtons,
+        modalReadOnlyNotice,
+        modalForm,
+        cancelForm,
+        modalTabs,
+        signupHelper,
+        cancelSignupList,
+        cancelMessage: createElement("div"),
+        cancelSubmitBtn: createElement("button"),
+        confirmBox: createElement("div"),
+        confirmYes: createElement("button"),
+        confirmNo: createElement("button"),
+        readOnlyBanner: createElement("div"),
+        h1: pageHeading,
+      },
+      extraGlobals: {
+        google: deferred.google,
+        setTimeout(callback, delay) {
+          timers.push({ callback, delay });
+          return timers.length;
+        },
+      },
+    });
+    return {
+      ...loaded,
+      deferred,
+      timers,
+      modalOverlay,
+      roleButtons,
+      modalReadOnlyNotice,
+      modalForm,
+      cancelForm,
+      modalTabs,
+      signupHelper,
+      modalTitle,
+      cancelSignupList,
+    };
+  }
+
+  function startConfirmedCancellation(loaded) {
+    loaded.exports.openModal(1);
+    loaded.exports.switchTab("cancel");
+    loaded.exports.selectCancelSignup(
+      loaded.cancelSignupList.children[0].cancelSignupData,
+      loaded.cancelSignupList.children[0],
+    );
+    loaded.exports.confirmCancel();
+    loaded.deferred.calls.cancel[0].succeed({
+      success: true,
+      message: "Cancelled.",
+      role: loaded.exports.ROLE_KEYS[0].label,
+      filled: 0,
+    });
+    return JSON.parse(JSON.stringify(loaded.context.gridData));
+  }
+
+  const visible = createReadOnlyRefreshCase();
+  const visibleFreshGrid = startConfirmedCancellation(visible);
+  visible.exports.closeModal();
+  visible.exports.openModal(2);
+  visible.deferred.calls.refresh[0].succeed({
+    success: true,
+    gridData: visibleFreshGrid,
+    eventStatus: "READ_ONLY",
+  });
+
+  assert.equal(visible.exports.isEventReadOnly(), true);
+  assert.equal(String(visible.context.currentEventId), "2");
+  assert.equal(visible.modalTitle.textContent, "Library Desk");
+  assert.equal(visible.modalOverlay.classList.has("active"), true);
+  assert.equal(visible.modalReadOnlyNotice.style.display, "block");
+  assert.equal(visible.modalTabs.style.display, "none");
+  assert.equal(visible.signupHelper.style.display, "none");
+  assert.equal(visible.roleButtons.style.display, "none");
+  assert.equal(visible.modalForm.className, "modal-form");
+  assert.equal(visible.cancelForm.className, "cancel-form");
+  assert.equal(visible.timers.length, 1);
+  visible.timers[0].callback();
+  assert.equal(visible.modalOverlay.classList.has("active"), true);
+
+  const closed = createReadOnlyRefreshCase();
+  const closedFreshGrid = startConfirmedCancellation(closed);
+  closed.exports.closeModal();
+  closed.deferred.calls.refresh[0].succeed({
+    success: true,
+    gridData: closedFreshGrid,
+    eventStatus: "READ_ONLY",
+  });
+
+  assert.equal(closed.exports.isEventReadOnly(), true);
+  assert.equal(closed.context.currentEventId, null);
+  assert.equal(closed.modalOverlay.classList.has("active"), false);
+  closed.timers[0].callback();
+  assert.equal(closed.modalOverlay.classList.has("active"), false);
 });
 
 test("submitSignup refreshes grid data after a stale full-slot rejection", () => {
@@ -1753,11 +3679,58 @@ test("submitSignup refreshes grid data after a stale full-slot rejection", () =>
   assert.equal(roleButtons.children[0].children[1].textContent, "Full");
 });
 
+test("stale-slot refresh keeps the global mutation guard until it settles", () => {
+  const submitBtn = createElement("button");
+  const modalMessage = createElement("div");
+  modalMessage.style = { display: "none" };
+  const deferred = createDeferredGoogleRun();
+  const { exports: client, context } = loadClient({
+    elements: {
+      honeypot: { ...createElement("input"), value: "" },
+      inputName: { ...createElement("input"), value: "Carol" },
+      inputClass: { ...createElement("input"), value: "2-1" },
+      submitBtn,
+      modalMessage,
+      cancelSignupList: createElement("div"),
+      cancelMessage: createElement("div"),
+      cancelSubmitBtn: createElement("button"),
+      confirmBox: createElement("div"),
+      confirmYes: createElement("button"),
+      confirmNo: createElement("button"),
+    },
+    extraGlobals: {
+      google: deferred.google,
+    },
+  });
+  context.PAGE_LOAD_TIME = Date.now() - 4000;
+  context.currentEventId = 1;
+  context.currentRole = client.ROLE_KEYS[0].label;
+
+  client.submitSignup();
+  deferred.calls.signup[0].succeed({
+    success: false,
+    code: "slot_full",
+    message: "Slot is full.",
+  });
+
+  assert.equal(deferred.calls.refresh.length, 1);
+  assert.equal(submitBtn.disabled, true);
+  context.currentCancelSignup = {
+    name: "Alice",
+    cls: "1-1",
+    role: client.ROLE_KEYS[0].label,
+  };
+  client.confirmCancel();
+  assert.equal(deferred.calls.cancel.length, 0);
+
+  deferred.calls.refresh[0].fail(new Error("refresh failed"));
+  assert.equal(submitBtn.disabled, false);
+  client.confirmCancel();
+  assert.equal(deferred.calls.cancel.length, 1);
+});
+
 test("desktop reuses the responsive filters and card schedule", () => {
-  const htmlSource = fs.readFileSync(
-    path.resolve(__dirname, "..", "index.html"),
-    "utf8",
-  );
+  const htmlSource = getIndexHtmlSource();
 
   assert.match(
     htmlSource,
@@ -2223,9 +4196,7 @@ test("desktop registration summary applies selected time filters", () => {
             steeringCommittee: { max: 0, filled: 0 },
             orgCommittee: { max: 0, filled: 0 },
           },
-          signups: [
-            { name: "Alice", cls: "1-1", role: "一般保護者" },
-          ],
+          signups: [{ name: "Alice", cls: "1-1", role: "一般保護者" }],
         },
         {
           eventId: 2,
@@ -2342,10 +4313,7 @@ test("desktop insight scopes reuse current filters and reset to overall", () => 
   assert.equal(filteredButton.getAttribute("aria-pressed"), "true");
   assert.match(description.textContent, /現在の絞り込み/);
   assert.equal(content.children.length, 1);
-  assert.equal(
-    content.children[0].getAttribute("data-insight-eventid"),
-    "2",
-  );
+  assert.equal(content.children[0].getAttribute("data-insight-eventid"), "2");
 
   client.setDesktopInsightView("registrations");
   assert.equal(title.textContent, "現在の登録");
@@ -2354,10 +4322,7 @@ test("desktop insight scopes reuse current filters and reset to overall", () => 
   assert.equal(overallCount.textContent, "1件");
   assert.equal(filteredCount.textContent, "0件");
   assert.equal(content.children.length, 1);
-  assert.equal(
-    content.children[0].getAttribute("data-insight-eventid"),
-    "1",
-  );
+  assert.equal(content.children[0].getAttribute("data-insight-eventid"), "1");
 
   client.setDesktopInsightView("vacancies");
   assert.equal(title.textContent, "空き枠の一覧");
@@ -2408,10 +4373,7 @@ test("desktop insight scopes reuse current filters and reset to overall", () => 
   assert.equal(filteredButton.hidden, false);
   assert.equal(overallButton.classList.has("is-active"), true);
   assert.equal(content.children.length, 1);
-  assert.equal(
-    content.children[0].getAttribute("data-insight-eventid"),
-    "1",
-  );
+  assert.equal(content.children[0].getAttribute("data-insight-eventid"), "1");
 
   panel.dispatchEvent({
     type: "click",
@@ -2427,10 +4389,7 @@ test("desktop insight scopes reuse current filters and reset to overall", () => 
   client.setMobileKeywordSearchQuery("Alice");
   assert.equal(filteredCount.textContent, "1件");
   assert.equal(content.children.length, 1);
-  assert.equal(
-    content.children[0].getAttribute("data-insight-eventid"),
-    "1",
-  );
+  assert.equal(content.children[0].getAttribute("data-insight-eventid"), "1");
   const filteredNames = content.children[0].children.find(function (child) {
     return child.className === "desktop-insight-names";
   });
@@ -2538,11 +4497,37 @@ test("desktop insight cards render useful views and reuse existing actions", () 
   assert.equal(panel.hidden, true);
 });
 
-test("mobile role filter active pills keep their role colour families", () => {
-  const htmlSource = fs.readFileSync(
-    path.resolve(__dirname, "..", "index.html"),
-    "utf8",
+test("desktop insight views preserve their overall empty messages", () => {
+  const panel = createElement("div");
+  panel.hidden = true;
+  const content = createElement("div");
+  const { exports: client } = loadClient({
+    gridData: { activities: [], times: [], events: [] },
+    elements: {
+      desktopInsightsPanel: panel,
+      desktopInsightsTitle: createElement("h2"),
+      desktopInsightsDescription: createElement("p"),
+      desktopInsightsContent: content,
+    },
+  });
+
+  client.setDesktopInsightView("vacancies");
+  assert.equal(content.children.length, 1);
+  assert.equal(
+    content.children[0].textContent,
+    "\u73FE\u5728\u3001\u7A7A\u3044\u3066\u3044\u308B\u52DF\u96C6\u67A0\u306F\u3042\u308A\u307E\u305B\u3093\u3002",
   );
+
+  client.setDesktopInsightView("registrations");
+  assert.equal(content.children.length, 1);
+  assert.equal(
+    content.children[0].textContent,
+    "\u73FE\u5728\u306E\u767B\u9332\u306F\u3042\u308A\u307E\u305B\u3093\u3002",
+  );
+});
+
+test("mobile role filter active pills keep their role colour families", () => {
+  const htmlSource = getIndexHtmlSource();
 
   assert.match(
     htmlSource,
@@ -2563,10 +4548,7 @@ test("mobile role filter active pills keep their role colour families", () => {
 });
 
 test("desktop insights reuse the activity ribbons", () => {
-  const htmlSource = fs.readFileSync(
-    path.resolve(__dirname, "..", "index.html"),
-    "utf8",
-  );
+  const htmlSource = getIndexHtmlSource();
 
   assert.match(
     htmlSource,
@@ -2579,10 +4561,7 @@ test("desktop insights reuse the activity ribbons", () => {
 });
 
 test("mobile tab and filter controls stay sticky in compact layout", () => {
-  const htmlSource = fs.readFileSync(
-    path.resolve(__dirname, "..", "index.html"),
-    "utf8",
-  );
+  const htmlSource = getIndexHtmlSource();
 
   assert.match(
     htmlSource,
@@ -2599,10 +4578,7 @@ test("mobile tab and filter controls stay sticky in compact layout", () => {
 });
 
 test("mobile sticky controls use opaque backing so cards do not show through", () => {
-  const htmlSource = fs.readFileSync(
-    path.resolve(__dirname, "..", "index.html"),
-    "utf8",
-  );
+  const htmlSource = getIndexHtmlSource();
 
   assert.match(
     htmlSource,
@@ -2621,7 +4597,6 @@ test("mobile sticky controls use opaque backing so cards do not show through", (
     /body\.compact-layout \.mobile-display-mode-control::before\s*{[\s\S]*?right:\s*-14px;[\s\S]*?left:\s*-14px;[\s\S]*?background:\s*#efebe5;/,
   );
 });
-
 
 test("buildMobileAgenda groups mobile signup names by role", () => {
   const mobileNode = createElement("div");
@@ -2732,7 +4707,10 @@ test("buildMobileDayOverview renders a time-based day timeline", () => {
   const firstItem = firstTimeBlock.children[1].children[0];
   const secondItem = secondTimeBlock.children[1].children[0];
 
-  assert.equal(mobileNode.className, "mobile-agenda mobile-display-by-overview");
+  assert.equal(
+    mobileNode.className,
+    "mobile-agenda mobile-display-by-overview",
+  );
   assert.equal(timeline.className, "mobile-overview-timeline");
   assert.equal(timeline.children.length, 3);
   assert.equal(firstTimeBlock.children[0].textContent, "9:30 am - 10:00 am");
@@ -2741,7 +4719,10 @@ test("buildMobileDayOverview renders a time-based day timeline", () => {
   assert.equal(secondItem.className.includes("activity-accent-1"), true);
   assert.equal(firstItem.children[0].children[0].textContent, "Bake Sale");
   assert.equal(firstItem.children[1].className, "mobile-overview-role-chips");
-  assert.equal(firstItem.children[1].children[0].textContent, "\u52DF\u96C6\u4E2D");
+  assert.equal(
+    firstItem.children[1].children[0].textContent,
+    "\u52DF\u96C6\u4E2D",
+  );
   assert.equal(
     firstItem.children[1].children[1].className,
     "mobile-overview-role-chip role-general",
@@ -2755,10 +4736,7 @@ test("buildMobileDayOverview renders a time-based day timeline", () => {
 });
 
 test("mobile day overview keeps activity accent colours in compact layout", () => {
-  const htmlSource = fs.readFileSync(
-    path.resolve(__dirname, "..", "index.html"),
-    "utf8",
-  );
+  const htmlSource = getIndexHtmlSource();
 
   assert.match(
     htmlSource,
@@ -2907,11 +4885,23 @@ test("buildMobileAgenda can group mobile cards by time with headings", () => {
   assert.equal(firstTimeSection.children[0].className, "mobile-time-heading");
   assert.equal(firstTimeSection.children[0].textContent, "9:30 am - 10:00 am");
   assert.equal(getTitleWrap(firstCard).children[0].textContent, "Bake Sale");
-  assert.equal(getTitleWrap(firstCard).children[1].className, "mobile-slot-time");
-  assert.equal(getTitleWrap(firstCard).children[1].textContent, "9:30 am - 10:00 am");
-  assert.equal(getTitleWrap(firstCard).children[2].className, "mobile-slot-meta");
+  assert.equal(
+    getTitleWrap(firstCard).children[1].className,
+    "mobile-slot-time",
+  );
+  assert.equal(
+    getTitleWrap(firstCard).children[1].textContent,
+    "9:30 am - 10:00 am",
+  );
+  assert.equal(
+    getTitleWrap(firstCard).children[2].className,
+    "mobile-slot-meta",
+  );
   assert.equal(getTitleWrap(secondCard).children[0].textContent, "Games");
-  assert.equal(secondTimeSection.children[0].textContent, "10:00 am - 10:30 am");
+  assert.equal(
+    secondTimeSection.children[0].textContent,
+    "10:00 am - 10:30 am",
+  );
 });
 
 test("renderResponsiveView only changes responsive classes for the shared view", () => {

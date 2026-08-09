@@ -2,17 +2,76 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 
+const PROJECT_ROOT = path.resolve(__dirname, "..");
+const HTML_INCLUDE_PATTERN =
+  /<\?!=\s*include_\(\s*["']([A-Za-z0-9_-]+)["']\s*\)\s*;?\s*\?>/g;
+
 function encodeBase64(value) {
   return Buffer.from(String(value), "utf8").toString("base64");
 }
 
-function extractInlineScript(htmlSource) {
-  const matches = [...htmlSource.matchAll(/<script>([\s\S]*?)<\/script>/g)];
-  if (!matches.length) {
-    throw new Error("Could not find inline script in index.html");
+function getRawIndexHtmlSource() {
+  return fs.readFileSync(path.resolve(PROJECT_ROOT, "index.html"), "utf8");
+}
+
+function getHtmlPartialFileNames() {
+  return [...getRawIndexHtmlSource().matchAll(HTML_INCLUDE_PATTERN)].map(
+    (match) => match[1],
+  );
+}
+
+function validateHtmlPartial(fileName, source) {
+  const trimmedSource = source.trim();
+  const wrapperName =
+    fileName === "Styles"
+      ? "style"
+      : fileName.startsWith("Client")
+        ? "script"
+        : "";
+
+  if (wrapperName) {
+    const wrapperPattern = new RegExp(
+      `^<${wrapperName}>[\\s\\S]*<\\/${wrapperName}>$`,
+    );
+    if (!wrapperPattern.test(trimmedSource)) {
+      throw new Error(
+        `${fileName}.html must contain exactly one complete ` +
+          `<${wrapperName}> partial`,
+      );
+    }
+    return;
   }
 
-  return matches[matches.length - 1][1];
+  if (/<(?:script|style)(?:\s|>)/i.test(trimmedSource)) {
+    throw new Error(`${fileName}.html must contain markup only`);
+  }
+}
+
+function getIndexHtmlSource() {
+  return getRawIndexHtmlSource().replace(
+    HTML_INCLUDE_PATTERN,
+    (_match, includedFileName) => {
+      const filePath = path.resolve(PROJECT_ROOT, `${includedFileName}.html`);
+      const partialSource = fs.readFileSync(filePath, "utf8");
+      if (/<\?/.test(partialSource)) {
+        throw new Error(
+          `${includedFileName}.html contains a template scriptlet; ` +
+            "Apps Script does not recursively evaluate included partials",
+        );
+      }
+      validateHtmlPartial(includedFileName, partialSource);
+      return partialSource;
+    },
+  );
+}
+
+function extractInlineScripts(htmlSource) {
+  const matches = [...htmlSource.matchAll(/<script>([\s\S]*?)<\/script>/g)];
+  if (!matches.length) {
+    throw new Error("Could not find inline scripts in the composed HTML");
+  }
+
+  return matches.map((match) => match[1]);
 }
 
 function loadIndexHtml(exportsList, options = {}) {
@@ -30,22 +89,15 @@ function loadIndexHtml(exportsList, options = {}) {
     globals = {},
   } = options;
 
-  const indexPath = path.resolve(__dirname, "..", "index.html");
-  const htmlSource = fs.readFileSync(indexPath, "utf8");
-  const inlineScript = extractInlineScript(htmlSource)
-    .replace(/<\?!= gridData \?>/g, encodeBase64(JSON.stringify(gridData)))
-    .replace(/<\?!= alias \?>/g, encodeBase64(alias))
-    .replace(/<\?!= eventStatus \?>/g, encodeBase64(eventStatus))
-    .replace(/<\?!= roles \?>/g, encodeBase64(JSON.stringify(roles)))
-    .replace(/<\?!= title \?>/g, encodeBase64(title));
-
-  const script = `
-${inlineScript}
-
-module.exports = {
-  ${exportsList.join(",\n  ")}
-};
-`;
+  const htmlSource = getIndexHtmlSource();
+  const inlineScripts = extractInlineScripts(htmlSource).map((source) =>
+    source
+      .replace(/<\?!= gridData \?>/g, encodeBase64(JSON.stringify(gridData)))
+      .replace(/<\?!= alias \?>/g, encodeBase64(alias))
+      .replace(/<\?!= eventStatus \?>/g, encodeBase64(eventStatus))
+      .replace(/<\?!= roles \?>/g, encodeBase64(JSON.stringify(roles)))
+      .replace(/<\?!= title \?>/g, encodeBase64(title)),
+  );
 
   const context = {
     module: { exports: {} },
@@ -63,7 +115,16 @@ module.exports = {
   };
 
   vm.createContext(context);
-  vm.runInContext(script, context, { filename: "index.html<script>" });
+  inlineScripts.forEach((source, index) => {
+    vm.runInContext(source, context, {
+      filename: `index.html<script:${index + 1}>`,
+    });
+  });
+  vm.runInContext(
+    `module.exports = {\n  ${exportsList.join(",\n  ")}\n};`,
+    context,
+    { filename: "index.html<exports>" },
+  );
 
   return {
     exports: context.module.exports,
@@ -72,5 +133,8 @@ module.exports = {
 }
 
 module.exports = {
+  getHtmlPartialFileNames,
+  getIndexHtmlSource,
+  getRawIndexHtmlSource,
   loadIndexHtml,
 };

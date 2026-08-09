@@ -1,0 +1,438 @@
+    <script>
+      /**
+       * @fileoverview Core client state, access-policy, display-mode, index,
+       * and DOM lookup helpers. Loaded after the bootstrap globals in
+       * index.html and before the filter, insight, schedule, modal, and
+       * initialization modules that consume these shared APIs.
+       */
+
+      /**
+       * Reports whether the current event disallows signup mutations.
+       * @returns {boolean} True unless the current status is OPEN.
+       */
+      function isEventReadOnly() {
+        return eventStatus !== EVENT_STATUS_OPEN;
+      }
+
+      /**
+       * Normalises and stores a refreshed event status, then updates the page.
+       * Side effect: changes global eventStatus and read-only DOM state.
+       * @param {*} status Status returned by the backend.
+       * @returns {void}
+       */
+      function setEventStatus(status) {
+        var normalisedStatus = String(status || "")
+          .trim()
+          .toUpperCase();
+        eventStatus =
+          normalisedStatus === EVENT_STATUS_OPEN
+            ? EVENT_STATUS_OPEN
+            : EVENT_STATUS_READ_ONLY;
+        applyEventAccessState();
+      }
+
+      /**
+       * Synchronises the CSS banner-height variable with the visible banner.
+       * Side effect: writes --event-read-only-banner-height on the root style.
+       * @returns {void}
+       */
+      function updateReadOnlyBannerOffset() {
+        var banner = document.getElementById("readOnlyBanner");
+        var bannerHeight =
+          banner && !banner.hidden ? Math.ceil(Number(banner.offsetHeight) || 0) : 0;
+        var rootStyle =
+          document.documentElement && document.documentElement.style;
+        if (rootStyle && rootStyle.setProperty) {
+          rootStyle.setProperty(
+            "--event-read-only-banner-height",
+            bannerHeight + "px",
+          );
+        }
+      }
+
+      /**
+       * Applies the current read-only policy to the banner and body classes.
+       * Side effect: updates DOM visibility, classes, and the sticky offset.
+       * @returns {void}
+       */
+      function applyEventAccessState() {
+        var banner = document.getElementById("readOnlyBanner");
+        var readOnly = isEventReadOnly();
+        if (banner) banner.hidden = !readOnly;
+        document.body.classList.toggle("event-read-only", readOnly);
+        updateReadOnlyBannerOffset();
+      }
+      var desktopInsightScope = DESKTOP_INSIGHT_SCOPE_OVERALL;
+
+      var ROLE_KEYS = [
+        {
+          key: "general",
+          classSuffix: "general",
+          label: ROLES.general,
+          btnClass: "role-btn-general",
+          labelClass: "names-role-label-general",
+          nameClass: "name-role-general",
+        },
+        {
+          key: "classRep",
+          classSuffix: "classrep",
+          label: ROLES.classRep,
+          btnClass: "role-btn-classrep",
+          labelClass: "names-role-label-classrep",
+          nameClass: "name-role-classrep",
+        },
+        {
+          key: "steeringCommittee",
+          classSuffix: "steeringcommittee",
+          label: ROLES.steeringCommittee,
+          btnClass: "role-btn-steeringcommittee",
+          labelClass: "names-role-label-steeringcommittee",
+          nameClass: "name-role-steeringcommittee",
+        },
+        {
+          key: "orgCommittee",
+          classSuffix: "orgcommittee",
+          label: ROLES.orgCommittee,
+          btnClass: "role-btn-orgcommittee",
+          labelClass: "names-role-label-orgcommittee",
+          nameClass: "name-role-orgcommittee",
+        },
+      ];
+
+      var ROLE_META_BY_LABEL = ROLE_KEYS.reduce(function (acc, roleMeta) {
+        acc[roleMeta.label] = roleMeta;
+        return acc;
+      }, {});
+      var gridIndexes = null;
+      var mobileDisplayMode = getStoredMobileDisplayMode();
+
+      /**
+       * Maps an activity to a stable, repeating accent class.
+       * @param {string} activity Activity name from the schedule data.
+       * @returns {string} An activity-accent-N CSS class.
+       */
+      function getActivityAccentClass(activity) {
+        var activities = (gridData && gridData.activities) || [];
+        var activityIndex = activities.indexOf(activity);
+        if (activityIndex < 0) activityIndex = 0;
+        return "activity-accent-" + (activityIndex % 6);
+      }
+
+      /**
+       * Converts current and legacy display-mode values to supported modes.
+       * @param {*} mode Candidate display-mode value.
+       * @returns {string} Either signup, overview, or the configured default.
+       */
+      function normaliseMobileDisplayMode(mode) {
+        if (mode === "signup" || mode === "overview") return mode;
+        if (mode === "time") return "signup";
+        if (mode === "activity") return "overview";
+        return DEFAULT_MOBILE_DISPLAY_MODE;
+      }
+
+      /**
+       * Reads and normalises the saved mobile display preference.
+       * @returns {string} The stored mode, or the default when unavailable.
+       */
+      function getStoredMobileDisplayMode() {
+        try {
+          if (window.localStorage) {
+            return normaliseMobileDisplayMode(
+              window.localStorage.getItem(MOBILE_DISPLAY_MODE_STORAGE_KEY),
+            );
+          }
+        } catch (e) {}
+        return DEFAULT_MOBILE_DISPLAY_MODE;
+      }
+
+      /**
+       * Persists a normalised mobile display preference when storage is usable.
+       * Side effect: writes to window.localStorage and ignores storage errors.
+       * @param {*} mode Candidate display-mode value.
+       * @returns {void}
+       */
+      function saveMobileDisplayMode(mode) {
+        try {
+          if (window.localStorage) {
+            window.localStorage.setItem(
+              MOBILE_DISPLAY_MODE_STORAGE_KEY,
+              normaliseMobileDisplayMode(mode),
+            );
+          }
+        } catch (e) {}
+      }
+
+      /**
+       * Returns the currently selected mobile display mode in canonical form.
+       * @returns {string} Either signup or overview.
+       */
+      function getMobileDisplayMode() {
+        return normaliseMobileDisplayMode(mobileDisplayMode);
+      }
+
+      /**
+       * Reflects the selected display mode in the mode-toggle buttons.
+       * Side effect: updates button classes and aria-pressed attributes.
+       * @returns {void}
+       */
+      function updateMobileDisplayModeControl() {
+        var activeMode = getMobileDisplayMode();
+        [
+          { id: "mobileDisplayModeTime", mode: "signup" },
+          { id: "mobileDisplayModeActivity", mode: "overview" },
+        ].forEach(function (item) {
+          var btn = document.getElementById(item.id);
+          if (!btn) return;
+          var active = item.mode === activeMode;
+          if (btn.classList && btn.classList.toggle) {
+            btn.classList.toggle("active", active);
+          }
+          btn.setAttribute("aria-pressed", active ? "true" : "false");
+        });
+      }
+
+      /**
+       * Selects, persists, and renders a mobile display mode.
+       * Side effect: updates client state, controls, and the mobile agenda.
+       * @param {*} mode Candidate display-mode value.
+       * @returns {void}
+       */
+      function setMobileDisplayMode(mode) {
+        var nextMode = normaliseMobileDisplayMode(mode);
+        if (mobileDisplayMode === nextMode) {
+          updateMobileDisplayModeControl();
+          return;
+        }
+
+        mobileDisplayMode = nextMode;
+        desktopFilterPopoverOpen = "";
+        saveMobileDisplayMode(nextMode);
+        updateMobileDisplayModeControl();
+        buildMobileAgenda();
+      }
+
+      /**
+       * Removes every child node from an element.
+       * Side effect: mutates the supplied DOM element.
+       * @param {Element|null} element Element to empty; null is ignored.
+       * @returns {void}
+       */
+      function clearElement(element) {
+        while (element && element.firstChild) {
+          element.removeChild(element.firstChild);
+        }
+      }
+
+      /**
+       * Rebuilds fast event lookup and per-role signup groupings.
+       * Side effect: replaces gridIndexes and adds signupsByRole to events.
+       * @returns {void}
+       */
+      function buildGridIndexes() {
+        var events = (gridData && gridData.events) || [];
+        var indexes = {
+          eventById: Object.create(null),
+        };
+
+        events.forEach(function (event) {
+          indexes.eventById[String(event.eventId)] = event;
+
+          event.signupsByRole = ROLE_KEYS.reduce(function (roleMap, roleMeta) {
+            roleMap[roleMeta.label] = [];
+            return roleMap;
+          }, {});
+
+          (event.signups || []).forEach(function (signup) {
+            if (!event.signupsByRole[signup.role]) {
+              event.signupsByRole[signup.role] = [];
+            }
+            event.signupsByRole[signup.role].push(signup);
+          });
+        });
+
+        gridIndexes = indexes;
+      }
+
+      /**
+       * Orders schedule events by start time, end time, then event ID.
+       * @param {Object} a First event.
+       * @param {Object} b Second event.
+       * @returns {number} Negative, zero, or positive sort comparator result.
+       */
+      function compareEventsByTime(a, b) {
+        var startA = String((a && a.startTime) || "");
+        var startB = String((b && b.startTime) || "");
+        if (startA !== startB) return startA < startB ? -1 : 1;
+
+        var endA = String((a && a.endTime) || "");
+        var endB = String((b && b.endTime) || "");
+        if (endA !== endB) return endA < endB ? -1 : 1;
+
+        return String((a && a.eventId) || "").localeCompare(
+          String((b && b.eventId) || ""),
+        );
+      }
+
+      /**
+       * Looks up an indexed event by its string-equivalent identifier.
+       * @param {*} eventId Event identifier.
+       * @returns {Object|undefined} Matching event, if the index contains it.
+       */
+      function getEventById(eventId) {
+        return gridIndexes && gridIndexes.eventById[String(eventId)];
+      }
+
+      /**
+       * Resolves display and CSS metadata for a canonical role label.
+       * @param {string} roleLabel Canonical role label.
+       * @returns {Object|null} Role metadata, or null when unknown.
+       */
+      function getRoleMetaByLabel(roleLabel) {
+        return ROLE_META_BY_LABEL[roleLabel] || null;
+      }
+
+      /**
+       * Finds the narrowest valid width reported by browser viewport sources.
+       * @returns {number} Effective viewport width in CSS pixels.
+       */
+      function getEffectiveWidth() {
+        var widths = [];
+
+        if (window.visualViewport && window.visualViewport.width) {
+          widths.push(window.visualViewport.width);
+        }
+
+        if (window.screen && window.screen.width) {
+          widths.push(window.screen.width);
+        }
+
+        if (document.documentElement && document.documentElement.clientWidth) {
+          widths.push(document.documentElement.clientWidth);
+        }
+
+        if (window.innerWidth) {
+          widths.push(window.innerWidth);
+        }
+
+        widths = widths.filter(function (w) {
+          return typeof w === "number" && w > 0;
+        });
+
+        if (!widths.length) return window.innerWidth || 9999;
+
+        return Math.min.apply(null, widths);
+      }
+
+      /**
+       * Reports whether the effective viewport uses the compact layout.
+       * @returns {boolean} True at or below the 900-pixel breakpoint.
+       */
+      function isCompactLayout() {
+        return getEffectiveWidth() <= 900;
+      }
+
+      /**
+       * Gets the shared responsive schedule container.
+       * @returns {HTMLElement|null} The mobileAgenda element.
+       */
+      function getMobileAgenda() {
+        return document.getElementById("mobileAgenda");
+      }
+
+      /**
+       * Gets the available-time options container.
+       * @returns {HTMLElement|null} The mobileTimeAvailabilityFilter element.
+       */
+      function getMobileTimeFilterSelect() {
+        return document.getElementById("mobileTimeAvailabilityFilter");
+      }
+
+      /**
+       * Gets the available-time dropdown toggle.
+       * @returns {HTMLElement|null} The mobileTimeAvailabilityToggle element.
+       */
+      function getMobileTimeFilterToggle() {
+        return document.getElementById("mobileTimeAvailabilityToggle");
+      }
+
+      /**
+       * Gets the mobile activity filter container.
+       * @returns {HTMLElement|null} The mobileActivityFilter element.
+       */
+      function getMobileActivityFilterContainer() {
+        return document.getElementById("mobileActivityFilter");
+      }
+
+      /**
+       * Gets the desktop activity popover toggle.
+       * @returns {HTMLElement|null} The desktopActivityFilterToggle element.
+       */
+      function getDesktopActivityFilterToggle() {
+        return document.getElementById("desktopActivityFilterToggle");
+      }
+
+      /**
+       * Gets the desktop activity popover menu.
+       * @returns {HTMLElement|null} The desktopActivityFilterMenu element.
+       */
+      function getDesktopActivityFilterMenu() {
+        return document.getElementById("desktopActivityFilterMenu");
+      }
+
+      /**
+       * Gets the desktop activity filter value label.
+       * @returns {HTMLElement|null} The desktopActivityFilterValue element.
+       */
+      function getDesktopActivityFilterValue() {
+        return document.getElementById("desktopActivityFilterValue");
+      }
+
+      /**
+       * Gets the mobile role filter container.
+       * @returns {HTMLElement|null} The mobileRoleAvailabilityFilter element.
+       */
+      function getMobileRoleFilterSelect() {
+        return document.getElementById("mobileRoleAvailabilityFilter");
+      }
+
+      /**
+       * Gets the desktop role popover toggle.
+       * @returns {HTMLElement|null} The desktopRoleFilterToggle element.
+       */
+      function getDesktopRoleFilterToggle() {
+        return document.getElementById("desktopRoleFilterToggle");
+      }
+
+      /**
+       * Gets the desktop role popover menu.
+       * @returns {HTMLElement|null} The desktopRoleFilterMenu element.
+       */
+      function getDesktopRoleFilterMenu() {
+        return document.getElementById("desktopRoleFilterMenu");
+      }
+
+      /**
+       * Gets the desktop role filter value label.
+       * @returns {HTMLElement|null} The desktopRoleFilterValue element.
+       */
+      function getDesktopRoleFilterValue() {
+        return document.getElementById("desktopRoleFilterValue");
+      }
+
+      /**
+       * Gets the shared keyword-search input.
+       * @returns {HTMLInputElement|null} The mobileKeywordSearch element.
+       */
+      function getMobileKeywordSearchInput() {
+        return document.getElementById("mobileKeywordSearch");
+      }
+
+      /**
+       * Gets the desktop filter-reset button.
+       * @returns {HTMLButtonElement|null} The desktopFilterReset element.
+       */
+      function getDesktopFilterResetButton() {
+        return document.getElementById("desktopFilterReset");
+      }
+
+    </script>
