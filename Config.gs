@@ -3,11 +3,11 @@
  * Constants and functions here are globals shared by every server-side `.gs`
  * file. The policy readers depend on spreadsheet helpers from
  * SpreadsheetData.gs and validators from Validation.gs, plus PropertiesService
- * and SpreadsheetApp. Reading MASTER_SHEET_ID at load time is intentional.
+ * and SpreadsheetApp. MASTER_SHEET_ID is read lazily and memoised only for the
+ * current execution; Config rows and Status policy are never cached.
  */
 
-const MASTER_SHEET_ID =
-  PropertiesService.getScriptProperties().getProperty("MASTER_SHEET_ID");
+let masterSheetIdForExecution_;
 
 const ROLES = {
   general: "一般保護者",
@@ -88,9 +88,10 @@ const SIGNUP_HEADER_ALIASES = [
 const APP_TIME_ZONE = "Australia/Brisbane";
 
 /**
- * Reads the master Config sheet into a case-normalised event-settings map.
+ * Freshly reads Config into a case-normalised event-settings map on every call.
  * Rows with invalid aliases or Sheet IDs are ignored. A missing/invalid Status
- * header or value is logged and fails closed to READ_ONLY.
+ * header or value is logged and fails closed to READ_ONLY, while a missing or
+ * malformed required Config schema remains an operational error.
  * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} [masterSpreadsheet]
  *   Existing master handle; Config values are freshly read on every call.
  * @returns {Object<string, {sheetId: string, status: string}>} Settings by alias.
@@ -98,7 +99,7 @@ const APP_TIME_ZONE = "Australia/Brisbane";
  *   if the required Config headers are invalid.
  */
 function getEventSettings_(masterSpreadsheet) {
-  if (!MASTER_SHEET_ID) {
+  if (!getMasterSheetId_()) {
     console.error("MASTER_SHEET_ID not set in Script Properties");
     return {};
   }
@@ -150,6 +151,23 @@ function getEventSettings_(masterSpreadsheet) {
 }
 
 /**
+ * Lazily reads and memoises MASTER_SHEET_ID for this Apps Script execution.
+ * An absent property is memoised as `null`; service errors propagate so callers
+ * fail safely instead of opening an untrusted or guessed spreadsheet.
+ * @returns {?string} Configured master spreadsheet ID, or `null` when absent.
+ */
+function getMasterSheetId_() {
+  if (masterSheetIdForExecution_ !== undefined) {
+    return masterSheetIdForExecution_;
+  }
+  const configuredId = PropertiesService.getScriptProperties().getProperty(
+    "MASTER_SHEET_ID",
+  );
+  masterSheetIdForExecution_ = String(configuredId || "").trim() || null;
+  return masterSheetIdForExecution_;
+}
+
+/**
  * Opens the configured master spreadsheet for reuse within one request.
  * Values and sheets are not cached by this helper.
  * @returns {?GoogleAppsScript.Spreadsheet.Spreadsheet} Master handle, or `null`
@@ -157,8 +175,9 @@ function getEventSettings_(masterSpreadsheet) {
  * @throws {Error} If Apps Script cannot open the configured spreadsheet.
  */
 function getMasterSpreadsheet_() {
-  if (!MASTER_SHEET_ID) return null;
-  return SpreadsheetApp.openById(MASTER_SHEET_ID);
+  const masterSheetId = getMasterSheetId_();
+  if (!masterSheetId) return null;
+  return SpreadsheetApp.openById(masterSheetId);
 }
 
 /**
@@ -191,8 +210,8 @@ function parseEventStatus_(value) {
 }
 
 /**
- * Re-reads event policy and confirms that an alias still targets the expected
- * spreadsheet and remains open. Used immediately before mutations.
+ * Re-reads event policy after business validation and immediately before write
+ * admission, confirming the alias still targets the expected OPEN spreadsheet.
  * @param {*} alias - Event alias supplied with the request.
  * @param {string} expectedSheetId - Previously resolved event Sheet ID.
  * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} [masterSpreadsheet]

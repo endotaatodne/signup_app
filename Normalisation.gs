@@ -1,8 +1,10 @@
 /**
- * @fileoverview Pure text, name, class, and comparison-key normalisation helpers.
+ * @fileoverview Text, display-value, legacy-comparison, and identity helpers.
  * These functions and constants live in Apps Script's shared global scope and
  * are consumed by validation, spreadsheet, signup, and rate-limit code. They
- * depend only on ECMAScript built-ins and do not read or mutate external state.
+ * use ECMAScript text primitives; identity-tuple hashing additionally uses
+ * Apps Script Utilities. Display/storage and legacy comparison rules remain
+ * separate from the server-only NFKC identity layer.
  */
 
 /**
@@ -168,7 +170,9 @@ function normaliseClassValue_(value) {
 }
 
 /**
- * Produces the case-insensitive comparison key used for participant names.
+ * Produces the legacy case-insensitive comparison key for participant names.
+ * It intentionally does not apply NFKC; cancellation uses this unchanged key
+ * as its middle compatibility tier after case-sensitive display matching.
  * @param {*} value - Name-like value to coerce to text.
  * @returns {string} Lower-case canonical name key.
  */
@@ -177,12 +181,77 @@ function normaliseComparable_(value) {
 }
 
 /**
- * Produces the case-insensitive comparison key used for class labels.
+ * Produces the legacy case-insensitive comparison key for class labels.
+ * It intentionally does not apply NFKC or change class display/storage rules.
  * @param {*} value - Class-like value to coerce to text.
  * @returns {string} Lower-case canonical class key.
  */
 function normaliseClassComparable_(value) {
   return normaliseClassValue_(value).toLowerCase();
+}
+
+/**
+ * Produces the server-only NFKC identity key used for participant matching.
+ * Ordering is NFKC, existing name rules, locale-neutral lower-case, then NFC.
+ * It is used for duplicate, overlap, activity-person, cancellation-fallback,
+ * and rate-limit identity only—not storage, display, filters, or activity labels.
+ * NFKC compatibility matching is not general visual-confusable detection.
+ * @param {*} value - Name-like value to coerce to text.
+ * @returns {string} Lower-case, compatibility-normalised participant key.
+ */
+function normaliseNameIdentityKey_(value) {
+  return normaliseNameValue_(
+    String(value == null ? "" : value).normalize("NFKC"),
+  )
+    .toLowerCase()
+    .normalize("NFC");
+}
+
+/**
+ * Produces the server-only NFKC identity key used for class matching.
+ * Ordering is NFKC, existing class rules, locale-neutral lower-case, then NFC.
+ * It is limited to identity tuples for rate limiting and cancellation fallback;
+ * class validation, storage, display, and legacy comparisons remain unchanged.
+ * @param {*} value - Class-like value to coerce to text.
+ * @returns {string} Lower-case, compatibility-normalised class key.
+ */
+function normaliseClassIdentityKey_(value) {
+  return normaliseClassValue_(
+    String(value == null ? "" : value).normalize("NFKC"),
+  )
+    .toLowerCase()
+    .normalize("NFC");
+}
+
+/**
+ * Hashes a length-delimited NFKC name/class tuple to a bounded cache-key part.
+ * Length delimiters prevent tuple-boundary collisions; SHA-256 keeps plaintext
+ * names/classes out of cache keys but is not an authorization mechanism.
+ * @param {*} name - Participant name.
+ * @param {*} cls - Participant class.
+ * @returns {string} Lower-case 64-character SHA-256 hexadecimal digest.
+ */
+function buildIdentityTupleHash_(name, cls) {
+  const nameKey = normaliseNameIdentityKey_(name);
+  const classKey = normaliseClassIdentityKey_(cls);
+  const tuple =
+    String(nameKey.length) +
+    ":" +
+    nameKey +
+    "|" +
+    String(classKey.length) +
+    ":" +
+    classKey;
+  const digest = Utilities.computeDigest(
+    Utilities.DigestAlgorithm.SHA_256,
+    tuple,
+    Utilities.Charset.UTF_8,
+  );
+  return digest
+    .map(function (byte) {
+      return (byte & 0xff).toString(16).padStart(2, "0");
+    })
+    .join("");
 }
 
 /**

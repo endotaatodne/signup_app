@@ -58,9 +58,14 @@ test("every production source file explains its responsibility", () => {
 test("every named production function has an adjacent JSDoc description", () => {
   PRODUCTION_FILES.forEach((filename) => {
     const source = readProductionFile(filename);
-    const declarations = source.matchAll(
-      /^\s*function\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*\(([^)]*)\)/gm,
-    );
+    const declarations = [
+      ...source.matchAll(
+        /^\s*function\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*\(([^)]*)\)/gm,
+      ),
+      ...source.matchAll(
+        /^\s*(?:var|let|const)\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*function\s*\(([^)]*)\)/gm,
+      ),
+    ].sort((left, right) => left.index - right.index);
 
     for (const declaration of declarations) {
       const functionName = declaration[1];

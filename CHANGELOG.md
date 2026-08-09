@@ -1,3 +1,17 @@
+## v0.2.11 - 2026-08-09
+
+- Patch
+  - Adds server-only NFKC participant identity keys for duplicate, overlap, and activity-limit checks without changing existing display, storage, or browser-filter normalisation.
+  - Makes cancellation exact-first and collision-safe across legacy and NFKC compatibility tiers, and returns the deleted row's actual name and displayed class for immediate client reconciliation.
+  - Uses hashed transient NFKC name/class limiter keys (first 3 attempts per 60 seconds), an advisory emergency attempt fuse (first 100 per 10 seconds), and a durable v3 validated-write budget (first 20 admissions per 60 seconds) scoped independently by Sheet, event, and action.
+  - Replaces the long lock wait with a 250 ms `ScriptLock` attempt and at most one 400–799 ms client retry when the server explicitly confirms pre-write contention and the captured modal session is still current; ambiguous and transport failures are never retried.
+  - Rechecks final event policy and business rules under the lock, then flushes each confirmed Sheet mutation before releasing it.
+  - Documents exact-value transport through Base64-encoded template values, JSON for structured payloads, and `textContent` rendering instead of destructive input rewriting.
+  - Documents exact limiter accounting and generated v3 Script Properties, clarifies the remaining anonymous read-path/global-lock limits and lack of CAPTCHA, and narrows the Unicode input claim to the validated character set.
+  - Leaves legacy `signup_app_rate_limit_v2_*` Script Properties unused by the v3 limiter; existing values can remain safely.
+  - Expands backend and browser regression coverage for exact rate-limit boundaries, lock contention, Unicode identities, collision-safe cancellation, exact-value round trips, and a same-event modal reopened while a safe retry is already in flight.
+  - Bumps the app version to 0.2.11.
+
 ## v0.2.10 - 2026-08-08
 
 - Patch

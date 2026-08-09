@@ -7,17 +7,23 @@
 
       // Modal lifecycle and signup-role selection.
 
+      // One owner spans the initial RPC, an optional busy retry, and any
+      // authoritative refresh needed to settle the mutation.
       var nextModalMutationRequestToken = 1;
       var activeModalMutationRequest = null;
       var modalSessionToken = 0;
       var modalCompletionRequestToken = null;
       var MUTATION_SUCCESS_DISPLAY_MS = 3000;
       var CANCELLATION_REFRESH_GRACE_MS = 10500;
+      var MUTATION_BUSY_MAX_RETRIES = 1;
+      var MUTATION_BUSY_RETRY_BASE_MS = 400;
+      var MUTATION_BUSY_RETRY_JITTER_MS = 400;
       var FULL_CAPACITY_MESSAGE =
         "この枠はおかげさまで定員に達しました。ありがとうございます。";
 
       /**
-       * Captures one immutable signup or cancellation request context.
+       * Captures one immutable signup or cancellation request context. Retries
+       * and callbacks therefore cannot adopt edited fields or a newer modal.
        * @param {string} kind Mutation kind, either signup or cancel.
        * @param {string|number} eventId Event identifier submitted to the server.
        * @param {string} name Canonical participant name sent to the server.
@@ -40,8 +46,8 @@
       }
 
       /**
-       * Reports whether either modal mutation workflow has an active request.
-       * @returns {boolean} True while a signup or cancellation RPC is pending.
+       * Reports whether either modal mutation workflow has an active owner.
+       * @returns {boolean} True during an RPC, queued retry, or owned refresh.
        */
       function isModalMutationPending() {
         return activeModalMutationRequest !== null;
@@ -49,6 +55,7 @@
 
       /**
        * Reports whether a request still belongs to the currently open modal.
+       * The session token distinguishes closing and reopening the same event.
        * @param {Object} request Captured modal mutation request.
        * @returns {boolean} True when both modal session and event still match.
        */
@@ -62,7 +69,7 @@
       }
 
       /**
-       * Clears an active request only when the callback owns its token.
+       * Clears the active request only when the same captured object owns it.
        * @param {Object} request Captured modal mutation request.
        * @returns {boolean} True when the request was current and was cleared.
        */
@@ -70,6 +77,51 @@
         if (activeModalMutationRequest !== request) return false;
         activeModalMutationRequest = null;
         return true;
+      }
+
+      /**
+       * Reports whether a response explicitly proves that no write started and
+       * remains within the one-retry allowance. Generic retry hints do not count.
+       * @param {?Object} result Server mutation response.
+       * @param {number} completedRetryCount Retries already sent for the request.
+       * @returns {boolean} True only for the explicit pre-write busy response.
+       */
+      function shouldRetryBusyMutation(result, completedRetryCount) {
+        return (
+          !!result &&
+          result.success === false &&
+          result.code === "busy_retryable" &&
+          completedRetryCount < MUTATION_BUSY_MAX_RETRIES
+        );
+      }
+
+      /**
+       * Schedules the single 400-799 ms ownership-checked mutation retry. A
+       * duplicate timer cannot resend, and a stale modal/session releases the
+       * old owner without retrying.
+       * @param {Object} request Captured mutation request retaining ownership.
+       * @param {number} retryNumber One-based retry number used for backoff.
+       * @param {function(): void} retryCallback Sends the next mutation attempt.
+       * @returns {void}
+       */
+      function scheduleBusyMutationRetry(
+        request,
+        retryNumber,
+        retryCallback,
+      ) {
+        var retryStarted = false;
+        var delay =
+          MUTATION_BUSY_RETRY_BASE_MS * retryNumber +
+          Math.floor(Math.random() * MUTATION_BUSY_RETRY_JITTER_MS);
+        setTimeout(function () {
+          if (retryStarted || activeModalMutationRequest !== request) return;
+          retryStarted = true;
+          if (!isModalMutationRequestCurrent(request)) {
+            finishModalMutationRequest(request);
+            return;
+          }
+          retryCallback();
+        }, delay);
       }
 
       /**
@@ -554,8 +606,8 @@
       }
 
       /**
-       * Applies a confirmed signup to the captured event and rebuilds all
-       * schedule-derived browser surfaces.
+       * Applies a confirmed signup immediately to the captured event, preferring
+       * server-returned canonical fields, then rebuilds all derived surfaces.
        * @param {Object} request Captured signup request.
        * @param {Object} result Successful server response.
        * @returns {boolean} True when the captured event was updated.
@@ -594,8 +646,9 @@
       }
 
       /**
-       * Applies a confirmed cancellation to the captured event and rebuilds all
-       * schedule-derived browser surfaces. Nothing changes before confirmation.
+       * Applies a confirmed cancellation immediately to the captured event.
+       * The server-returned raw tuple wins; compatibility matching is used only
+       * when unique, so an ambiguous local cache is left for authoritative refresh.
        * @param {Object} request Captured cancellation request.
        * @param {Object} result Successful server response.
        * @returns {boolean} True when one matching local signup was removed.
@@ -605,23 +658,53 @@
         var roleMeta = getModalMutationRoleMeta(result, request);
         if (!event || !roleMeta || !event.signups) return false;
 
-        var targetName = (result && result.name) || request.name;
-        var targetClass = (result && result.cls) || request.cls;
-        var comparableTargetName = normaliseComparable(targetName);
-        var comparableTargetClass = normaliseClassComparable(targetClass);
+        var targetName =
+          result && typeof result.name === "string"
+            ? result.name
+            : request.name;
+        var targetClass =
+          result && typeof result.cls === "string"
+            ? result.cls
+            : request.cls;
+        var targetRole =
+          result && typeof result.role === "string"
+            ? result.role
+            : request.role;
         var matchingIndex = -1;
         for (var i = 0; i < event.signups.length; i += 1) {
-          var signup = event.signups[i];
+          var exactSignup = event.signups[i];
           if (
-            signup.role === roleMeta.label &&
-            normaliseComparable(signup.name) ===
-              comparableTargetName &&
-            normaliseClassComparable(signup.cls) ===
-              comparableTargetClass
+            exactSignup.role === targetRole &&
+            exactSignup.name === targetName &&
+            exactSignup.cls === targetClass
           ) {
             matchingIndex = i;
             break;
           }
+        }
+
+        if (matchingIndex === -1) {
+          var compatibleMatchingIndex = -1;
+          var comparableTargetName = normaliseComparable(targetName);
+          var comparableTargetClass = normaliseClassComparable(targetClass);
+          for (var j = 0; j < event.signups.length; j += 1) {
+            var compatibleSignup = event.signups[j];
+            var compatibleRoleMeta = getRoleMetaByLabel(
+              compatibleSignup.role,
+            );
+            if (
+              compatibleRoleMeta &&
+              compatibleRoleMeta.key === roleMeta.key &&
+              normaliseComparable(compatibleSignup.name) ===
+                comparableTargetName &&
+              normaliseClassComparable(compatibleSignup.cls) ===
+                comparableTargetClass
+            ) {
+              if (compatibleMatchingIndex !== -1) return false;
+              compatibleMatchingIndex = j;
+            }
+          }
+          matchingIndex = compatibleMatchingIndex;
         }
         if (matchingIndex === -1) return false;
 
@@ -694,10 +777,15 @@
       }
 
       /**
-       * Rebuilds a still-current modal from updated event data and restores its
-       * mutation success feedback.
+       * Rebuilds a modal from the current client model and restores mutation
+       * success feedback. A request that still owns its original/completed
+       * session may later close that modal. If the user deliberately closed and
+       * reopened the same event while the RPC was in flight, the confirmed
+       * model update is still rendered, but draft input is preserved and the old
+       * request is not given ownership of the newer session or its close timer.
        * @param {Object} request Completed modal mutation request.
-       * @param {string} tab Signup or cancel tab to restore.
+       * @param {string} tab Signup or cancel tab restored for an owned session;
+       *   a reopened session uses `openModal`'s current default state instead.
        * @param {string} message Success message to display.
        * @returns {boolean} True when the current modal was rebuilt.
        */
@@ -707,7 +795,26 @@
           modalCompletionRequestToken === request.token &&
           currentEventId !== null &&
           String(currentEventId) === String(request.eventId);
-        if (!ownsInitialModal && !ownsCompletedModal) return false;
+        if (!ownsInitialModal && !ownsCompletedModal) {
+          var hasReopenedSameEvent =
+            currentEventId !== null &&
+            String(currentEventId) === String(request.eventId);
+          if (!hasReopenedSameEvent) return false;
+
+          // Reuse the canonical modal renderer so counts, names, role options,
+          // and tabs agree with the updated model. The request was pending while
+          // this session was open, so role/tab/cancel actions could not change;
+          // only freely editable draft text needs to survive the rebuild.
+          var nameInput = document.getElementById("inputName");
+          var classInput = document.getElementById("inputClass");
+          var draftName = nameInput.value;
+          var draftClass = classInput.value;
+          openModal(request.eventId);
+          nameInput.value = draftName;
+          classInput.value = draftClass;
+          showMessage("modalRoleMessage", message, true);
+          return true;
+        }
 
         openModal(request.eventId);
         modalCompletionRequestToken = request.token;
@@ -752,6 +859,13 @@
         }
 
         var responseHandled = false;
+
+        /**
+         * Settles deployed-URL resolution once and passes the event URL to the
+         * caller's callback.
+         * @param {*} url Candidate deployment URL from Apps Script.
+         * @returns {void}
+         */
         var finish = function (url) {
           if (responseHandled) return;
           responseHandled = true;
@@ -793,10 +907,9 @@
       }
 
       /**
-       * Starts an authoritative post-cancellation refresh immediately, keeps
-       * success feedback visible while it is pending, closes after both the
-       * minimum interval and a successful refresh, and uses bounded full-page
-       * recovery when fresh data cannot be applied.
+       * Starts an authoritative post-cancellation refresh immediately. Mutation
+       * ownership remains single-flight until fresh data applies or bounded
+       * full-page recovery begins; success feedback keeps its minimum duration.
        * @param {Object} request Completed cancellation request.
        * @param {string} message Cancellation success message.
        * @returns {void}
@@ -808,6 +921,14 @@
         var fallbackUrlResolved = false;
         var fallbackUrl = "";
         var fallbackNavigationStarted = false;
+
+        /**
+         * Starts at most one recovery navigation after refresh failure and the
+         * minimum success-display interval have both settled.
+         * @param {boolean} forceReload Whether to reload without waiting for
+         *   deployment-URL resolution.
+         * @returns {void}
+         */
         var navigateAfterFailure = function (forceReload) {
           if (
             !refreshFailed ||
@@ -821,6 +942,12 @@
           finishModalMutationRequest(request);
           navigateToFreshEventPage(fallbackUrlResolved ? fallbackUrl : "");
         };
+
+        /**
+         * Settles the refresh as failed and begins bounded URL/reload recovery.
+         * Duplicate refresh callbacks are ignored.
+         * @returns {void}
+         */
         var markRefreshFailed = function () {
           if (refreshHandled) return;
           refreshHandled = true;
@@ -875,44 +1002,20 @@
       }
 
       /**
-       * Sends the selected cancellation to the server and updates modal feedback.
+       * Sends one cancellation attempt. Duplicate callbacks are ignored; only
+       * an explicit pre-write busy result may schedule the one owned retry, while
+       * transport and all other failures settle without automatic resubmission.
+       * @param {Object} request Immutable cancellation request context.
+       * @param {number} completedRetryCount Retries already sent for this request.
+       * @param {HTMLElement} btn Confirmation button disabled for the request.
        * @returns {void}
        */
-      function confirmCancel() {
-        if (isEventReadOnly()) {
-          showCancelMessage(
-            "現在、このページは閲覧専用です。登録やキャンセルはできません。",
-            false,
-          );
-          return;
-        }
-        if (isModalMutationPending()) return;
-        if (!currentCancelSignup) {
-          showCancelMessage("キャンセルする登録を選んでください。", false);
-          return;
-        }
-
-        var name = currentCancelSignup.name;
-        var cls = currentCancelSignup.cls;
-        var role = currentCancelSignup.role;
-        var btn = document.getElementById("confirmYes");
-        var request = createModalMutationRequest(
-          "cancel",
-          currentEventId,
-          name,
-          cls,
-          role,
-        );
+      function sendCancellationMutationRequest(
+        request,
+        completedRetryCount,
+        btn,
+      ) {
         var responseHandled = false;
-        invalidateModalCompletion();
-        activeModalMutationRequest = request;
-
-        btn.disabled = true;
-        btn.textContent = "キャンセル中...";
-        document.getElementById("confirmNo").disabled = true;
-        document.getElementById("cancelSubmitBtn").disabled = true;
-        setCancelSignupListDisabled(true);
-
         google.script.run
           .withSuccessHandler(function (result) {
             if (
@@ -922,6 +1025,13 @@
               return;
             }
             responseHandled = true;
+            if (shouldRetryBusyMutation(result, completedRetryCount)) {
+              var retryNumber = completedRetryCount + 1;
+              scheduleBusyMutationRetry(request, retryNumber, function () {
+                sendCancellationMutationRequest(request, retryNumber, btn);
+              });
+              return;
+            }
             if (result && result.code === "event_read_only") {
               applyReadOnlyMutationResult(request);
               return;
@@ -952,7 +1062,7 @@
               }
             }
           })
-          .withFailureHandler(function (error) {
+          .withFailureHandler(function () {
             if (
               responseHandled ||
               activeModalMutationRequest !== request
@@ -982,6 +1092,46 @@
             request.role,
             alias,
           );
+      }
+
+      /**
+       * Starts one captured, single-flight cancellation and disables mutation UI.
+       * @returns {void}
+       */
+      function confirmCancel() {
+        if (isEventReadOnly()) {
+          showCancelMessage(
+            "現在、このページは閲覧専用です。登録やキャンセルはできません。",
+            false,
+          );
+          return;
+        }
+        if (isModalMutationPending()) return;
+        if (!currentCancelSignup) {
+          showCancelMessage("キャンセルする登録を選んでください。", false);
+          return;
+        }
+
+        var name = currentCancelSignup.name;
+        var cls = currentCancelSignup.cls;
+        var role = currentCancelSignup.role;
+        var btn = document.getElementById("confirmYes");
+        var request = createModalMutationRequest(
+          "cancel",
+          currentEventId,
+          name,
+          cls,
+          role,
+        );
+        invalidateModalCompletion();
+        activeModalMutationRequest = request;
+
+        btn.disabled = true;
+        btn.textContent = "キャンセル中...";
+        document.getElementById("confirmNo").disabled = true;
+        document.getElementById("cancelSubmitBtn").disabled = true;
+        setCancelSignupListDisabled(true);
+        sendCancellationMutationRequest(request, 0, btn);
       }
 
       // Shared modal feedback and refreshed-data recovery.
@@ -1085,7 +1235,103 @@
       // Signup validation and submission.
 
       /**
-       * Validates the active signup form and submits it to the server.
+       * Sends one signup attempt. Duplicate callbacks are ignored; only an
+       * explicit pre-write busy result may schedule the one owned retry, while
+       * transport and all other failures settle without automatic resubmission.
+       * @param {Object} request Immutable signup request context.
+       * @param {number} completedRetryCount Retries already sent for this request.
+       * @param {HTMLElement} btn Submit button disabled for the request.
+       * @returns {void}
+       */
+      function sendSignupMutationRequest(
+        request,
+        completedRetryCount,
+        btn,
+      ) {
+        var responseHandled = false;
+        google.script.run
+          .withSuccessHandler(function (result) {
+            if (
+              responseHandled ||
+              activeModalMutationRequest !== request
+            ) {
+              return;
+            }
+            responseHandled = true;
+            if (shouldRetryBusyMutation(result, completedRetryCount)) {
+              var retryNumber = completedRetryCount + 1;
+              scheduleBusyMutationRetry(request, retryNumber, function () {
+                sendSignupMutationRequest(request, retryNumber, btn);
+              });
+              return;
+            }
+            if (result && result.code === "event_read_only") {
+              applyReadOnlyMutationResult(request);
+              return;
+            }
+            if (result && result.success) {
+              finishModalMutationRequest(request);
+              applySuccessfulSignupToGrid(request, result);
+              renderCompletedMutationModal(
+                request,
+                "signup",
+                result.message,
+              );
+              setTimeout(function () {
+                closeCompletedMutationModal(request);
+              }, MUTATION_SUCCESS_DISPLAY_MS);
+            } else if (shouldRefreshAfterSubmitRejection(result)) {
+              if (isModalMutationRequestCurrent(request)) {
+                showModalMessage(
+                  (result && result.message) ||
+                    "問題が発生しました。再度試してください。",
+                  false,
+                );
+                btn.textContent = SIGNUP_BTN_TEXT;
+              }
+              refreshGridDataAfterSubmitRejection(
+                request,
+                result.message,
+              );
+            } else {
+              finishModalMutationRequest(request);
+              if (isModalMutationRequestCurrent(request)) {
+                showModalMessage(
+                  (result && result.message) ||
+                    "問題が発生しました。再度試してください。",
+                  false,
+                );
+                btn.disabled = false;
+                btn.textContent = SIGNUP_BTN_TEXT;
+              }
+            }
+          })
+          .withFailureHandler(function () {
+            if (
+              responseHandled ||
+              activeModalMutationRequest !== request
+            ) {
+              return;
+            }
+            responseHandled = true;
+            finishModalMutationRequest(request);
+            if (isModalMutationRequestCurrent(request)) {
+              showModalMessage("問題が発生しました。再度試してください。", false);
+              btn.disabled = false;
+              btn.textContent = SIGNUP_BTN_TEXT;
+            }
+          })
+          .submitSignup(
+            request.eventId,
+            request.name,
+            request.cls,
+            request.role,
+            alias,
+          );
+      }
+
+      /**
+       * Validates and captures the active form, then starts one single-flight signup.
        * @returns {void}
        */
       function submitSignup() {
@@ -1147,86 +1393,13 @@
           cls,
           currentRole,
         );
-        var responseHandled = false;
         invalidateModalCompletion();
         activeModalMutationRequest = request;
 
         btn.disabled = true;
         btn.textContent = "送信中...";
         document.getElementById("modalMessage").style.display = "none";
-
-        google.script.run
-          .withSuccessHandler(function (result) {
-            if (
-              responseHandled ||
-              activeModalMutationRequest !== request
-            ) {
-              return;
-            }
-            responseHandled = true;
-            if (result && result.code === "event_read_only") {
-              applyReadOnlyMutationResult(request);
-              return;
-            }
-            if (result && result.success) {
-              finishModalMutationRequest(request);
-              applySuccessfulSignupToGrid(request, result);
-              renderCompletedMutationModal(
-                request,
-                "signup",
-                result.message,
-              );
-              setTimeout(function () {
-                closeCompletedMutationModal(request);
-              }, MUTATION_SUCCESS_DISPLAY_MS);
-            } else if (shouldRefreshAfterSubmitRejection(result)) {
-              if (isModalMutationRequestCurrent(request)) {
-                showModalMessage(
-                  (result && result.message) ||
-                    "問題が発生しました。再度試してください。",
-                  false,
-                );
-                btn.textContent = SIGNUP_BTN_TEXT;
-              }
-              refreshGridDataAfterSubmitRejection(
-                request,
-                result.message,
-              );
-            } else {
-              finishModalMutationRequest(request);
-              if (isModalMutationRequestCurrent(request)) {
-                showModalMessage(
-                  (result && result.message) ||
-                    "問題が発生しました。再度試してください。",
-                  false,
-                );
-                btn.disabled = false;
-                btn.textContent = SIGNUP_BTN_TEXT;
-              }
-            }
-          })
-          .withFailureHandler(function (error) {
-            if (
-              responseHandled ||
-              activeModalMutationRequest !== request
-            ) {
-              return;
-            }
-            responseHandled = true;
-            finishModalMutationRequest(request);
-            if (isModalMutationRequestCurrent(request)) {
-              showModalMessage("問題が発生しました。再度試してください。", false);
-              btn.disabled = false;
-              btn.textContent = SIGNUP_BTN_TEXT;
-            }
-          })
-          .submitSignup(
-            request.eventId,
-            request.name,
-            request.cls,
-            request.role,
-            alias,
-          );
+        sendSignupMutationRequest(request, 0, btn);
       }
 
       /**

@@ -1,27 +1,9 @@
 /**
- * @fileoverview Request, output-safety, sheet-schema, and row validation.
+ * @fileoverview Request, sheet-schema, and spreadsheet-row validation.
  * These helpers occupy Apps Script's shared global scope. They depend on role
  * and header-schema constants from Config.gs and canonicalisation helpers from
  * Normalisation.gs; they have no direct Apps Script service dependencies.
  */
-
-/**
- * Escapes script-sensitive characters as literal Unicode escape sequences.
- * Falsy values intentionally become an empty string.
- * @param {*} str - Value destined for a JSON/script context.
- * @returns {string} Escaped text safe to carry in the client data model.
- */
-function sanitiseForScript_(str) {
-  if (!str) return "";
-  return String(str)
-    .replace(/&/g, "\\u0026")
-    .replace(/</g, "\\u003c")
-    .replace(/>/g, "\\u003e")
-    .replace(/"/g, "\\u0022")
-    .replace(/'/g, "\\u0027")
-    .replace(/\//g, "\\u002f")
-    .replace(/`/g, "\\u0060");
-}
 
 /**
  * Accepts a role only when it exactly matches a configured canonical label.
@@ -61,7 +43,9 @@ function parseRequestEventId_(eventId) {
 }
 
 /**
- * Validates and canonicalises a participant name from a write request.
+ * Validates and display-canonicalises a participant name from a write request.
+ * This preserves the existing UX/storage contract and deliberately omits NFKC;
+ * server-only identity matching is applied later without rewriting the value.
  * @param {*} name - Client-supplied name.
  * @returns {{ok: boolean, value: (string|undefined), message: (string|undefined)}}
  *   Normalised value on success or a user-facing validation message.
@@ -90,7 +74,9 @@ function validateNameInput_(name) {
 }
 
 /**
- * Validates and canonicalises a participant class from a write request.
+ * Validates and display-canonicalises a participant class from a write request.
+ * This deliberately omits NFKC so accepted display/storage text is unchanged;
+ * identity-only matching is applied separately by mutation workflows.
  * @param {*} cls - Client-supplied class value.
  * @returns {{ok: boolean, value: (string|undefined), message: (string|undefined)}}
  *   Normalised value on success or a user-facing validation message.

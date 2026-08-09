@@ -20,6 +20,9 @@ const { exports: codeGs } = loadCodeGs(
     "normaliseClassValue_",
     "normaliseComparable_",
     "normaliseClassComparable_",
+    "normaliseNameIdentityKey_",
+    "normaliseClassIdentityKey_",
+    "buildIdentityTupleHash_",
     "normaliseCompact_",
   ],
   globals,
@@ -39,6 +42,9 @@ const {
   normaliseClassValue_,
   normaliseComparable_,
   normaliseClassComparable_,
+  normaliseNameIdentityKey_,
+  normaliseClassIdentityKey_,
+  buildIdentityTupleHash_,
   normaliseCompact_,
 } = codeGs;
 
@@ -121,6 +127,60 @@ test("normaliseClassComparable_ treats ASCII, full-width, and Kanji digits as eq
 
 test("normaliseClassComparable_ does not broaden equivalence to full-width Latin letters", () => {
   assert.notEqual(normaliseClassComparable_("１-ａ"), normaliseClassComparable_("1-a"));
+});
+
+test("server identity keys apply NFKC without changing legacy display comparators", () => {
+  assert.equal(
+    normaliseNameIdentityKey_("\uFF21\uFF4C\uFF49\uFF43\uFF45"),
+    normaliseNameIdentityKey_("Alice"),
+  );
+  assert.equal(
+    normaliseClassIdentityKey_("\uFF11-\uFF21"),
+    normaliseClassIdentityKey_("1-A"),
+  );
+  assert.notEqual(
+    normaliseComparable_("\uFF21\uFF4C\uFF49\uFF43\uFF45"),
+    normaliseComparable_("Alice"),
+  );
+  assert.notEqual(
+    normaliseClassComparable_("\uFF11-\uFF21"),
+    normaliseClassComparable_("1-A"),
+  );
+});
+
+test("server identity keys canonicalize half-width Kana and compatibility forms", () => {
+  assert.equal(
+    normaliseNameIdentityKey_("\uFF94\uFF8F\uFF80\uFF9E"),
+    normaliseNameIdentityKey_("\u30E4\u30DE\u30C0"),
+  );
+  assert.equal(normaliseNameIdentityKey_("\uFB03"), normaliseNameIdentityKey_("ffi"));
+  assert.equal(normaliseNameIdentityKey_("\u2163"), normaliseNameIdentityKey_("IV"));
+});
+
+test("server identity keys canonicalize composed and decomposed accents", () => {
+  assert.equal(
+    normaliseNameIdentityKey_("Jos\u00E9"),
+    normaliseNameIdentityKey_("Jose\u0301"),
+  );
+  assert.equal(validateNameInput_("Jos\u00E9").ok, true);
+  assert.equal(validateNameInput_("Jose\u0301").ok, false);
+});
+
+test("server identity keys do not collapse unrelated scripts or language distinctions", () => {
+  assert.notEqual(normaliseNameIdentityKey_("a"), normaliseNameIdentityKey_("\u0430"));
+  assert.notEqual(normaliseNameIdentityKey_("Jose"), normaliseNameIdentityKey_("Jos\u00E9"));
+  assert.notEqual(normaliseNameIdentityKey_("\u00DF"), normaliseNameIdentityKey_("ss"));
+  assert.notEqual(normaliseNameIdentityKey_("I"), normaliseNameIdentityKey_("\u0131"));
+  assert.notEqual(normaliseNameIdentityKey_("I"), normaliseNameIdentityKey_("\u0130"));
+});
+
+test("identity tuple hashes are fixed-width and preserve tuple boundaries", () => {
+  const first = buildIdentityTupleHash_("\uFB03".repeat(50), "1-A");
+  const second = buildIdentityTupleHash_("\uFB03".repeat(49), "\uFB031-A");
+
+  assert.match(first, /^[0-9a-f]{64}$/);
+  assert.equal(first.length, 64);
+  assert.notEqual(first, second);
 });
 
 test("normaliseCompact_ removes regular and full-width spaces for rate-limit keys", () => {

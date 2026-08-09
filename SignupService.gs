@@ -1,10 +1,113 @@
 /**
  * @fileoverview Signup/cancellation workflows and scheduling conflict rules.
- * This file runs in Apps Script's project-wide global scope and coordinates
- * configuration, validation, normalisation, spreadsheet-data, and rate-limit
- * globals from the other server files. Mutations use SpreadsheetApp,
- * LockService, and Utilities under the deployer's authority.
+ * Public mutations validate cheap request/config/event facts, consult cached
+ * denial sentinels, charge the emergency fuse, and attempt a short ScriptLock.
+ * Under that lock they recheck the cached durable denial; surviving requests
+ * charge personal attempts, take a fresh full snapshot, enforce business rules,
+ * re-read OPEN policy, consume durable write admission, mutate, flush, and only
+ * then release. Apps Script services run as deployer.
  */
+
+// Bound how long each anonymous execution occupies a runtime while waiting for
+// the project-wide mutation lock. Only an explicit false return after 250 ms is
+// reported as busy_retryable; LockService exceptions remain generic failures.
+const SCRIPT_LOCK_TIMEOUT_MILLISECONDS = 250;
+
+/**
+ * Creates the standard non-retryable failure for every rate-limit layer.
+ * It deliberately has no `busy_retryable` code, so the client cannot replay a
+ * durable denial as if it were confirmed pre-write lock contention.
+ * @returns {{success: boolean, message: string}} User-safe limit response.
+ */
+function getMutationRateLimitResult_() {
+  return {
+    success: false,
+    message: "使用回数を超過しました。少し待ってからお試しください。",
+  };
+}
+
+/**
+ * Creates the retryable result only for an explicit `tryLock(250) === false`.
+ * The emergency fuse has already counted this attempt, but no personal/durable
+ * charge, locked snapshot, or write has occurred. Lock service exceptions use
+ * the outer generic non-retryable failure instead.
+ * @returns {{success: boolean, code: string, message: string}} Busy response.
+ */
+function getBusyRetryableResult_() {
+  return {
+    success: false,
+    code: "busy_retryable",
+    message: "システムがビジー状態です。もう少し待ってから試してください。",
+  };
+}
+
+/**
+ * Creates a non-retryable cancellation failure for an ambiguous match tier.
+ * Ambiguity never deletes a row or consumes durable write admission.
+ * @returns {{success: boolean, code: string, message: string}} Failure result.
+ */
+function getAmbiguousCancellationResult_() {
+  return {
+    success: false,
+    code: "ambiguous_signup",
+    message:
+      "一致する登録が複数見つかったため、キャンセルできませんでした。主催者にお問い合わせください。",
+  };
+}
+
+/**
+ * Selects a cancellation target using exact, legacy, then NFKC identity tiers.
+ * Tier 1 is case-sensitive domain/display-normalised matching; tier 2 uses the
+ * unchanged case-insensitive legacy comparator; tier 3 uses server-only NFKC
+ * identity. A unique match returns immediately. Zero falls through, while two
+ * or more at any tier is terminal so no arbitrary colliding row is deleted.
+ * @param {Array<{rowIndex: number, rawName: string, displayClass: string}>} candidates
+ *   Signup rows already restricted to the requested event and role.
+ * @param {string} name - Validated request name.
+ * @param {string} cls - Validated request class.
+ * @returns {{match: (?{rowIndex: number, rawName: string, displayClass: string}), ambiguous: boolean}}
+ *   Unique selected raw/display tuple, ambiguity indicator, or no match.
+ */
+function selectCancellationMatch_(candidates, name, cls) {
+  const exactName = normaliseNameValue_(name);
+  const exactClass = normaliseClassValue_(cls);
+  const legacyName = normaliseComparable_(name);
+  const legacyClass = normaliseClassComparable_(cls);
+  const identityName = normaliseNameIdentityKey_(name);
+  const identityClass = normaliseClassIdentityKey_(cls);
+  const tiers = [
+    function (candidate) {
+      return (
+        normaliseNameValue_(candidate.rawName) === exactName &&
+        normaliseClassValue_(candidate.displayClass) === exactClass
+      );
+    },
+    function (candidate) {
+      return (
+        normaliseComparable_(candidate.rawName) === legacyName &&
+        normaliseClassComparable_(candidate.displayClass) === legacyClass
+      );
+    },
+    function (candidate) {
+      return (
+        normaliseNameIdentityKey_(candidate.rawName) === identityName &&
+        normaliseClassIdentityKey_(candidate.displayClass) === identityClass
+      );
+    },
+  ];
+
+  for (let tierIndex = 0; tierIndex < tiers.length; tierIndex += 1) {
+    const matches = candidates.filter(tiers[tierIndex]);
+    if (matches.length === 1) {
+      return { match: matches[0], ambiguous: false };
+    }
+    if (matches.length > 1) {
+      return { match: null, ambiguous: true };
+    }
+  }
+
+  return { match: null, ambiguous: false };
+}
 
 /**
  * Converts an Events row into a timezone-aware date and minute range.
@@ -67,7 +170,7 @@ function eventRangesOverlap_(a, b) {
 }
 
 /**
- * Finds another signup for the same normalised name in an overlapping event.
+ * Finds another signup for the same NFKC participant identity in an overlap.
  * Rows whose EventID no longer exists in Events are ignored.
  * @param {Array<Array<*>>} eventRows - Events values including the header row.
  * @param {Array<Array<*>>} signupRows - Signups values including the header row.
@@ -78,7 +181,7 @@ function eventRangesOverlap_(a, b) {
  */
 function findConcurrentSignup_(eventRows, signupRows, eventId, name, eventRow) {
   const targetRange = getEventRange_(eventRow);
-  const normalisedName = normaliseComparable_(name);
+  const normalisedName = normaliseNameIdentityKey_(name);
   const eventById = {};
 
   eventRows.slice(1).forEach(function (row) {
@@ -87,7 +190,7 @@ function findConcurrentSignup_(eventRows, signupRows, eventId, name, eventRow) {
 
   return signupRows.slice(1).find(function (row) {
     if (row[1] == eventId) return false;
-    if (normaliseComparable_(row[2]) !== normalisedName) return false;
+    if (normaliseNameIdentityKey_(row[2]) !== normalisedName) return false;
 
     const conflictingEvent = eventById[String(row[1])];
     if (!conflictingEvent) return false;
@@ -97,7 +200,7 @@ function findConcurrentSignup_(eventRows, signupRows, eventId, name, eventRow) {
 }
 
 /**
- * Counts a participant's signups across events with the same activity key.
+ * Counts an NFKC participant identity across the same legacy activity key.
  * @param {Array<Array<*>>} eventRows - Events values including the header row.
  * @param {Array<Array<*>>} signupRows - Signups values including the header row.
  * @param {*} activity - Target activity label.
@@ -106,7 +209,7 @@ function findConcurrentSignup_(eventRows, signupRows, eventId, name, eventRow) {
  */
 function countPersonSignupsForActivity_(eventRows, signupRows, activity, name) {
   const targetActivity = normaliseActivityKey_(activity);
-  const normalisedName = normaliseComparable_(name);
+  const normalisedName = normaliseNameIdentityKey_(name);
   const activityByEventId = Object.create(null);
 
   eventRows.slice(1).forEach(function (row) {
@@ -115,7 +218,7 @@ function countPersonSignupsForActivity_(eventRows, signupRows, activity, name) {
 
   return signupRows.slice(1).reduce(function (count, row) {
     if (activityByEventId[String(row[1])] !== targetActivity) return count;
-    if (normaliseComparable_(row[2]) !== normalisedName) return count;
+    if (normaliseNameIdentityKey_(row[2]) !== normalisedName) return count;
 
     return count + 1;
   }, 0);
@@ -145,12 +248,16 @@ function getEventRowForRequest_(spreadsheet, eventId) {
 }
 
 /**
- * Submits a new signup for a given event and role.
- * SheetId is derived server-side from the alias — never trusted from client.
- * Under a project script lock, this revalidates sheet data, consumes rate-limit
- * state, enforces capacity/activity/time rules, rechecks write policy, and
- * appends one row. Operational exceptions are logged and normally converted to
- * safe failures; an acquired lock is always released in the finally block.
+ * Submits one signup using only a Config-derived event spreadsheet.
+ * Cached blocks shed work before the emergency fuse; otherwise that fuse also
+ * counts an attempt that later finds the lock busy. After lock acquisition a
+ * cached durable denial is checked again; surviving requests charge a personal
+ * attempt before the fresh snapshot and business checks.
+ * Durable admission is charged only after those checks and a final fresh OPEN
+ * policy read, immediately before appendRow. The append is flushed while the
+ * lock is held. Mutation/flush errors are generic and non-retryable to the
+ * client because the write outcome may be ambiguous; finally releases every
+ * acquired lock.
  * @param {(number|string)} eventId - EventID from the Events sheet.
  * @param {*} name - Client-supplied participant name.
  * @param {*} cls - Client-supplied participant class.
@@ -220,16 +327,33 @@ function submitSignup(eventId, name, cls, role, alias) {
       return { success: false, message: "このイベントは既に終了しています。" };
     }
 
+    if (
+      isPersonAttemptBlocked_(eventId, name, cls, "signup", sheetId) ||
+      isEventSuccessLimitBlocked_(eventId, "signup", sheetId)
+    ) {
+      return getMutationRateLimitResult_();
+    }
+
+    // Charge only the high-threshold cache fuse before lock acquisition. This
+    // busy attempt cannot consume personal/durable budgets; its optional client
+    // retry is a new attempt and can do so only if it acquires the lock.
+    if (!checkEmergencyAttemptFuse_(eventId, "signup", sheetId)) {
+      return getMutationRateLimitResult_();
+    }
+
     // Only valid, writable requests may contend for the global mutation lock.
     lock = LockService.getScriptLock();
-    try {
-      lock.waitLock(5000);
-      lockAcquired = true;
-    } catch (e) {
-      return {
-        success: false,
-        message: "システムがビジー状態です。もう少し待ってから試してください。",
-      };
+    lockAcquired = lock.tryLock(SCRIPT_LOCK_TIMEOUT_MILLISECONDS);
+
+    if (!lockAcquired) {
+      return getBusyRetryableResult_();
+    }
+
+    if (isEventSuccessLimitBlocked_(eventId, "signup", sheetId)) {
+      return getMutationRateLimitResult_();
+    }
+    if (!checkPersonAttemptLimit_(eventId, name, cls, "signup", sheetId)) {
+      return getMutationRateLimitResult_();
     }
 
     const data = getValidatedEventSpreadsheetData_(spreadsheet);
@@ -247,15 +371,6 @@ function submitSignup(eventId, name, cls, role, alias) {
     today.setHours(0, 0, 0, 0);
     if (eventDate < today) {
       return { success: false, message: "このイベントは既に終了しています。" };
-    }
-
-    // Run the limiter only after confirming that EventID exists. The durable
-    // layer must never create persistent counters for arbitrary request IDs.
-    if (!checkRateLimit_(eventId, name, cls, "signup", sheetId)) {
-      return {
-        success: false,
-        message: "使用回数を超過しました。少し待ってからお試しください。",
-      };
     }
 
     // Get max slots for the selected role
@@ -295,11 +410,10 @@ function submitSignup(eventId, name, cls, role, alias) {
       };
     }
 
-    // Normalise name for comparison — case insensitive, collapse regular
-    // and full-width spaces (common in Japanese input)
-    const normalisedInput = normaliseComparable_(name);
+    // Use the server-only compatibility identity without changing stored text.
+    const normalisedInput = normaliseNameIdentityKey_(name);
     const duplicate = existing.find(
-      (r) => normaliseComparable_(r[2]) === normalisedInput,
+      (r) => normaliseNameIdentityKey_(r[2]) === normalisedInput,
     );
     if (duplicate) {
       return {
@@ -369,6 +483,9 @@ function submitSignup(eventId, name, cls, role, alias) {
     }
 
     const signupId = Utilities.getUuid();
+    if (!consumeEventSuccessLimit_(eventId, "signup", sheetId)) {
+      return getMutationRateLimitResult_();
+    }
     signupsSheet.appendRow([
       signupId,
       eventId,
@@ -377,6 +494,7 @@ function submitSignup(eventId, name, cls, role, alias) {
       canonicalRole,
       new Date(),
     ]);
+    SpreadsheetApp.flush();
 
     return {
       success: true,
@@ -401,18 +519,22 @@ function submitSignup(eventId, name, cls, role, alias) {
 }
 
 /**
- * Cancels a signup for a given event, matching on name, class, and role.
- * The Sheet ID and write policy are derived server-side. Under a project script
- * lock, this revalidates sheet data, consumes cancellation rate-limit state,
- * rechecks policy, and deletes at most one matching row. Operational exceptions
- * are logged and normally converted to safe failures; an acquired lock is
- * always released in the finally block.
+ * Cancels at most one signup in a Config-derived event spreadsheet.
+ * Cached blocks shed work before the emergency fuse; otherwise that fuse also
+ * counts an attempt that later finds the lock busy. After lock acquisition a
+ * cached durable denial is checked again; surviving requests charge a personal
+ * attempt before the fresh snapshot and tiered target selection. Ambiguous
+ * matches delete nothing. Durable admission is charged only after a unique
+ * match and a final fresh OPEN policy read, immediately
+ * before deleteRow. The deletion is flushed while the lock is held. Mutation/
+ * flush errors are generic and non-retryable because the outcome may be
+ * ambiguous; finally releases every acquired lock.
  * @param {(number|string)} eventId - EventID from the Events sheet.
  * @param {*} name - Client-supplied participant name.
  * @param {*} cls - Client-supplied participant class.
  * @param {*} role - Client-supplied canonical role label.
  * @param {*} alias - Event alias from the page URL.
- * @returns {{success: boolean, message: string, code: (string|undefined), role: (string|undefined), filled: (number|undefined)}}
+ * @returns {{success: boolean, message: string, code: (string|undefined), name: (string|undefined), cls: (string|undefined), role: (string|undefined), filled: (number|undefined)}}
  *   Cancellation confirmation or a user-safe rejection/failure payload.
  */
 function cancelSignup(eventId, name, cls, role, alias) {
@@ -463,20 +585,36 @@ function cancelSignup(eventId, name, cls, role, alias) {
     }
 
     const spreadsheet = SpreadsheetApp.openById(sheetId);
-    if (!getEventRowForRequest_(spreadsheet, parsedEventId)) {
+    const initialEventRow = getEventRowForRequest_(spreadsheet, parsedEventId);
+    if (!initialEventRow) {
       return { success: false, message: "イベントが見つかりません。" };
+    }
+
+    if (
+      isPersonAttemptBlocked_(parsedEventId, name, cls, "cancel", sheetId) ||
+      isEventSuccessLimitBlocked_(parsedEventId, "cancel", sheetId)
+    ) {
+      return getMutationRateLimitResult_();
+    }
+    if (!checkEmergencyAttemptFuse_(parsedEventId, "cancel", sheetId)) {
+      return getMutationRateLimitResult_();
     }
 
     // Only valid, writable requests may contend for the global mutation lock.
     lock = LockService.getScriptLock();
-    try {
-      lock.waitLock(5000);
-      lockAcquired = true;
-    } catch (e) {
-      return {
-        success: false,
-        message: "システムがビジー状態です。もう少し待ってから試してください。",
-      };
+    lockAcquired = lock.tryLock(SCRIPT_LOCK_TIMEOUT_MILLISECONDS);
+
+    if (!lockAcquired) {
+      return getBusyRetryableResult_();
+    }
+
+    if (isEventSuccessLimitBlocked_(parsedEventId, "cancel", sheetId)) {
+      return getMutationRateLimitResult_();
+    }
+    if (
+      !checkPersonAttemptLimit_(parsedEventId, name, cls, "cancel", sheetId)
+    ) {
+      return getMutationRateLimitResult_();
     }
 
     const data = getValidatedEventSpreadsheetData_(spreadsheet);
@@ -487,23 +625,15 @@ function cancelSignup(eventId, name, cls, role, alias) {
       return { success: false, message: "イベントが見つかりません。" };
     }
 
-    if (!checkRateLimit_(parsedEventId, name, cls, "cancel", sheetId)) {
-      return {
-        success: false,
-        message: "使用回数を超過しました。少し待ってからお試しください。",
-      };
-    }
-
     const signupsSheet = data.signupsSheet;
     const signupRows = data.signupRows;
     const signupDisplayRows = data.signupDisplayRows;
 
-    // Normalise name for comparison
-    const normalisedInput = normaliseComparable_(name);
-    const normalisedCls = normaliseClassComparable_(cls);
+    // Collect only same-event/same-role rows; tiered name/class matching below
+    // decides whether exactly one safe cancellation target exists.
+    const candidates = [];
 
     // Find matching row — name + role + eventId
-    let matchRowIndex = -1;
     let roleSignupCount = 0;
     for (let i = 1; i < signupRows.length; i++) {
       const rowEventId = signupRows[i][1];
@@ -511,18 +641,19 @@ function cancelSignup(eventId, name, cls, role, alias) {
       // Avoid expensive name/class canonicalisation for unrelated rows.
       if (rowEventId != parsedEventId || rowRole !== canonicalRole) continue;
       roleSignupCount += 1;
-      // Keep scanning cheap fields after the first match so the response can
-      // report the locked snapshot's authoritative post-delete occupancy.
-      if (matchRowIndex !== -1) continue;
-
-      const rowName = normaliseComparable_(signupRows[i][2]);
-      // Compare against the displayed sheet text so values like "1-1" are
-      // matched consistently even if Sheets auto-detects the raw cell value.
-      const rowCls = normaliseClassComparable_(signupDisplayRows[i][3]);
-      if (rowName === normalisedInput && rowCls === normalisedCls) {
-        matchRowIndex = i + 1;
-      }
+      candidates.push({
+        rowIndex: i + 1,
+        rawName: String(signupRows[i][2]),
+        displayClass: String(signupDisplayRows[i][3]),
+      });
     }
+
+    const selection = selectCancellationMatch_(candidates, name, cls);
+    if (selection.ambiguous) {
+      return getAmbiguousCancellationResult_();
+    }
+    const matchedSignup = selection.match;
+    const matchRowIndex = matchedSignup ? matchedSignup.rowIndex : -1;
 
     if (matchRowIndex === -1) {
       return {
@@ -538,12 +669,19 @@ function cancelSignup(eventId, name, cls, role, alias) {
       return getEventReadOnlyResult_();
     }
 
+    if (!consumeEventSuccessLimit_(parsedEventId, "cancel", sheetId)) {
+      return getMutationRateLimitResult_();
+    }
+
     // Delete the matching row
     signupsSheet.deleteRow(matchRowIndex);
+    SpreadsheetApp.flush();
 
     return {
       success: true,
       message: "登録がキャンセルされました。",
+      name: matchedSignup.rawName,
+      cls: matchedSignup.displayClass,
       role: canonicalRole,
       filled: roleSignupCount - 1,
     };

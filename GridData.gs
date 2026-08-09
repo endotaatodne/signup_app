@@ -1,14 +1,16 @@
 /**
  * @fileoverview Public schedule retrieval and browser-facing grid shaping.
  * Functions run in Apps Script's shared global scope and depend on schema/data
- * helpers from SpreadsheetData.gs, sanitisation from Validation.gs, constants
- * from Config.gs, and the SpreadsheetApp and Utilities services.
+ * helpers from SpreadsheetData.gs, constants from Config.gs, and the
+ * SpreadsheetApp and Utilities services.
  */
 
 /**
- * Reads a validated event spreadsheet and builds the browser's schedule model.
- * Text copied from Sheets is escaped for a JSON/script context, class values use
- * their displayed text, and filled slot counts are grouped by canonical role.
+ * Reads a validated event spreadsheet and builds the public schedule model.
+ * Sheet text remains exact String data: doGet protects its JSON at the template
+ * boundary with UTF-8 Base64, while getGridDataForAlias uses Apps Script's
+ * structured RPC channel. The client must still render these strings as text.
+ * Class uses displayed sheet text; signup IDs and timestamps are never exposed.
  * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} spreadsheet - Event spreadsheet.
  * @returns {{events: Array<Object>, times: Array<string>, activities: Array<string>}}
  *   Events plus distinct start times and activity labels.
@@ -26,11 +28,11 @@ function getGridData_(spreadsheet) {
   signupRows.slice(1).forEach((row, index) => {
     const displayRow = signupDisplayRows[index + 1] || [];
     const eventId = row[1];
-    const name = sanitiseForScript_(row[2]);
+    const name = String(row[2]);
     // Use the displayed sheet text for class so values like "1-1" are not
     // serialised as Date strings when Sheets auto-detects them internally.
-    const cls = sanitiseForScript_(String(displayRow[3] || ""));
-    const role = sanitiseForScript_(row[4]);
+    const cls = String(displayRow[3] == null ? "" : displayRow[3]);
+    const role = String(row[4]);
     if (!signupsMap[eventId]) signupsMap[eventId] = [];
     if (!signupCountsMap[eventId]) {
       // A null-prototype map preserves arbitrary configured role labels as
@@ -61,8 +63,8 @@ function getGridData_(spreadsheet) {
 
     return {
       eventId: eventId,
-      activity: sanitiseForScript_(row[1]),
-      subtitle: sanitiseForScript_(String(row[2])),
+      activity: String(row[1]),
+      subtitle: String(row[2] == null ? "" : row[2]),
       date: Utilities.formatDate(
         new Date(row[3]),
         APP_TIME_ZONE,
@@ -78,8 +80,8 @@ function getGridData_(spreadsheet) {
         APP_TIME_ZONE,
         "HH:mm",
       ),
-      description: sanitiseForScript_(String(row[6])),
-      location: sanitiseForScript_(String(row[7])),
+      description: String(row[6] == null ? "" : row[6]),
+      location: String(row[7] == null ? "" : row[7]),
       slots: slots,
       signups: allSignups,
     };
@@ -92,8 +94,9 @@ function getGridData_(spreadsheet) {
 }
 
 /**
- * Fetches fresh public schedule data and policy status for an event alias.
- * Validation and spreadsheet errors are logged and converted to safe failures.
+ * Fetches fresh public schedule data and policy status through structured RPC.
+ * Validation and spreadsheet errors are logged and converted to safe failures;
+ * the response deliberately contains raw public strings, not HTML fragments.
  * @param {string} alias - Event alias from the page URL.
  * @returns {{success: boolean, gridData: (Object|undefined), eventStatus: (string|undefined), title: (string|undefined), message: (string|undefined)}}
  *   Success payload or a user-safe failure payload.
