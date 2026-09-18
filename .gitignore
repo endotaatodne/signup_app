@@ -20,3 +20,11 @@ credentials.json
 Thumbs.db
 .vscode/
 .idea/
+
+# Miscellaneous
+REFACTOR_HANDOFF.md
+.codex/handoffs/*
+!.codex/handoffs/.gitkeep
+
+AGENTS.md
+.codex/
