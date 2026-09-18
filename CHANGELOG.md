@@ -1,3 +1,13 @@
+## v0.2.12 - 2026-09-18
+
+- Patch
+  - Adds the `CLOSED` event Status, denying initial page loads and schedule refreshes before opening an event Sheet, and returning a distinct non-retryable result for signup and cancellation.
+  - Rechecks event policy and the expected Sheet ID immediately before each mutation, so a transition to `CLOSED` observed at the final check blocks the append or deletion.
+  - Replaces stale browser content with the unavailable page when a mutation or either authoritative refresh reports that an event has closed; the public unavailable page uses a Japanese message.
+  - Expands backend and browser regression coverage for CLOSED parsing, page and refresh denial without event-Sheet access, initial and final mutation denial, and stale-page recovery.
+  - Updates English and Japanese administrator documentation for current clasp commands and push safety guidance, fixed role keys and selector families, matching project/application timezone configuration, and legacy Steering Committee header migration aliases.
+  - Bumps the app version to 0.2.12.
+
 ## v0.2.11 - 2026-08-09
 
 - Patch

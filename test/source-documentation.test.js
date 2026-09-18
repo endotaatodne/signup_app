@@ -30,6 +30,21 @@ function readProductionFile(filename) {
   return fs.readFileSync(path.join(PROJECT_ROOT, filename), "utf8");
 }
 
+function getMarkdownSection(source, heading) {
+  const headingPattern = new RegExp(
+    `^### ${escapeRegExp(heading)}[\\t ]*(?=\\r?$)`,
+    "m",
+  );
+  const headingMatch = headingPattern.exec(source);
+  assert.ok(headingMatch, `README must contain the ${heading} section`);
+
+  const contentStart = headingMatch.index + headingMatch[0].length;
+  const nextHeadingPattern = /^#{1,3}(?:[\t ]+|$)/gm;
+  nextHeadingPattern.lastIndex = contentStart;
+  const nextHeading = nextHeadingPattern.exec(source);
+  return source.slice(contentStart, nextHeading ? nextHeading.index : undefined);
+}
+
 function getImmediatelyPrecedingJsDoc(source, functionIndex) {
   const sourceBeforeFunction = source.slice(0, functionIndex).trimEnd();
   if (!sourceBeforeFunction.endsWith("*/")) return "";
@@ -43,6 +58,14 @@ function getImmediatelyPrecedingJsDoc(source, functionIndex) {
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
+
+test("Markdown section extraction ends at a following higher-level heading", () => {
+  const source = "### Target\r\ninside\r\n## Following\r\nAPP_TIME_ZONE\r\n";
+  const section = getMarkdownSection(source, "Target");
+
+  assert.match(section, /inside/);
+  assert.doesNotMatch(section, /APP_TIME_ZONE/);
+});
 
 test("every production source file explains its responsibility", () => {
   PRODUCTION_FILES.forEach((filename) => {
@@ -105,5 +128,55 @@ test("every named production function has an adjacent JSDoc description", () => 
         );
       });
     }
+  });
+});
+
+test("README role-colour guidance uses current selector families", () => {
+  const roleColourSections = {
+    "README.en.md": "Changing Role Colours",
+    "README.ja.md": "役割カラーの変更",
+  };
+  const selectorFamilies = [
+    ".name-role-*",
+    ".role-btn-*",
+    ".modal-submit-*",
+    ".names-role-label-*",
+    ".name-chip.name-role-*",
+    ".mobile-slot-summary-item.role-*",
+    ".mobile-role-filter-pill.role-*",
+    ".mobile-overview-role-chip.role-*",
+    ".desktop-insight-chip.role-*",
+  ];
+
+  Object.entries(roleColourSections).forEach(([filename, heading]) => {
+    const source = readProductionFile(filename);
+    assert.doesNotMatch(source, /\.count-(?:general|classrep|steeringcommittee|orgcommittee)\b/);
+    const section = getMarkdownSection(source, heading);
+
+    selectorFamilies.forEach((selectorFamily) => {
+      assert.ok(
+        section.includes(selectorFamily),
+        `${filename}'s ${heading} section must name ${selectorFamily}`,
+      );
+    });
+  });
+});
+
+test("README timezone guidance documents both timezone configuration locations", () => {
+  const timezoneSections = {
+    "README.en.md": "Changing the Timezone",
+    "README.ja.md": "タイムゾーンの変更",
+  };
+
+  Object.entries(timezoneSections).forEach(([filename, heading]) => {
+    const source = readProductionFile(filename);
+    const section = getMarkdownSection(source, heading);
+
+    ["appsscript.json", "Config.gs", "APP_TIME_ZONE"].forEach((identifier) => {
+      assert.ok(
+        section.includes(identifier),
+        `${filename}'s ${heading} section must mention ${identifier}`,
+      );
+    });
   });
 });

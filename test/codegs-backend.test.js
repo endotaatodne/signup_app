@@ -136,7 +136,8 @@ function loadBackend(options = {}) {
   configSheet.__state.operationLog = mockEnv.serviceCalls.operations;
   Object.keys(eventSheets).forEach((sheetName) => {
     eventSheets[sheetName].__state.operationLabel = sheetName;
-    eventSheets[sheetName].__state.operationLog = mockEnv.serviceCalls.operations;
+    eventSheets[sheetName].__state.operationLog =
+      mockEnv.serviceCalls.operations;
   });
 
   const { exports: app, context } = loadCodeGs(
@@ -332,6 +333,24 @@ test("doGet keeps an event viewable when Status fails closed", () => {
   assert.ok(logs.some((entry) => /Status header/.test(entry.message)));
 });
 
+test("doGet returns an unavailable page for CLOSED without opening the event Sheet", () => {
+  const { app, serviceCalls } = loadBackend({
+    configRows: [
+      ["Alias", "SheetId", "Status"],
+      ["Spring-Fete", EVENT_SHEET_ID, " closed "],
+    ],
+  });
+
+  const result = app.doGet({ parameter: { event: "Spring-Fete" } });
+
+  assert.equal(result.kind, "html");
+  assert.match(
+    result.content,
+    /現在、このボランティア募集ページはご利用いただけません。/,
+  );
+  assert.equal(serviceCalls.spreadsheetOpenByIdById[EVENT_SHEET_ID] || 0, 0);
+});
+
 test("doGet returns an error page when the alias is invalid", () => {
   const { app } = loadBackend();
 
@@ -351,6 +370,24 @@ test("getGridDataForAlias returns fresh public grid data for a valid alias", () 
   assert.equal(result.gridData.events[0].slots.general.filled, 0);
   assert.equal(result.eventStatus, "OPEN");
   assert.equal(result.title, "Spring Fete");
+});
+
+test("getGridDataForAlias denies CLOSED without reading the event Sheet", () => {
+  const { app, serviceCalls } = loadBackend({
+    configRows: [
+      ["Alias", "SheetId", "Status"],
+      ["Spring-Fete", EVENT_SHEET_ID, "CLOSED"],
+    ],
+  });
+
+  const result = app.getGridDataForAlias("Spring-Fete");
+
+  assert.deepEqual(JSON.parse(JSON.stringify(result)), {
+    success: false,
+    code: "event_closed",
+    message: "現在、このボランティア募集ページはご利用いただけません。",
+  });
+  assert.equal(serviceCalls.spreadsheetOpenByIdById[EVENT_SHEET_ID] || 0, 0);
 });
 
 test("getGridDataForAlias rejects invalid aliases safely", () => {
@@ -376,15 +413,29 @@ test("personal attempts allow the first three, block the fourth, and reset at 60
   }
 
   assert.equal(
-    app.isPersonAttemptBlocked_(1, "\uFF21lice", "1-\uFF21", "signup", "sheet-a"),
+    app.isPersonAttemptBlocked_(
+      1,
+      "\uFF21lice",
+      "1-\uFF21",
+      "signup",
+      "sheet-a",
+    ),
     true,
   );
   assert.equal(
-    app.checkPersonAttemptLimit_(1, "\uFF21lice", "1-\uFF21", "signup", "sheet-a"),
+    app.checkPersonAttemptLimit_(
+      1,
+      "\uFF21lice",
+      "1-\uFF21",
+      "signup",
+      "sheet-a",
+    ),
     false,
   );
   assert.ok(
-    [...cacheStore.keys()].every((key) => !key.includes("Alice") && !key.includes("1-A")),
+    [...cacheStore.keys()].every(
+      (key) => !key.includes("Alice") && !key.includes("1-A"),
+    ),
   );
 
   const { app: almostResetApp } = loadBackend({
@@ -420,15 +471,36 @@ test("personal attempt limits isolate action, event, sheet, and complete identit
   const { app } = loadBackend({ cacheStore: new Map() });
 
   for (let i = 0; i < app.RATE_LIMIT_PERSON_MAX_HITS; i += 1) {
-    assert.equal(app.checkPersonAttemptLimit_(1, "Alice", "1-A", "signup", "sheet-a"), true);
-    assert.equal(app.checkPersonAttemptLimit_(1, "Alina", "1-A", "signup", "sheet-a"), true);
+    assert.equal(
+      app.checkPersonAttemptLimit_(1, "Alice", "1-A", "signup", "sheet-a"),
+      true,
+    );
+    assert.equal(
+      app.checkPersonAttemptLimit_(1, "Alina", "1-A", "signup", "sheet-a"),
+      true,
+    );
   }
 
-  assert.equal(app.checkPersonAttemptLimit_(1, "Alice", "1-A", "signup", "sheet-a"), false);
-  assert.equal(app.checkPersonAttemptLimit_(1, "Alina", "1-A", "signup", "sheet-a"), false);
-  assert.equal(app.checkPersonAttemptLimit_(1, "Alice", "1-A", "cancel", "sheet-a"), true);
-  assert.equal(app.checkPersonAttemptLimit_(2, "Alice", "1-A", "signup", "sheet-a"), true);
-  assert.equal(app.checkPersonAttemptLimit_(1, "Alice", "1-A", "signup", "sheet-b"), true);
+  assert.equal(
+    app.checkPersonAttemptLimit_(1, "Alice", "1-A", "signup", "sheet-a"),
+    false,
+  );
+  assert.equal(
+    app.checkPersonAttemptLimit_(1, "Alina", "1-A", "signup", "sheet-a"),
+    false,
+  );
+  assert.equal(
+    app.checkPersonAttemptLimit_(1, "Alice", "1-A", "cancel", "sheet-a"),
+    true,
+  );
+  assert.equal(
+    app.checkPersonAttemptLimit_(2, "Alice", "1-A", "signup", "sheet-a"),
+    true,
+  );
+  assert.equal(
+    app.checkPersonAttemptLimit_(1, "Alice", "1-A", "signup", "sheet-b"),
+    true,
+  );
 });
 
 test("the emergency mutation-attempt fuse is high-threshold, short-window, and scoped", () => {
@@ -459,22 +531,39 @@ test("the emergency mutation-attempt fuse is high-threshold, short-window, and s
     cacheStore,
     nowValue: "2026-04-19T00:00:10Z",
   });
-  assert.equal(resetApp.checkEmergencyAttemptFuse_(1, "signup", "sheet-a"), true);
+  assert.equal(
+    resetApp.checkEmergencyAttemptFuse_(1, "signup", "sheet-a"),
+    true,
+  );
 });
 
 test("malformed and future advisory counters restart instead of blocking", () => {
   const cacheStore = new Map();
   const initial = loadBackend({ cacheStore });
   assert.equal(
-    initial.app.checkPersonAttemptLimit_(1, "Alice", "1-A", "signup", "sheet-a"),
+    initial.app.checkPersonAttemptLimit_(
+      1,
+      "Alice",
+      "1-A",
+      "signup",
+      "sheet-a",
+    ),
     true,
   );
-  const personKey = [...cacheStore.keys()].find((key) => key.includes("person_"));
+  const personKey = [...cacheStore.keys()].find((key) =>
+    key.includes("person_"),
+  );
 
   cacheStore.set(personKey, "not-json");
   const malformed = loadBackend({ cacheStore });
   assert.equal(
-    malformed.app.checkPersonAttemptLimit_(1, "Alice", "1-A", "signup", "sheet-a"),
+    malformed.app.checkPersonAttemptLimit_(
+      1,
+      "Alice",
+      "1-A",
+      "signup",
+      "sheet-a",
+    ),
     true,
   );
   assert.equal(JSON.parse(cacheStore.get(personKey)).hits, 1);
@@ -516,8 +605,14 @@ test("advisory cache limiter failures fail open without exposing identity data",
   const { app, logs } = loadBackend({ cacheStore: failingCacheStore });
 
   assert.equal(app.checkEmergencyAttemptFuse_(1, "signup", "sheet-a"), true);
-  assert.equal(app.isPersonAttemptBlocked_(1, "Alice", "1-A", "signup", "sheet-a"), false);
-  assert.equal(app.checkPersonAttemptLimit_(1, "Alice", "1-A", "signup", "sheet-a"), true);
+  assert.equal(
+    app.isPersonAttemptBlocked_(1, "Alice", "1-A", "signup", "sheet-a"),
+    false,
+  );
+  assert.equal(
+    app.checkPersonAttemptLimit_(1, "Alice", "1-A", "signup", "sheet-a"),
+    true,
+  );
   assert.ok(logs.some((entry) => /cache rate limiter/i.test(entry.message)));
 });
 
@@ -556,19 +651,28 @@ test("cached durable denial expires exactly with the original persistent window"
     propertyStore,
     nowValue: "2026-04-19T00:00:59.999Z",
   });
-  assert.equal(boundary.app.consumeEventSuccessLimit_(1, "signup", "sheet-a"), true);
+  assert.equal(
+    boundary.app.consumeEventSuccessLimit_(1, "signup", "sheet-a"),
+    true,
+  );
   const denialPut = boundary.serviceCalls.cachePutExpirations.find(({ key }) =>
     key.includes("success_blocked_"),
   );
   assert.equal(denialPut.expirationInSeconds, 1);
-  assert.equal(boundary.app.isEventSuccessLimitBlocked_(1, "signup", "sheet-a"), true);
+  assert.equal(
+    boundary.app.isEventSuccessLimitBlocked_(1, "signup", "sheet-a"),
+    true,
+  );
 
   const expired = loadBackend({
     cacheStore,
     propertyStore,
     nowValue: "2026-04-19T00:01:00Z",
   });
-  assert.equal(expired.app.isEventSuccessLimitBlocked_(1, "signup", "sheet-a"), false);
+  assert.equal(
+    expired.app.isEventSuccessLimitBlocked_(1, "signup", "sheet-a"),
+    false,
+  );
   assert.equal(expired.serviceCalls.cacheRemove, 1);
 });
 
@@ -579,12 +683,30 @@ test("durable validated-write denial survives cache eviction and remains scoped"
     assert.equal(app.consumeEventSuccessLimit_(1, "signup", "sheet-a"), true);
   }
 
-  const { app: freshApp } = loadBackend({ cacheStore: new Map(), propertyStore });
-  assert.equal(freshApp.isEventSuccessLimitBlocked_(1, "signup", "sheet-a"), false);
-  assert.equal(freshApp.consumeEventSuccessLimit_(1, "signup", "sheet-a"), false);
-  assert.equal(freshApp.consumeEventSuccessLimit_(1, "cancel", "sheet-a"), true);
-  assert.equal(freshApp.consumeEventSuccessLimit_(2, "signup", "sheet-a"), true);
-  assert.equal(freshApp.consumeEventSuccessLimit_(1, "signup", "sheet-b"), true);
+  const { app: freshApp } = loadBackend({
+    cacheStore: new Map(),
+    propertyStore,
+  });
+  assert.equal(
+    freshApp.isEventSuccessLimitBlocked_(1, "signup", "sheet-a"),
+    false,
+  );
+  assert.equal(
+    freshApp.consumeEventSuccessLimit_(1, "signup", "sheet-a"),
+    false,
+  );
+  assert.equal(
+    freshApp.consumeEventSuccessLimit_(1, "cancel", "sheet-a"),
+    true,
+  );
+  assert.equal(
+    freshApp.consumeEventSuccessLimit_(2, "signup", "sheet-a"),
+    true,
+  );
+  assert.equal(
+    freshApp.consumeEventSuccessLimit_(1, "signup", "sheet-b"),
+    true,
+  );
 });
 
 test("durable validated-write budgets reset after their window", () => {
@@ -613,7 +735,10 @@ test("durable validated-write budgets reset after their window", () => {
     propertyStore,
     nowValue: "2026-04-19T00:01:00Z",
   });
-  assert.equal(resetApp.consumeEventSuccessLimit_(1, "signup", "sheet-a"), true);
+  assert.equal(
+    resetApp.consumeEventSuccessLimit_(1, "signup", "sheet-a"),
+    true,
+  );
 });
 
 test("durable validated-write budgets fail closed when state cannot be written", () => {
@@ -658,15 +783,23 @@ test("legacy v2 properties are ignored by the v3 validated-write budget", () => 
 test("malformed and future persistent v3 state starts a fresh budget window", () => {
   const propertyStore = new Map();
   const initial = loadBackend({ propertyStore });
-  assert.equal(initial.app.consumeEventSuccessLimit_(1, "signup", "sheet-a"), true);
+  assert.equal(
+    initial.app.consumeEventSuccessLimit_(1, "signup", "sheet-a"),
+    true,
+  );
   const propertyKey = getDurableWriteBudgetEntries(propertyStore)[0][0];
 
   propertyStore.set(propertyKey, "not-json");
   const malformed = loadBackend({ propertyStore });
-  assert.equal(malformed.app.consumeEventSuccessLimit_(1, "signup", "sheet-a"), true);
+  assert.equal(
+    malformed.app.consumeEventSuccessLimit_(1, "signup", "sheet-a"),
+    true,
+  );
   assert.equal(JSON.parse(propertyStore.get(propertyKey)).hits, 1);
   assert.ok(
-    malformed.logs.some((entry) => /Invalid persistent rate-limit state/.test(entry.message)),
+    malformed.logs.some((entry) =>
+      /Invalid persistent rate-limit state/.test(entry.message),
+    ),
   );
 
   propertyStore.set(
@@ -677,7 +810,10 @@ test("malformed and future persistent v3 state starts a fresh budget window", ()
     }),
   );
   const future = loadBackend({ propertyStore });
-  assert.equal(future.app.consumeEventSuccessLimit_(1, "signup", "sheet-a"), true);
+  assert.equal(
+    future.app.consumeEventSuccessLimit_(1, "signup", "sheet-a"),
+    true,
+  );
   assert.equal(JSON.parse(propertyStore.get(propertyKey)).hits, 1);
 });
 
@@ -694,9 +830,15 @@ test("malformed cached durable denials are removed and fail open to durable stat
   cacheStore.set(denialKey, "not-json");
 
   const malformed = loadBackend({ cacheStore, propertyStore });
-  assert.equal(malformed.app.isEventSuccessLimitBlocked_(1, "signup", "sheet-a"), false);
+  assert.equal(
+    malformed.app.isEventSuccessLimitBlocked_(1, "signup", "sheet-a"),
+    false,
+  );
   assert.equal(cacheStore.has(denialKey), false);
-  assert.equal(malformed.app.consumeEventSuccessLimit_(1, "signup", "sheet-a"), false);
+  assert.equal(
+    malformed.app.consumeEventSuccessLimit_(1, "signup", "sheet-a"),
+    false,
+  );
 });
 
 test("submitSignup appends a normalised signup row on success", () => {
@@ -862,6 +1004,26 @@ test("submitSignup rereads Config through the reused master handle before append
   assert.equal(serviceCalls.spreadsheetOpenByIdById[MASTER_SHEET_ID], 1);
 });
 
+test("submitSignup blocks a transition to CLOSED before append", () => {
+  const { app, spreadsheets } = loadBackend();
+  const configSheet = spreadsheets[MASTER_SHEET_ID].getSheetByName("Config");
+  const signupsSheet = spreadsheets[EVENT_SHEET_ID].getSheetByName("Signups");
+  configSheet.__state.onGetValues = ({ callNumber }) => {
+    if (callNumber === 2) configSheet.__state.values[1][2] = "CLOSED";
+  };
+
+  const result = app.submitSignup(
+    "1",
+    "Alice",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+
+  assert.equal(result.code, "event_closed");
+  assert.equal(signupsSheet.__state.values.length, 1);
+});
+
 test("submitSignup rejects READ_ONLY events without appending a row", () => {
   const { app, spreadsheets, lock } = loadBackend({
     configRows: [
@@ -884,6 +1046,28 @@ test("submitSignup rejects READ_ONLY events without appending a row", () => {
   assert.equal(signupsSheet.getDataRange().getValues().length, 1);
   assert.equal(lock.tryCount, 0);
   assert.equal(lock.released, false);
+});
+
+test("submitSignup rejects CLOSED events without opening or writing the event Sheet", () => {
+  const { app, spreadsheets, lock, serviceCalls } = loadBackend({
+    configRows: [
+      ["Alias", "SheetId", "Status"],
+      ["Spring-Fete", EVENT_SHEET_ID, "CLOSED"],
+    ],
+  });
+  const signupsSheet = spreadsheets[EVENT_SHEET_ID].getSheetByName("Signups");
+  const result = app.submitSignup(
+    "1",
+    "Alice",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+
+  assert.equal(result.code, "event_closed");
+  assert.equal(signupsSheet.__state.values.length, 1);
+  assert.equal(serviceCalls.spreadsheetOpenByIdById[EVENT_SHEET_ID] || 0, 0);
+  assert.equal(lock.tryCount, 0);
 });
 
 test("submitSignup rejects malformed requests before waiting for the lock", () => {
@@ -1654,6 +1838,14 @@ test("getEventSettings_ normalises supported status values", () => {
       status: "READ_ONLY",
     },
   );
+
+  const { app: closedApp } = loadBackend({
+    configRows: [
+      ["Alias", "SheetId", "Status"],
+      ["Spring-Fete", EVENT_SHEET_ID, " closed "],
+    ],
+  });
+  assert.equal(closedApp.getEventSettings_()["spring-fete"].status, "CLOSED");
 });
 
 test("getEventSettings_ fails closed when Status is missing or invalid", () => {
@@ -1876,6 +2068,30 @@ test("cancelSignup normalises only rows matching the requested event and role", 
   assert.deepEqual(signupsSheet.__state.deletedRows, [4]);
 });
 
+test("cancelSignup blocks a transition to CLOSED before delete", () => {
+  const signupRows = [
+    ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
+    ["s1", 1, "Alice", "1-1", appRoleGeneral(), new Date()],
+  ];
+  const { app, spreadsheets } = loadBackend({ signupRows });
+  const configSheet = spreadsheets[MASTER_SHEET_ID].getSheetByName("Config");
+  const signupsSheet = spreadsheets[EVENT_SHEET_ID].getSheetByName("Signups");
+  configSheet.__state.onGetValues = ({ callNumber }) => {
+    if (callNumber === 2) configSheet.__state.values[1][2] = "CLOSED";
+  };
+
+  const result = app.cancelSignup(
+    "1",
+    "Alice",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+
+  assert.equal(result.code, "event_closed");
+  assert.deepEqual(signupsSheet.__state.deletedRows, []);
+});
+
 test("cancelSignup rejects READ_ONLY events without deleting a row", () => {
   const signupRows = [
     ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
@@ -1904,6 +2120,33 @@ test("cancelSignup rejects READ_ONLY events without deleting a row", () => {
   assert.equal(signupsSheet.getDataRange().getValues().length, 2);
   assert.equal(lock.tryCount, 0);
   assert.equal(lock.released, false);
+});
+
+test("cancelSignup rejects CLOSED events without opening or deleting from the event Sheet", () => {
+  const signupRows = [
+    ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
+    ["s1", 1, "Alice", "1-1", appRoleGeneral(), new Date()],
+  ];
+  const { app, spreadsheets, lock, serviceCalls } = loadBackend({
+    signupRows,
+    configRows: [
+      ["Alias", "SheetId", "Status"],
+      ["Spring-Fete", EVENT_SHEET_ID, "CLOSED"],
+    ],
+  });
+  const signupsSheet = spreadsheets[EVENT_SHEET_ID].getSheetByName("Signups");
+  const result = app.cancelSignup(
+    "1",
+    "Alice",
+    "1-1",
+    app.ROLES.general,
+    "spring-fete",
+  );
+
+  assert.equal(result.code, "event_closed");
+  assert.deepEqual(signupsSheet.__state.deletedRows, []);
+  assert.equal(serviceCalls.spreadsheetOpenByIdById[EVENT_SHEET_ID] || 0, 0);
+  assert.equal(lock.tryCount, 0);
 });
 
 test("cancelSignup rejects malformed requests before waiting for the lock", () => {
@@ -2496,10 +2739,11 @@ test("flush failures are generic and never marked retryable after mutation", () 
             ["s1", 1, "Alice", "1-A", appRoleGeneral(), new Date()],
           ]
         : undefined;
-    const { app, spreadsheets, lock, propertyStore, serviceCalls } = loadBackend({
-      signupRows,
-      flushFails: true,
-    });
+    const { app, spreadsheets, lock, propertyStore, serviceCalls } =
+      loadBackend({
+        signupRows,
+        flushFails: true,
+      });
     const result =
       action === "signup"
         ? app.submitSignup(
@@ -2722,14 +2966,26 @@ test("business and policy rejections never consume durable write budget", () => 
       label: "duplicate",
       options: { signupRows: duplicateRows },
       invoke(app) {
-        return app.submitSignup("1", "Alice", "2-A", app.ROLES.general, "spring-fete");
+        return app.submitSignup(
+          "1",
+          "Alice",
+          "2-A",
+          app.ROLES.general,
+          "spring-fete",
+        );
       },
     },
     {
       label: "slot full",
       options: { eventRows: slotRows, signupRows: duplicateRows },
       invoke(app) {
-        return app.submitSignup("1", "Bob", "2-A", app.ROLES.general, "spring-fete");
+        return app.submitSignup(
+          "1",
+          "Bob",
+          "2-A",
+          app.ROLES.general,
+          "spring-fete",
+        );
       },
     },
     {
@@ -2737,40 +2993,76 @@ test("business and policy rejections never consume durable write budget", () => 
       options: {
         eventRows: activityRows,
         signupRows: otherEventSignup,
-        activityLimitRows: [["Activity", "MaxPerPerson"], ["Hall Monitor", 1]],
+        activityLimitRows: [
+          ["Activity", "MaxPerPerson"],
+          ["Hall Monitor", 1],
+        ],
       },
       invoke(app) {
-        return app.submitSignup("1", "Alice", "2-A", app.ROLES.general, "spring-fete");
+        return app.submitSignup(
+          "1",
+          "Alice",
+          "2-A",
+          app.ROLES.general,
+          "spring-fete",
+        );
       },
     },
     {
       label: "time conflict",
       options: { eventRows: overlapRows, signupRows: otherEventSignup },
       invoke(app) {
-        return app.submitSignup("1", "Alice", "2-A", app.ROLES.general, "spring-fete");
+        return app.submitSignup(
+          "1",
+          "Alice",
+          "2-A",
+          app.ROLES.general,
+          "spring-fete",
+        );
       },
     },
     {
       label: "cancel no match",
       options: {},
       invoke(app) {
-        return app.cancelSignup("1", "Alice", "1-A", app.ROLES.general, "spring-fete");
+        return app.cancelSignup(
+          "1",
+          "Alice",
+          "1-A",
+          app.ROLES.general,
+          "spring-fete",
+        );
       },
     },
     {
       label: "cancel ambiguity",
       options: { eventRows: ambiguousEvents, signupRows: ambiguousRows },
       invoke(app) {
-        return app.cancelSignup("1", "Alice", "1-A", app.ROLES.general, "spring-fete");
+        return app.cancelSignup(
+          "1",
+          "Alice",
+          "1-A",
+          app.ROLES.general,
+          "spring-fete",
+        );
       },
     },
     {
       label: "activity configuration",
       options: {
-        activityLimitRows: [["Wrong", "MaxPerPerson"], ["Hall Monitor", 1]],
+        activityLimitRows: [
+          ["Wrong", "MaxPerPerson"],
+          ["Hall Monitor", 1],
+        ],
       },
       invoke(app) {
-        return app.submitSignup("1", "Alice", "1-A", app.ROLES.general, "spring-fete");
+        return app.submitSignup(
+          "1",
+          "Alice",
+          "1-A",
+          app.ROLES.general,
+          "spring-fete",
+        );
       },
     },
   ];
@@ -2871,7 +3163,10 @@ test("public signup matching uses NFKC for duplicate, overlap, and activity iden
   const activity = loadBackend({
     eventRows: activityEvents,
     signupRows: otherEventSignup,
-    activityLimitRows: [["Activity", "MaxPerPerson"], ["Hall Monitor", 1]],
+    activityLimitRows: [
+      ["Activity", "MaxPerPerson"],
+      ["Hall Monitor", 1],
+    ],
   });
   const activityResult = activity.app.submitSignup(
     "1",
@@ -2929,7 +3224,10 @@ test("activity labels retain their legacy non-NFKC grouping semantics", () => {
   const { app } = loadBackend({
     eventRows,
     signupRows,
-    activityLimitRows: [["Activity", "MaxPerPerson"], ["IV", 1]],
+    activityLimitRows: [
+      ["Activity", "MaxPerPerson"],
+      ["IV", 1],
+    ],
   });
 
   const result = app.submitSignup(
@@ -3048,11 +3346,25 @@ test("GridData and Base64 template payload round-trip hostile text exactly", () 
   eventRows[1][7] = `Location ${hostile}`;
   const signupRows = [
     ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
-    ["secret-id", 1, `Name ${hostile}`, "raw-class", appRoleGeneral(), new Date()],
+    [
+      "secret-id",
+      1,
+      `Name ${hostile}`,
+      "raw-class",
+      appRoleGeneral(),
+      new Date(),
+    ],
   ];
   const signupDisplayRows = [
     ["SignupID", "EventID", "Name", "Class", "Role", "CreatedAt"],
-    ["secret-id", "1", `Name ${hostile}`, `Class ${hostile}`, appRoleGeneral(), "secret-time"],
+    [
+      "secret-id",
+      "1",
+      `Name ${hostile}`,
+      `Class ${hostile}`,
+      appRoleGeneral(),
+      "secret-time",
+    ],
   ];
   const { app } = loadBackend({
     eventRows,
@@ -3081,7 +3393,11 @@ test("GridData and Base64 template payload round-trip hostile text exactly", () 
   assert.equal(rpc.success, true);
   assert.equal(rpc.gridData.events[0].description, `Description ${hostile}`);
   assert.equal(rpc.gridData.events[0].signups[0].name, `Name ${hostile}`);
-  assert.deepEqual(Object.keys(event.signups[0]).sort(), ["cls", "name", "role"]);
+  assert.deepEqual(Object.keys(event.signups[0]).sort(), [
+    "cls",
+    "name",
+    "role",
+  ]);
   assert.equal(JSON.stringify(decoded).includes("secret-id"), false);
   assert.equal(JSON.stringify(decoded).includes("secret-time"), false);
 });

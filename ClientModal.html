@@ -907,6 +907,17 @@
       }
 
       /**
+       * Replaces stale page content after the server reports that the event is
+       * closed. The new GET request renders the generic unavailable page.
+       * @returns {void}
+       */
+      function navigateToClosedEventPage() {
+        resolveFreshEventUrl(function (freshEventUrl) {
+          navigateToFreshEventPage(freshEventUrl);
+        });
+      }
+
+      /**
        * Starts an authoritative post-cancellation refresh immediately. Mutation
        * ownership remains single-flight until fresh data applies or bounded
        * full-page recovery begins; success feedback keeps its minimum duration.
@@ -971,6 +982,12 @@
         google.script.run
           .withSuccessHandler(function (result) {
             if (refreshHandled) return;
+            if (result && result.code === "event_closed") {
+              refreshHandled = true;
+              finishModalMutationRequest(request);
+              navigateToClosedEventPage();
+              return;
+            }
             if (!applyFreshGridDataResult(result)) {
               markRefreshFailed();
               return;
@@ -1034,6 +1051,11 @@
             }
             if (result && result.code === "event_read_only") {
               applyReadOnlyMutationResult(request);
+              return;
+            }
+            if (result && result.code === "event_closed") {
+              finishModalMutationRequest(request);
+              navigateToClosedEventPage();
               return;
             }
             if (result && result.success) {
@@ -1198,6 +1220,11 @@
               return;
             }
             responseHandled = true;
+            if (result && result.code === "event_closed") {
+              finishModalMutationRequest(request);
+              navigateToClosedEventPage();
+              return;
+            }
             var applied = applyFreshGridDataResult(result);
             finishModalMutationRequest(request);
 
@@ -1267,6 +1294,11 @@
             }
             if (result && result.code === "event_read_only") {
               applyReadOnlyMutationResult(request);
+              return;
+            }
+            if (result && result.code === "event_closed") {
+              finishModalMutationRequest(request);
+              navigateToClosedEventPage();
               return;
             }
             if (result && result.success) {

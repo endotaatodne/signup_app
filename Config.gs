@@ -23,7 +23,11 @@ const ROLES = {
  */
 const ROLE_SLOT_DESCRIPTORS = Object.freeze([
   Object.freeze({ key: "general", label: ROLES.general, eventColumnIndex: 8 }),
-  Object.freeze({ key: "classRep", label: ROLES.classRep, eventColumnIndex: 9 }),
+  Object.freeze({
+    key: "classRep",
+    label: ROLES.classRep,
+    eventColumnIndex: 9,
+  }),
   Object.freeze({
     key: "steeringCommittee",
     label: ROLES.steeringCommittee,
@@ -51,6 +55,7 @@ const CONFIG_STATUS_HEADER_ALIASES = ["status"];
 const EVENT_STATUSES = {
   open: "OPEN",
   readOnly: "READ_ONLY",
+  closed: "CLOSED",
 };
 const EVENT_READ_ONLY_MESSAGE =
   "現在、このページは閲覧専用です。登録やキャンセルはできません。";
@@ -160,9 +165,8 @@ function getMasterSheetId_() {
   if (masterSheetIdForExecution_ !== undefined) {
     return masterSheetIdForExecution_;
   }
-  const configuredId = PropertiesService.getScriptProperties().getProperty(
-    "MASTER_SHEET_ID",
-  );
+  const configuredId =
+    PropertiesService.getScriptProperties().getProperty("MASTER_SHEET_ID");
   masterSheetIdForExecution_ = String(configuredId || "").trim() || null;
   return masterSheetIdForExecution_;
 }
@@ -206,7 +210,27 @@ function parseEventStatus_(value) {
     .toUpperCase();
   if (status === EVENT_STATUSES.open) return EVENT_STATUSES.open;
   if (status === EVENT_STATUSES.readOnly) return EVENT_STATUSES.readOnly;
+  if (status === EVENT_STATUSES.closed) return EVENT_STATUSES.closed;
   return null;
+}
+
+/**
+ * Re-reads policy immediately before write admission and confirms that the
+ * alias still targets the expected spreadsheet. A remapped or removed alias
+ * has no admitted status.
+ * @param {*} alias - Event alias supplied with the request.
+ * @param {string} expectedSheetId - Previously resolved event Sheet ID.
+ * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} [masterSpreadsheet]
+ *   Reusable master handle; Config values are still read again.
+ * @returns {?string} The current canonical status for the expected event, or
+ *   `null` when its Config mapping changed or was removed.
+ * @throws {Error} If the Config sheet cannot be read or validated.
+ */
+function getEventWriteStatus_(alias, expectedSheetId, masterSpreadsheet) {
+  const eventSettings =
+    getEventSettings_(masterSpreadsheet)[String(alias || "").toLowerCase()];
+  if (!eventSettings || eventSettings.sheetId !== expectedSheetId) return null;
+  return eventSettings.status;
 }
 
 /**
@@ -220,13 +244,9 @@ function parseEventStatus_(value) {
  * @throws {Error} If the Config sheet cannot be read or validated.
  */
 function isEventOpenForWrite_(alias, expectedSheetId, masterSpreadsheet) {
-  const eventSettings = getEventSettings_(masterSpreadsheet)[
-    String(alias || "").toLowerCase()
-  ];
-  return Boolean(
-    eventSettings &&
-    eventSettings.sheetId === expectedSheetId &&
-    eventSettings.status === EVENT_STATUSES.open,
+  return (
+    getEventWriteStatus_(alias, expectedSheetId, masterSpreadsheet) ===
+    EVENT_STATUSES.open
   );
 }
 
@@ -239,5 +259,17 @@ function getEventReadOnlyResult_() {
     success: false,
     code: "event_read_only",
     message: EVENT_READ_ONLY_MESSAGE,
+  };
+}
+
+/**
+ * Creates the standard failure result returned for closed events.
+ * @returns {{success: boolean, code: string, message: string}} Failure payload.
+ */
+function getEventClosedResult_() {
+  return {
+    success: false,
+    code: "event_closed",
+    message: "現在、このボランティア募集ページはご利用いただけません。",
   };
 }

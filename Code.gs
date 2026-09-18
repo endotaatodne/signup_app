@@ -4,7 +4,7 @@
  * configuration and grid-building globals declared in the other server files,
  * plus HtmlService, SpreadsheetApp, Utilities, and ScriptApp.
  * @author endotaatodne
- * @version 0.2.11
+ * @version 0.2.12
  */
 
 /**
@@ -40,6 +40,12 @@ function doGet(e) {
     if (!sheetId) {
       return HtmlService.createHtmlOutput(
         '<p style="font-family:Arial;padding:20px;">Event not found. Please check your link.</p>',
+      );
+    }
+
+    if (eventSettings.status === EVENT_STATUSES.closed) {
+      return HtmlService.createHtmlOutput(
+        '<p style="font-family:Arial;padding:20px;">現在、このボランティア募集ページはご利用いただけません。</p>',
       );
     }
 

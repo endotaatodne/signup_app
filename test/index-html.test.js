@@ -3729,6 +3729,88 @@ test("stale-slot refresh keeps the global mutation guard until it settles", () =
   assert.equal(deferred.calls.cancel.length, 1);
 });
 
+test("event_closed mutation and stale-slot refresh responses navigate to the unavailable page", () => {
+  function createClosedCase() {
+    const deferred = createDeferredGoogleRun();
+    const topLocation = {
+      href: "",
+      reload() {},
+    };
+    const loaded = loadClient({
+      elements: {
+        honeypot: { ...createElement("input"), value: "" },
+        inputName: { ...createElement("input"), value: "Carol" },
+        inputClass: { ...createElement("input"), value: "2-1" },
+        submitBtn: createElement("button"),
+        modalMessage: createElement("div"),
+        roleButtons: createElement("div"),
+      },
+      windowOverrides: { top: { location: topLocation } },
+      extraGlobals: { google: deferred.google },
+    });
+    loaded.context.PAGE_LOAD_TIME = Date.now() - 4000;
+    loaded.context.currentEventId = 1;
+    loaded.context.currentRole = loaded.exports.ROLE_KEYS[0].label;
+    return { ...loaded, deferred, topLocation };
+  }
+
+  const mutation = createClosedCase();
+  mutation.exports.submitSignup();
+  mutation.deferred.calls.signup[0].succeed({
+    success: false,
+    code: "event_closed",
+  });
+  assert.equal(mutation.topLocation.href, "https://example.com/app?event=test-alias");
+
+  const refresh = createClosedCase();
+  refresh.exports.submitSignup();
+  refresh.deferred.calls.signup[0].succeed({
+    success: false,
+    code: "slot_full",
+    message: "Slot is full.",
+  });
+  refresh.deferred.calls.refresh[0].succeed({
+    success: false,
+    code: "event_closed",
+  });
+  assert.equal(refresh.topLocation.href, "https://example.com/app?event=test-alias");
+});
+
+test("event_closed cancellation refresh navigates to the unavailable page", () => {
+  const deferred = createDeferredGoogleRun();
+  const topLocation = { href: "", reload() {} };
+  const pageHeading = createElement("h1");
+  pageHeading.scrollIntoView = function () {};
+  const { exports: client, context } = loadClient({
+    elements: {
+      cancelSignupList: createElement("div"),
+      cancelMessage: createElement("div"),
+      cancelSubmitBtn: createElement("button"),
+      confirmBox: createElement("div"),
+      confirmYes: createElement("button"),
+      confirmNo: createElement("button"),
+      h1: pageHeading,
+    },
+    windowOverrides: { top: { location: topLocation } },
+    extraGlobals: {
+      google: deferred.google,
+      setTimeout() {
+        return 1;
+      },
+    },
+  });
+  context.currentEventId = 1;
+  client.selectCancelSignup(
+    { name: "Alice", cls: "1-1", role: client.ROLE_KEYS[0].label },
+    createElement("button"),
+  );
+  client.confirmCancel();
+  deferred.calls.cancel[0].succeed({ success: true, message: "Cancelled." });
+  deferred.calls.refresh[0].succeed({ success: false, code: "event_closed" });
+
+  assert.equal(topLocation.href, "https://example.com/app?event=test-alias");
+});
+
 test("desktop reuses the responsive filters and card schedule", () => {
   const htmlSource = getIndexHtmlSource();
 

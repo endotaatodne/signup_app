@@ -123,6 +123,8 @@ https://docs.google.com/spreadsheets/d/YOUR_MASTER_SHEET_ID/edit
 5. URLからSheet IDを確認。
 6. 共有設定を**制限付き**に設定 — 編集できるのは権限を付与した管理者または編集者のみ。
 
+移行互換用として、`SteeringCommitteeSlots`列では旧`CommitteeSlots`および`CommitteeMax`ヘッダーも受け付けます。可能な場合は旧ヘッダーを現在の名称へ変更してください。これらの別名は互換性のためだけで、追加の列ではありません。
+
 ### ステップ3 — ConfigタブへのイベントIDの登録
 
 1. **マスター管理シート** → **Configタブ** を開く
@@ -132,11 +134,11 @@ https://docs.google.com/spreadsheets/d/YOUR_MASTER_SHEET_ID/edit
 | ----------- | ------------------- | ------ |
 | myevent     | YOUR_EVENT_SHEET_ID | OPEN   |
 
-**Status**列に、`OPEN`と`READ_ONLY`のみを含むGoogle Sheetsのプルダウンを設定してください。ConfigタブまたはStatus列を保護し、管理者だけが変更できるようにします。Statusが未入力または不正な場合は、安全のため`READ_ONLY`として扱われます。スケジュールは表示されますが、公開アプリからの申込みとキャンセルは拒否されます。
+**Status**列に、`OPEN`、`READ_ONLY`、`CLOSED`のみを含むGoogle Sheetsのプルダウンを設定してください。ConfigタブまたはStatus列を保護し、管理者だけが変更できるようにします。Statusが未入力または不正な場合は、安全のため`READ_ONLY`として扱われます。スケジュールは表示されますが、公開アプリからの申込みとキャンセルは拒否されます。
 
 ### ステップ4 — Apps Script APIの有効化
 
-[script.google.com/home/usersettings](https://script.google.com/home/usersettings) にアクセスし、**Google Apps Script API** をオンにする。
+[script.google.com/home/usersettings](https://script.google.com/home/usersettings) にアクセスし、**Google Apps Script API** をオンにします。このダッシュボードの切り替えにより、claspなどの認可済みツールがスクリプトとデプロイを管理できるようになります。カスタムGoogle Cloud/OAuth認証情報を使用する場合は、そのCloudプロジェクトでもApps Script APIを有効にしてください。詳しくは[Apps Script API を有効にする](https://developers.google.com/apps-script/api/how-tos/enable)を参照してください。
 
 ### ステップ5 — CLASPのインストール
 
@@ -155,10 +157,10 @@ cd signup_app
 ### ステップ7 — Apps Scriptプロジェクトの作成
 
 ```bash
-clasp create --title "Signup App"
+clasp create-script --title "Signup App"
 ```
 
-`clasp create`を実行すると、リポジトリルートにローカル用の`.clasp.json`が作成されます。このファイルは、`clasp push`や`clasp deploy`が更新するApps Scriptプロジェクトとローカルのチェックアウトをひも付けます。Apps ScriptプロジェクトのスクリプトIDが含まれるため、ローカル専用として扱い、コミットしたり、Issueなどに貼り付けたり、他の人と共有したりしないでください。このリポジトリでは`.clasp.json`を`.gitignore`に含めています。
+`clasp create-script`を実行すると、リポジトリルートにローカル用の`.clasp.json`が作成されます。このファイルは、`clasp push`や`clasp update-deployment`が更新するApps Scriptプロジェクトとローカルのチェックアウトをひも付けます。Apps ScriptプロジェクトのスクリプトIDが含まれるため、ローカル専用として扱い、コミットしたり、Issueなどに貼り付けたり、他の人と共有したりしないでください。このリポジトリでは`.clasp.json`を`.gitignore`に含めています。
 
 新規作成ではなく既存のApps Scriptプロジェクトにこのチェックアウトを接続する場合は、ローカルで`.clasp.json`を作成または更新します。共有する文書には実際のIDを書かず、形式は次の例を参考にします：
 
@@ -206,7 +208,7 @@ const ROLES = {
 clasp push
 ```
 
-このコマンドはローカルの`.clasp.json`を読み取り、どのApps Scriptプロジェクトを更新するかを判断します。ファイルがない場合やスクリプトIDが間違っている場合、`clasp push`は失敗するか、意図しないプロジェクトを更新してしまいます。
+このコマンドはローカルの`.clasp.json`を読み取り、どのApps Scriptプロジェクトを更新するかを判断します。ファイルがない場合やスクリプトIDが間違っている場合、`clasp push`は失敗するか、意図しないプロジェクトを更新してしまいます。[clasp push](https://github.com/google/clasp#push)はリモートのApps Scriptプロジェクト内容全体を置き換えるため、プッシュ前に`clasp show-file-status`を実行して対象ファイルを確認してください。
 
 ### ステップ10 — Webアプリとしてデプロイ
 
@@ -215,7 +217,7 @@ clasp push
 3. 歯車アイコン → **ウェブアプリ** を選択
 4. 以下を設定：
    - **次のユーザーとして実行：** 自分
-   - **アクセスできるユーザー：** 全員
+   - **アクセスできるユーザー：** 全員（匿名ユーザーもログインせずに公開Webアプリを開けます）
 5. **デプロイ** をクリック
 6. 権限の承認を求められたら許可
 7. `/exec` で終わるWebアプリのURLをコピー
@@ -247,7 +249,7 @@ URLのエイリアスはConfigタブの**Event Alias**列と完全に一致し�
 
 日本語の文字を含む名前を入力した場合、半角・全角を含む空白はブラウザとバックエンドの両方で一貫して削除されます。たとえば`山田 太郎`は`山田太郎`として保存されます。日本語の文字を含まない名前では、単語間に正規化された半角スペースが1つ保持されます。
 
-同一スロットへの重複申込み、時間が重なる申込み、および活動ごとの上限を確認する際は、バックエンドが正規化済みの名前からサーバー専用のNFKC識別キーを生成します。このため、全角・半角のラテン文字など、互換上同じ表記は同一の参加者として扱われます。この追加の識別用正規化は、従来の表示・保存時の正規化やブラウザの絞り込みには影響しません。クラスは自由入力の情報として保存・表示され、クラスを変更してもこれらの確認では別の参加者として扱われません。
+同一スロットへの重複申込み、時間が重なる申込み、および活動ごとの上限を確認する際は、バックエンドが正規化済みの名前からサーバー専用のNFKC識別キーを生成します。このため、全角・半角のラテン文字など、互換上同じ表記は同一の参加者として扱われます。この追加の識別用正規化は、従来の表示・保存時の正規化やブラウザの絞り込みには影響しません。クラスは検証される自由入力の情報として保存・表示され、クラスを変更してもこれらの確認では別の参加者として扱われません。
 
 キャンセルでは、まず名前とクラスを厳密に正規化した照合段階を使用します。従来互換およびNFKC互換の照合段階は、一致する行が1件だけの場合に限り採用し、複数行が一致する場合は任意の申込みを削除せず拒否します。成功時には、削除した行の実際の名前と表示用クラスが返されるため、ブラウザはその表示行を直ちに削除できます。古い応答との互換用照合も、一致が1件だけの場合に限定されます。
 
@@ -294,10 +296,11 @@ URLのエイリアスはConfigタブの**Event Alias**列と完全に一致し�
 
 - `OPEN`では、公開アプリからの申込みとキャンセルが可能です。
 - `READ_ONLY`では、スケジュールと既存の申込み情報は表示されますが、新しい申込みとキャンセルの両方が拒否されます。
+- `CLOSED`では、一般的な利用不可ページが返され、イベントシートを開かずにスケジュールの更新、申込み、キャンセルが拒否されます。
 
-Statusはバックエンドで強制され、申込み行の追加または削除の直前にも最新値を確認します。すでにページを開いている利用者もロックを回避できません。ブラウザには閲覧専用の案内が表示され、申込みとキャンセルの操作欄が非表示になります。`OPEN`に戻すと、コードを再デプロイせずにイベントを再開できます。
+`CLOSED`の設定後に開始したすべてのリクエストは、バックエンドで拒否されます。申込みとキャンセルでは書き込み直前にStatusを再確認しますが、管理者による直接編集をその書き込みとアトミックにはできません。最終Status確認の後に`CLOSED`へ変更された場合、すでに処理中のリクエストは完了することがあります。終了前に読み込まれたページは、次のサーバーリクエストまたは再読み込みまで、すでに配信されたデータを保持します。その後のリクエストでは利用不可ページへ移動します。`OPEN`または`READ_ONLY`に戻すと、コードを再デプロイせずにイベントを再開できます。
 
-対応する2つの値だけを含むプルダウンを使用してください。空欄、スペルミス、未対応の値は`READ_ONLY`として扱われ、詳細は非公開ログに記録されます。既存環境へこのバージョンをデプロイする前に、C列へ`Status`ヘッダーを追加し、引き続き書き込み可能にするすべてのイベントを`OPEN`に設定してください。
+対応する3つの値だけを含むプルダウンを使用してください。空欄、スペルミス、未対応の値は`READ_ONLY`として扱われ、詳細は非公開ログに記録されます。既存環境へこのバージョンをデプロイする前に、C列へ`Status`ヘッダーを追加し、引き続き書き込み可能にするすべてのイベントを`OPEN`に設定してください。
 
 ### イベントの削除
 
@@ -379,22 +382,7 @@ const ROLES = {
 
 ### 役割カラーの変更
 
-`Styles.html`の役割カラーCSSを更新：
-
-```css
-.count-general {
-  color: #2e7d32;
-} /* 緑 */
-.count-classrep {
-  color: #f57f17;
-} /* 琥珀 */
-.count-steeringcommittee {
-  color: #1565c0;
-} /* 青 */
-.count-orgcommittee {
-  color: #6a1b9a;
-} /* 紫 */
-```
+`Styles.html`では、対応する役割セレクターファミリーを更新します：`.name-role-*`、`.role-btn-*`、`.modal-submit-*`、`.names-role-label-*`、`.name-chip.name-role-*`、`.mobile-slot-summary-item.role-*`、`.mobile-role-filter-pill.role-*`、`.mobile-overview-role-chip.role-*`、`.desktop-insight-chip.role-*`。各ファミリーには`general`、`classrep`、`steeringcommittee`、`orgcommittee`のバリエーションがあります。前景色、背景色、アクセント色は意図どおりにそろえてください。コンポーネントファミリー間では色合いが異なる場合があります。
 
 ### ボタンテキストの変更
 
@@ -406,12 +394,20 @@ var SIGNUP_BTN_TEXT = "申し込む";
 
 ### タイムゾーンの変更
 
+`appsscript.json`と`Config.gs`の`APP_TIME_ZONE`の両方に、同じIANAタイムゾーン識別子を設定してください。マニフェストはApps Scriptプロジェクトのタイムゾーンを、`APP_TIME_ZONE`はアプリ内の日付表示と時間帯の重なり判定を制御します。
+
 `appsscript.json`：
 
 ```json
 {
   "timeZone": "Asia/Tokyo"
 }
+```
+
+`Config.gs`：
+
+```javascript
+const APP_TIME_ZONE = "Asia/Tokyo";
 ```
 
 タイムゾーン文字列の一覧は[タイムゾーンデータベースの一覧](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)を参照してください。
@@ -424,7 +420,7 @@ var SIGNUP_BTN_TEXT = "申し込む";
 
 ```bash
 clasp push
-clasp deploy --deploymentId YOUR_DEPLOYMENT_ID --description "変更内容の説明"
+clasp update-deployment YOUR_DEPLOYMENT_ID --description "変更内容の説明"
 ```
 
 常に同じデプロイメントIDを使用して、公開URLを変更しないようにしてください。
@@ -434,7 +430,7 @@ clasp deploy --deploymentId YOUR_DEPLOYMENT_ID --description "変更内容の説
 ```json
 {
   "scripts": {
-    "deploy": "clasp push && clasp deploy --deploymentId YOUR_DEPLOYMENT_ID --description \"update\""
+    "deploy": "clasp push && clasp update-deployment YOUR_DEPLOYMENT_ID --description \"update\""
   }
 }
 ```
@@ -455,7 +451,7 @@ npm run deploy
 - `MASTER_SHEET_ID`はスクリプトプロパティに保存
 - `.clasp.json`はApps ScriptプロジェクトのスクリプトIDを含むローカル専用のCLASP設定です。`.gitignore`に含まれており、バージョン管理したり共有したりしないでください
 - Configタブに登録されたSheet IDのみ読み込み可能 — 未登録のSheet IDは拒否
-- イベントのStatusはサーバー側で検証・強制され、未入力または不正な値は`READ_ONLY`として扱われる
+- イベントのStatusはサーバー側で検証・強制され、`CLOSED`ではイベントデータを公開せず、未入力または不正な値は`READ_ONLY`として扱われる
 - シート識別子はサーバーサイドでイベントエイリアスから導出 — クライアントからSheet IDを直接送信しない
 - 入力の文字数と文字種類をクライアント・サーバー両側で検証
 - `eventId`は厳格な正の整数として検証

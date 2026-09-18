@@ -16,7 +16,7 @@ A free, open-source volunteer signup app built on Google Apps Script and Google 
 - Activity-coloured ribbons identify related activities in both vacancy and current-registration detail lists
 - Role-coloured 募集中 chips and activity accents make open slots easy to scan
 - Time ranges displayed per slot/card (e.g. 9:00 am - 10:00 am)
-- Four volunteer roles per slot — General, Class Rep, Steering Committee, Org Committee (fully configurable)
+- Four volunteer roles per slot — General, Class Rep, Steering Committee, Org Committee (fixed role keys with configurable display names)
 - Role-based slot limits — each role has its own quota
 - Optional per-person signup limits for selected activities, configured in Google Sheets
 - Roles with zero quota are hidden automatically
@@ -123,6 +123,8 @@ Add one row for each activity that should have a per-person limit. For example, 
 5. Note the Sheet ID from the URL.
 6. Set sharing to **Restricted** — only authorised administrators or editors should be able to edit this Sheet
 
+For migration only, the `SteeringCommitteeSlots` column also accepts the legacy `CommitteeSlots` and `CommitteeMax` headers. Rename legacy headers to the current name when practical; the aliases are compatibility support, not additional columns.
+
 ### Step 3 — Register the Event in the Config Tab
 
 1. Open your **Master Admin Sheet** → **Config tab**
@@ -132,11 +134,11 @@ Add one row for each activity that should have a per-person limit. For example, 
 | ----------- | ------------------- | ------ |
 | myevent     | YOUR_EVENT_SHEET_ID | OPEN   |
 
-Set a Google Sheets dropdown on the **Status** column with the exact values `OPEN` and `READ_ONLY`. Protect the Config tab or Status column so only administrators can change it. A missing or invalid Status fails closed to `READ_ONLY`: the schedule remains visible, but public signup and cancellation requests are rejected.
+Set a Google Sheets dropdown on the **Status** column with the exact values `OPEN`, `READ_ONLY`, and `CLOSED`. Protect the Config tab or Status column so only administrators can change it. A missing or invalid Status fails closed to `READ_ONLY`: the schedule remains visible, but public signup and cancellation requests are rejected.
 
 ### Step 4 — Enable Apps Script API
 
-Go to [script.google.com/home/usersettings](https://script.google.com/home/usersettings) and turn on **Google Apps Script API**.
+Go to [script.google.com/home/usersettings](https://script.google.com/home/usersettings) and turn on **Google Apps Script API**. This dashboard toggle lets authorised tools such as clasp manage scripts and deployments. If you use custom Google Cloud/OAuth credentials, also enable the Apps Script API in that Cloud project; see [Enable the Apps Script API](https://developers.google.com/apps-script/api/how-tos/enable).
 
 ### Step 5 — Install CLASP
 
@@ -155,10 +157,10 @@ cd signup_app
 ### Step 7 — Create an Apps Script Project
 
 ```bash
-clasp create --title "Signup App"
+clasp create-script --title "Signup App"
 ```
 
-`clasp create` creates a local `.clasp.json` file in the repository root. This file binds your local checkout to the Apps Script project that `clasp push` and `clasp deploy` will update. It contains the Apps Script project script ID, so keep it local only: do not commit it, paste it into issues, or share it with others. This repository already lists `.clasp.json` in `.gitignore`.
+`clasp create-script` creates a local `.clasp.json` file in the repository root. This file binds your local checkout to the Apps Script project that `clasp push` and `clasp update-deployment` will update. It contains the Apps Script project script ID, so keep it local only: do not commit it, paste it into issues, or share it with others. This repository already lists `.clasp.json` in `.gitignore`.
 
 If you need to connect this checkout to an existing Apps Script project instead of creating a new one, create or update `.clasp.json` locally with placeholders like this:
 
@@ -206,7 +208,7 @@ The keys (`general`, `classRep`, `steeringCommittee`, `orgCommittee`) must stay 
 clasp push
 ```
 
-This command reads the local `.clasp.json` file to decide which Apps Script project to update. If the file is missing or points to the wrong script ID, `clasp push` will fail or update the wrong project.
+This command reads the local `.clasp.json` file to decide which Apps Script project to update. If the file is missing or points to the wrong script ID, `clasp push` will fail or update the wrong project. [clasp push](https://github.com/google/clasp#push) replaces the entire remote Apps Script project content, so run `clasp show-file-status` and inspect the push set before pushing.
 
 ### Step 10 — Deploy as a Web App
 
@@ -215,7 +217,7 @@ This command reads the local `.clasp.json` file to decide which Apps Script proj
 3. Click the gear icon → select **Web App**
 4. Set:
    - **Execute as:** Me
-   - **Who has access:** Anyone
+   - **Who has access:** Anyone (anonymous users can open the public web app without signing in)
 5. Click **Deploy**
 6. Authorise the requested permissions when prompted
 7. Copy the web app URL ending in `/exec`
@@ -247,7 +249,7 @@ Visiting the URL without a parameter shows a friendly "No event specified" messa
 
 When a name containing Japanese characters is submitted, spaces (including full-width spaces) are removed consistently by both the browser and backend. For example, `山田 太郎` is stored as `山田太郎`. Names without Japanese characters keep a single normalised space between words.
 
-For duplicate, overlapping-time, and activity-limit checks, the backend derives a server-only NFKC identity key from the participant's normalised name. Compatibility-equivalent forms, such as full-width and half-width Latin text, therefore identify the same participant. This extra identity folding does not change the app's existing display/storage normalisation or browser filtering. Class remains free-text information stored and displayed with the signup, and changing it does not create a separate participant for these checks.
+For duplicate, overlapping-time, and activity-limit checks, the backend derives a server-only NFKC identity key from the participant's normalised name. Compatibility-equivalent forms, such as full-width and half-width Latin text, therefore identify the same participant. This extra identity folding does not change the app's existing display/storage normalisation or browser filtering. Class is validated free-text information stored and displayed with the signup, and changing it does not create a separate participant for these checks.
 
 Cancellation checks the exact normalised name/class tier first. Legacy and NFKC compatibility tiers are accepted only when exactly one row matches; an ambiguous tier is rejected instead of deleting an arbitrary signup. A successful response returns the deleted row's actual name and displayed class so the browser can remove that exact visible row immediately, with a unique-only legacy fallback for older payloads.
 
@@ -294,10 +296,11 @@ In the Master Admin Sheet's **Config tab**, change the event's **Status** value:
 
 - `OPEN` allows public signup and cancellation.
 - `READ_ONLY` keeps the schedule and existing signup information visible, but blocks both new signups and cancellations.
+- `CLOSED` returns a generic unavailable page and denies schedule refresh, signup, and cancellation without opening the event Sheet.
 
-The status is enforced by the backend, including a fresh check immediately before adding or deleting a signup row. People with an already-open page cannot bypass the lock. The browser also displays a read-only banner and removes the signup and cancellation controls. Changing the value back to `OPEN` reopens the event without a code deployment.
+Every request that begins after `CLOSED` is set is denied by the backend. Signup and cancellation reread Status immediately before writing, but a direct administrator edit cannot be atomic with that write: an already in-flight request may finish if `CLOSED` is set after its final Status check. A page loaded before closure retains data already delivered until its next server request or reload; that later request navigates to the unavailable page. Changing the value back to `OPEN` or `READ_ONLY` reopens the event without a code deployment.
 
-Use a dropdown containing only the two supported values. Blank, misspelled, or unsupported values are treated as `READ_ONLY` and logged privately. Before deploying this version over an existing installation, add the `Status` header in column C and set every event that should remain writable to `OPEN`.
+Use a dropdown containing only the three supported values. Blank, misspelled, or unsupported values are treated as `READ_ONLY` and logged privately. Before deploying this version over an existing installation, add the `Status` header in column C and set every event that should remain writable to `OPEN`.
 
 ### Removing Events
 
@@ -379,22 +382,7 @@ The keys (`general`, `classRep`, `steeringCommittee`, `orgCommittee`) must stay 
 
 ### Changing Role Colours
 
-In `Styles.html`, find and update the role colour CSS:
-
-```css
-.count-general {
-  color: #2e7d32;
-} /* green */
-.count-classrep {
-  color: #f57f17;
-} /* amber */
-.count-steeringcommittee {
-  color: #1565c0;
-} /* blue  */
-.count-orgcommittee {
-  color: #6a1b9a;
-} /* purple */
-```
+In `Styles.html`, update the matching role selector families: `.name-role-*`, `.role-btn-*`, `.modal-submit-*`, `.names-role-label-*`, `.name-chip.name-role-*`, `.mobile-slot-summary-item.role-*`, `.mobile-role-filter-pill.role-*`, `.mobile-overview-role-chip.role-*`, and `.desktop-insight-chip.role-*`. Each family has `general`, `classrep`, `steeringcommittee`, and `orgcommittee` variants. Keep the foreground, background, and accent shades aligned as intended; they can differ between component families.
 
 ### Changing the Button Text
 
@@ -406,12 +394,20 @@ var SIGNUP_BTN_TEXT = "Your Text Here";
 
 ### Changing the Timezone
 
+Set the same IANA timezone identifier in both `appsscript.json` and `Config.gs` (`APP_TIME_ZONE`). The manifest controls the Apps Script project timezone, while `APP_TIME_ZONE` controls application date formatting and overlap checks.
+
 In `appsscript.json`:
 
 ```json
 {
   "timeZone": "Australia/Brisbane"
 }
+```
+
+In `Config.gs`:
+
+```javascript
+const APP_TIME_ZONE = "Australia/Brisbane";
 ```
 
 A full list of timezone strings is available at [List of tz database time zones](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones).
@@ -424,7 +420,7 @@ After editing code locally:
 
 ```bash
 clasp push
-clasp deploy --deploymentId YOUR_DEPLOYMENT_ID --description "describe what changed"
+clasp update-deployment YOUR_DEPLOYMENT_ID --description "describe what changed"
 ```
 
 Always use the same deployment ID to keep the same public URL.
@@ -434,7 +430,7 @@ For convenience, add this to `package.json`:
 ```json
 {
   "scripts": {
-    "deploy": "clasp push && clasp deploy --deploymentId YOUR_DEPLOYMENT_ID --description \"update\""
+    "deploy": "clasp push && clasp update-deployment YOUR_DEPLOYMENT_ID --description \"update\""
   }
 }
 ```
@@ -455,7 +451,7 @@ npm run deploy
 - `MASTER_SHEET_ID` is stored in Script Properties
 - `.clasp.json` is local-only CLASP configuration containing the Apps Script project script ID; it is included in `.gitignore` and should not be version controlled or shared
 - Only Sheet IDs registered in the Config tab can be loaded — arbitrary Sheet IDs are rejected
-- Event Status is validated and enforced server-side; missing or invalid values default to `READ_ONLY`
+- Event Status is validated and enforced server-side; `CLOSED` exposes no event data, while missing or invalid values default to `READ_ONLY`
 - The sheet identifier is derived server-side from the event alias — clients never supply a sheet ID directly
 - Input length and characters are validated both client-side and server-side
 - `eventId` is validated as a strict positive integer before use
