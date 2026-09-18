@@ -286,7 +286,7 @@
       }
       .name-chip-class {
         color: #888;
-        /* TEXT_SIZE: [POP-UP] Desktop class text inside name chips */
+        /* TEXT_SIZE: [POP-UP] Class text inside name chips */
         font-size: 11px;
       }
       .modal-full-message {
@@ -597,19 +597,6 @@
         margin-top: 8px;
         line-height: 1.5;
       }
-      /*
-      .mobile-slot-badge {
-        flex-shrink: 0;
-        font-size: 14px;
-        font-weight: 700;
-        border-radius: 999px;
-        padding: 8px 14px;
-        white-space: nowrap;
-        background: #16a34a;
-        color: #ffffff;
-        box-shadow: 0 2px 6px rgba(234, 182, 60, 0.2);
-      }
-*/
       .mobile-slot-badge.is-full {
         background: #d64545;
         color: #ffffff;
@@ -1207,11 +1194,7 @@
         display: block !important;
       }
 
-      /* --- Mobile agenda cards ---
-         Goal: ~5 cards visible at once, big legible text.
-         Each card is ~100-110px tall on a 390px-wide phone.
-         We achieve this by hiding the role-pills row and showing
-         a compact single-line summary instead.               */
+      /* --- Mobile agenda cards: compact summaries keep the card content scannable. --- */
 
       body.compact-layout .mobile-time-group {
         margin-bottom: 20px;
@@ -1343,7 +1326,7 @@
       }
 
       body.compact-layout .modal-subtitle {
-        /* TEXT_SIZE: [POP-UP] Mobile modal subtitle (e.g. "9:00 am - 10:00 am” Gymnasium") */
+        /* TEXT_SIZE: [POP-UP] Mobile modal subtitle (e.g. "9:00 am - 10:00 am — Gymnasium") */
         font-size: 30px;
         line-height: 1.55;
         text-align: center;
@@ -1498,7 +1481,7 @@
         font-size: 16px;
         font-weight: 600;
       }
-      /* TEXT_SIZE: [POP-UP] Mobile form inputs (name, class e.g. "åå‰", "ã‚¯ãƒ©ã‚¹" fields) */
+      /* TEXT_SIZE: [POP-UP] Mobile form inputs (name and class fields) */
       body.compact-layout input,
       body.compact-layout select,
       body.compact-layout textarea {

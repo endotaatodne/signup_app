@@ -112,6 +112,9 @@ function getGridDataForAlias(alias) {
     if (!sheetId) {
       return { success: false, message: "不正なリクエストです。" };
     }
+    if (eventSettings.status === EVENT_STATUSES.closed) {
+      return getEventClosedResult_();
+    }
 
     const spreadsheet = SpreadsheetApp.openById(sheetId);
     return {

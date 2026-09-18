@@ -113,7 +113,7 @@ function selectCancellationMatch_(candidates, name, cls) {
  * Converts an Events row into a timezone-aware date and minute range.
  * @param {Array<*>} eventRow - Validated Events row with date/start/end cells.
  * @returns {{dateKey: string, startMinutes: number, endMinutes: number}}
- *   Brisbane date key and minutes after midnight.
+ *   Date key in the configured application timezone and minutes after midnight.
  * @throws {Error} If Apps Script cannot format a supplied date/time value.
  */
 function getEventRange_(eventRow) {
@@ -289,6 +289,9 @@ function submitSignup(eventId, name, cls, role, alias) {
     const sheetId = eventSettings && eventSettings.sheetId;
     if (!sheetId) {
       return { success: false, message: "不正なリクエストです。" };
+    }
+    if (eventSettings.status === EVENT_STATUSES.closed) {
+      return getEventClosedResult_();
     }
     if (eventSettings.status !== EVENT_STATUSES.open) {
       return getEventReadOnlyResult_();
@@ -478,7 +481,15 @@ function submitSignup(eventId, name, cls, role, alias) {
 
     // Re-read the policy immediately before writing so an already-open page,
     // or a request that began while the event was open, cannot bypass a lock.
-    if (!isEventOpenForWrite_(alias, sheetId, masterSpreadsheet)) {
+    const finalStatus = getEventWriteStatus_(
+      alias,
+      sheetId,
+      masterSpreadsheet,
+    );
+    if (finalStatus === EVENT_STATUSES.closed) {
+      return getEventClosedResult_();
+    }
+    if (finalStatus !== EVENT_STATUSES.open) {
       return getEventReadOnlyResult_();
     }
 
@@ -580,6 +591,9 @@ function cancelSignup(eventId, name, cls, role, alias) {
     if (!sheetId) {
       return { success: false, message: "不正なリクエストです。" };
     }
+    if (eventSettings.status === EVENT_STATUSES.closed) {
+      return getEventClosedResult_();
+    }
     if (eventSettings.status !== EVENT_STATUSES.open) {
       return getEventReadOnlyResult_();
     }
@@ -665,7 +679,15 @@ function cancelSignup(eventId, name, cls, role, alias) {
 
     // Re-read the policy immediately before deleting for the same reason as
     // the final check in submitSignup.
-    if (!isEventOpenForWrite_(alias, sheetId, masterSpreadsheet)) {
+    const finalStatus = getEventWriteStatus_(
+      alias,
+      sheetId,
+      masterSpreadsheet,
+    );
+    if (finalStatus === EVENT_STATUSES.closed) {
+      return getEventClosedResult_();
+    }
+    if (finalStatus !== EVENT_STATUSES.open) {
       return getEventReadOnlyResult_();
     }
 

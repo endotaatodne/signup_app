@@ -86,6 +86,7 @@ function loadIndexHtml(exportsList, options = {}) {
       orgCommittee: "実行委員",
     },
     title = "Test Event",
+    appVersion = "0.2.12",
     globals = {},
   } = options;
 
@@ -96,7 +97,8 @@ function loadIndexHtml(exportsList, options = {}) {
       .replace(/<\?!= alias \?>/g, encodeBase64(alias))
       .replace(/<\?!= eventStatus \?>/g, encodeBase64(eventStatus))
       .replace(/<\?!= roles \?>/g, encodeBase64(JSON.stringify(roles)))
-      .replace(/<\?!= title \?>/g, encodeBase64(title)),
+      .replace(/<\?!= title \?>/g, encodeBase64(title))
+      .replace(/<\?!= appVersion \?>/g, encodeBase64(appVersion)),
   );
 
   const context = {

@@ -4,7 +4,7 @@
  * configuration and grid-building globals declared in the other server files,
  * plus HtmlService, SpreadsheetApp, Utilities, and ScriptApp.
  * @author endotaatodne
- * @version 0.2.11
+ * @version 0.2.12
  */
 
 /**
@@ -43,6 +43,12 @@ function doGet(e) {
       );
     }
 
+    if (eventSettings.status === EVENT_STATUSES.closed) {
+      return HtmlService.createHtmlOutput(
+        '<p style="font-family:Arial;padding:20px;">現在、このボランティア募集ページはご利用いただけません。</p>',
+      );
+    }
+
     const spreadsheet = SpreadsheetApp.openById(sheetId);
     const title = spreadsheet.getName();
     const gridData = JSON.stringify(getGridData_(spreadsheet));
@@ -62,6 +68,10 @@ function doGet(e) {
       Utilities.Charset.UTF_8,
     );
     const encodedTitle = Utilities.base64Encode(title, Utilities.Charset.UTF_8);
+    const encodedAppVersion = Utilities.base64Encode(
+      APP_VERSION,
+      Utilities.Charset.UTF_8,
+    );
 
     const template = HtmlService.createTemplateFromFile("index");
     template.gridData = encodedGridData;
@@ -69,6 +79,7 @@ function doGet(e) {
     template.eventStatus = encodedEventStatus;
     template.roles = encodedRoles;
     template.title = encodedTitle;
+    template.appVersion = encodedAppVersion;
 
     return template.evaluate().setTitle(title);
   } catch (err) {
