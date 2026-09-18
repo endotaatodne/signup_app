@@ -238,6 +238,7 @@ function createHtmlService() {
             eventStatus: this.eventStatus,
             roles: this.roles,
             titleData: this.title,
+            appVersion: this.appVersion,
             setTitle(title) {
               this.title = title;
               return this;

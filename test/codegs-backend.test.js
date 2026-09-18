@@ -303,6 +303,9 @@ test("doGet returns rendered template output for a valid alias", () => {
   const decodedEventStatus = Buffer.from(result.eventStatus, "base64").toString(
     "utf8",
   );
+  const decodedAppVersion = Buffer.from(result.appVersion, "base64").toString(
+    "utf8",
+  );
   const decodedGridData = JSON.parse(
     Buffer.from(result.gridData, "base64").toString("utf8"),
   );
@@ -312,6 +315,7 @@ test("doGet returns rendered template output for a valid alias", () => {
   assert.equal(decodedTitle, "Spring Fete");
   assert.equal(decodedAlias, "Spring-Fete");
   assert.equal(decodedEventStatus, "OPEN");
+  assert.equal(decodedAppVersion, "0.2.12");
   assert.equal(decodedGridData.events[0].activity, "Hall Monitor");
 });
 
@@ -348,6 +352,7 @@ test("doGet returns an unavailable page for CLOSED without opening the event She
     result.content,
     /現在、このボランティア募集ページはご利用いただけません。/,
   );
+  assert.ok(!("appVersion" in result));
   assert.equal(serviceCalls.spreadsheetOpenByIdById[EVENT_SHEET_ID] || 0, 0);
 });
 

@@ -91,6 +91,7 @@ const SIGNUP_HEADER_ALIASES = [
 ];
 
 const APP_TIME_ZONE = "Australia/Brisbane";
+const APP_VERSION = "0.2.12";
 
 /**
  * Freshly reads Config into a case-normalised event-settings map on every call.

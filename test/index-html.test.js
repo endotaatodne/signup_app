@@ -312,6 +312,7 @@ function loadClient(options = {}) {
       activities: ["Hall Monitor", "Library Desk"],
     },
     eventStatus = "OPEN",
+    appVersion = "0.2.12",
     elements = {},
     windowOverrides = {},
     extraGlobals = {},
@@ -425,6 +426,7 @@ function loadClient(options = {}) {
     {
       gridData,
       eventStatus,
+      appVersion,
       globals: {
         window,
         document,
@@ -453,6 +455,25 @@ test("server template data is injected only as quoted base64 values", () => {
   );
   assert.match(htmlSource, /JSON\.parse\(b64decode\("<\?!= roles \?>"\)\)/);
   assert.match(htmlSource, /var PAGE_TITLE = b64decode\("<\?!= title \?>"\);/);
+  assert.match(
+    htmlSource,
+    /var APP_VERSION = b64decode\("<\?!= appVersion \?>"\);/,
+  );
+  const composedHtmlSource = getIndexHtmlSource();
+  assert.match(
+    composedHtmlSource,
+    /id="appVersionFooter"[\s\S]*?textContent\s*=\s*[\s\S]*?APP_VERSION/,
+  );
+});
+
+test("client initialization renders the injected version in the footer as text", () => {
+  const appVersionFooter = createElement("span");
+  loadClient({
+    appVersion: "9.8.7-test",
+    elements: { appVersionFooter },
+  });
+
+  assert.equal(appVersionFooter.textContent, " · v9.8.7-test");
 });
 
 test("index.html composes every static partial in dependency order", () => {

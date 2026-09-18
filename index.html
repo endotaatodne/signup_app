@@ -16,6 +16,18 @@
 <!-- Primary schedule and modal markup. -->
 <?!= include_("Schedule"); ?>
 <?!= include_("SignupModal"); ?>
+    <div
+      style="margin-top: 2rem; font-size: 12px; color: #888; text-align: center"
+    >
+      <a
+        href="https://github.com/endotaatodne/signup_app"
+        target="_blank"
+        rel="noopener noreferrer"
+        style="color: #888"
+        >このアプリについて</a
+      >
+      <span id="appVersionFooter"></span>
+    </div>
     <script>
       /**
        * Decodes a Base64-encoded UTF-8 value supplied by the server template.
@@ -44,6 +56,7 @@
       var eventStatus = b64decode("<?!= eventStatus ?>");
       var ROLES = JSON.parse(b64decode("<?!= roles ?>"));
       var PAGE_TITLE = b64decode("<?!= title ?>");
+      var APP_VERSION = b64decode("<?!= appVersion ?>");
       var currentEventId = null;
       var currentRole = null;
       var currentCancelSignup = null;
@@ -72,17 +85,5 @@
 <?!= include_("ClientFormatting"); ?>
 <?!= include_("ClientModal"); ?>
 <?!= include_("ClientInit"); ?>
-
-    <div
-      style="margin-top: 2rem; font-size: 12px; color: #888; text-align: center"
-    >
-      <a
-        href="https://github.com/endotaatodne/signup_app"
-        target="_blank"
-        rel="noopener noreferrer"
-        style="color: #888"
-        >このアプリについて</a
-      >
-    </div>
   </body>
 </html>

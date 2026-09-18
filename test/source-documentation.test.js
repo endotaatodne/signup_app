@@ -180,3 +180,29 @@ test("README timezone guidance documents both timezone configuration locations",
     });
   });
 });
+
+test("live version metadata and the current changelog release stay synchronized", () => {
+  const configSource = readProductionFile("Config.gs");
+  const codeSource = readProductionFile("Code.gs");
+  const packageMetadata = JSON.parse(readProductionFile("package.json"));
+  const lockMetadata = JSON.parse(readProductionFile("package-lock.json"));
+  const changelog = readProductionFile("CHANGELOG.md");
+  const appVersionMatch = configSource.match(
+    /^const APP_VERSION = "([0-9]+\.[0-9]+\.[0-9]+)";$/m,
+  );
+  const codeVersionMatch = codeSource.match(/^ \* @version ([0-9]+\.[0-9]+\.[0-9]+)$/m);
+  const changelogVersionMatch = changelog.match(
+    /^## v([0-9]+\.[0-9]+\.[0-9]+) - /m,
+  );
+
+  assert.ok(appVersionMatch, "Config.gs must declare APP_VERSION");
+  assert.ok(codeVersionMatch, "Code.gs must declare its @version");
+  assert.ok(changelogVersionMatch, "CHANGELOG.md must have a release heading");
+  [
+    packageMetadata.version,
+    lockMetadata.version,
+    lockMetadata.packages[""].version,
+    codeVersionMatch[1],
+    changelogVersionMatch[1],
+  ].forEach((version) => assert.equal(version, appVersionMatch[1]));
+});
